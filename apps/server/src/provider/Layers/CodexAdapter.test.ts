@@ -47,7 +47,8 @@ import {
   type CodexSessionRuntimeShape,
   type CodexThreadSnapshot,
 } from "./CodexSessionRuntime.ts";
-import { classifyCodexBrokerFailure, makeCodexAdapter } from "./CodexAdapter.ts";
+import { makeCodexAdapter } from "./CodexAdapter.ts";
+import { classifyCodexBrokerFailure } from "./CodexBrokerAuth.ts";
 import type { CodexBrokerIntegration, CodexBrokerSession } from "./CodexBrokerAuth.ts";
 import type { CodexBrokerLease } from "./CodexBrokerClient.ts";
 const decodeCodexSettings = Schema.decodeSync(CodexSettings);
@@ -281,6 +282,7 @@ it.effect("rotates runtimes and resumes after a broker-account failure", () =>
       instanceId: "instance",
       client: { health: Effect.void, route: () => Effect.die("unused") },
       acquireEphemeralAuth: () => Effect.die("unused"),
+      newEphemeralSession: () => Effect.die("unused"),
       newInteractiveSession: () => Effect.succeed(brokerSession),
     };
     const adapter = yield* makeCodexAdapter(decodeCodexSettings({}), {

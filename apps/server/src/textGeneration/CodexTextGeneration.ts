@@ -1,3 +1,6 @@
+import * as NodeCrypto from "node:crypto";
+
+import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
@@ -6,6 +9,8 @@ import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
+import type * as CodexClient from "effect-codex-app-server/client";
+import * as EffectCodexSchema from "effect-codex-app-server/schema";
 
 import {
   type CodexSettings,
@@ -36,9 +41,30 @@ import {
 } from "./TextGenerationUtils.ts";
 import { getModelSelectionStringOptionValue } from "@t3tools/shared/model";
 import { getCodexServiceTierOptionValue } from "../codexModelOptions.ts";
+import {
+  authenticateCodexAppServer,
+  classifyCodexBrokerFailure,
+  type CodexBrokerIntegration,
+} from "../provider/Layers/CodexBrokerAuth.ts";
+import { withCodexAppServerClient } from "../provider/Layers/CodexProvider.ts";
 
 const CODEX_TIMEOUT_MS = 180_000;
 const encodeJsonString = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
+
+interface CodexTextGenerationOptions {
+  readonly withAppServerClient?: (input: {
+    readonly binaryPath: string;
+    readonly homePath?: string | undefined;
+    readonly launchArgs?: string | undefined;
+    readonly cwd: string;
+    readonly environment?: NodeJS.ProcessEnv | undefined;
+  }) => Effect.Effect<
+    { readonly client: CodexClient.CodexAppServerClient["Service"] },
+    unknown,
+    Scope.Scope
+  >;
+}
+
 /**
  * Build a Codex text-generation closure bound to a specific `CodexSettings`
  * payload. See `makeCodexAdapter` for the overall per-instance rationale.
@@ -46,6 +72,8 @@ const encodeJsonString = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknow
 export const makeCodexTextGeneration = Effect.fn("makeCodexTextGeneration")(function* (
   codexConfig: CodexSettings,
   environment?: NodeJS.ProcessEnv,
+  brokerIntegration?: CodexBrokerIntegration,
+  options?: CodexTextGenerationOptions,
 ) {
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -149,6 +177,197 @@ export const makeCodexTextGeneration = Effect.fn("makeCodexTextGeneration")(func
     return { imagePaths };
   });
 
+  const runBrokeredCodexJson = Effect.fn("runBrokeredCodexJson")(function* <S extends Schema.Top>({
+    operation,
+    cwd,
+    prompt,
+    outputSchemaJson,
+    imagePaths,
+    modelSelection,
+  }: {
+    operation:
+      | "generateCommitMessage"
+      | "generatePrContent"
+      | "generateBranchName"
+      | "generateThreadTitle";
+    cwd: string;
+    prompt: string;
+    outputSchemaJson: S;
+    imagePaths: ReadonlyArray<string>;
+    modelSelection: ModelSelection;
+  }): Effect.fn.Return<S["Type"], TextGenerationError, S["DecodingServices"] | Scope.Scope> {
+    if (!brokerIntegration) {
+      return yield* new TextGenerationError({
+        operation,
+        detail: "Codex Broker is not configured.",
+      });
+    }
+    const brokerTurnId = NodeCrypto.randomUUID();
+    const brokerSession = yield* brokerIntegration
+      .newEphemeralSession(operation, brokerTurnId)
+      .pipe(
+        Effect.mapError(
+          (cause) =>
+            new TextGenerationError({
+              operation,
+              detail: `Codex Broker request failed: ${cause.message}`,
+              cause,
+            }),
+        ),
+      );
+    const reasoningEffort =
+      getModelSelectionStringOptionValue(modelSelection, "reasoningEffort") ??
+      DEFAULT_TEXT_GENERATION_REASONING_EFFORT;
+    const serviceTier = getCodexServiceTierOptionValue(modelSelection);
+    const outputSchema = toJsonSchemaObject(outputSchemaJson);
+
+    const runAttempt = Effect.fn("runBrokeredCodexJson.attempt")(function* () {
+      const completed = yield* Deferred.make<EffectCodexSchema.V2TurnCompletedNotification>();
+      let providerThreadId: string | undefined;
+      let providerTurnId: string | undefined;
+      let output: string | undefined;
+      let failureKind: ReturnType<typeof classifyCodexBrokerFailure>;
+      const openAppServer = options?.withAppServerClient ?? withCodexAppServerClient;
+      const { client } = yield* openAppServer({
+        binaryPath: codexConfig.binaryPath || "codex",
+        homePath: codexConfig.homePath,
+        launchArgs: resolveCodexLaunchArgs(codexConfig.launchArgs, resolvedEnvironment),
+        cwd,
+        environment: resolvedEnvironment,
+      });
+      yield* authenticateCodexAppServer(client, brokerSession);
+      yield* client.handleServerNotification("item/completed", (payload) =>
+        Effect.sync(() => {
+          if (
+            (providerThreadId === undefined || payload.threadId === providerThreadId) &&
+            (providerTurnId === undefined || payload.turnId === providerTurnId) &&
+            payload.item.type === "agentMessage"
+          ) {
+            output = payload.item.text;
+          }
+        }),
+      );
+      yield* client.handleServerNotification("error", (payload) =>
+        Effect.sync(() => {
+          if (
+            (providerThreadId === undefined || payload.threadId === providerThreadId) &&
+            (providerTurnId === undefined || payload.turnId === providerTurnId) &&
+            !payload.willRetry
+          ) {
+            failureKind = classifyCodexBrokerFailure(payload);
+          }
+        }),
+      );
+      yield* client.handleServerNotification("turn/completed", (payload) =>
+        (providerThreadId === undefined || payload.threadId === providerThreadId) &&
+        (providerTurnId === undefined || payload.turn.id === providerTurnId)
+          ? Deferred.succeed(completed, payload).pipe(Effect.asVoid)
+          : Effect.void,
+      );
+
+      const thread = yield* client.request("thread/start", {
+        cwd,
+        ephemeral: true,
+        approvalPolicy: "never",
+        sandbox: "read-only",
+        model: modelSelection.model,
+        ...(serviceTier ? { serviceTier } : {}),
+      });
+      providerThreadId = thread.thread.id;
+      const turn = yield* client.request("turn/start", {
+        threadId: providerThreadId,
+        input: [
+          { type: "text", text: prompt },
+          ...imagePaths.map((path) => ({ type: "localImage" as const, path })),
+        ],
+        model: modelSelection.model,
+        effort: reasoningEffort,
+        ...(serviceTier ? { serviceTier } : {}),
+        approvalPolicy: "never",
+        sandboxPolicy: { type: "readOnly" },
+        outputSchema,
+      });
+      providerTurnId = turn.turn.id;
+      const result = yield* Deferred.await(completed);
+      if (result.threadId !== providerThreadId || result.turn.id !== providerTurnId) {
+        return yield* new TextGenerationError({
+          operation,
+          detail: "Codex App Server returned a mismatched turn.",
+        });
+      }
+      if (result.turn.status !== "completed") {
+        if (failureKind) return { failureKind } as const;
+        return yield* new TextGenerationError({
+          operation,
+          detail: "Codex App Server text generation failed.",
+        });
+      }
+      if (output === undefined) {
+        return yield* new TextGenerationError({
+          operation,
+          detail: "Codex App Server returned no final message.",
+        });
+      }
+      return { output } as const;
+    });
+
+    const generate = Effect.gen(function* () {
+      for (let attempt = 0; attempt < 32; attempt += 1) {
+        const result = yield* runAttempt().pipe(
+          Effect.scoped,
+          Effect.mapError((cause) =>
+            cause instanceof TextGenerationError
+              ? cause
+              : new TextGenerationError({
+                  operation,
+                  detail: "Codex App Server text generation failed.",
+                  cause,
+                }),
+          ),
+        );
+        if ("output" in result) {
+          return yield* Schema.decodeEffect(Schema.fromJsonString(outputSchemaJson))(
+            result.output,
+          ).pipe(
+            Effect.mapError(
+              (cause) =>
+                new TextGenerationError({
+                  operation,
+                  detail: "Codex returned invalid structured output.",
+                  cause,
+                }),
+            ),
+          );
+        }
+        yield* brokerSession.reportTerminalFailure(brokerTurnId, result.failureKind).pipe(
+          Effect.mapError(
+            (cause) =>
+              new TextGenerationError({
+                operation,
+                detail: `Codex Broker recovery failed: ${cause.message}`,
+                cause,
+              }),
+          ),
+        );
+      }
+      return yield* new TextGenerationError({
+        operation,
+        detail: "Codex Broker recovery attempt limit reached.",
+      });
+    });
+
+    return yield* generate.pipe(
+      Effect.timeoutOption(CODEX_TIMEOUT_MS),
+      Effect.flatMap(
+        Option.match({
+          onNone: () =>
+            Effect.fail(new TextGenerationError({ operation, detail: "Codex request timed out." })),
+          onSome: Effect.succeed,
+        }),
+      ),
+    );
+  });
+
   const runCodexJson = Effect.fn("runCodexJson")(function* <S extends Schema.Top>({
     operation,
     cwd,
@@ -170,6 +389,17 @@ export const makeCodexTextGeneration = Effect.fn("makeCodexTextGeneration")(func
     cleanupPaths?: ReadonlyArray<string>;
     modelSelection: ModelSelection;
   }): Effect.fn.Return<S["Type"], TextGenerationError, S["DecodingServices"]> {
+    if (brokerIntegration) {
+      return yield* runBrokeredCodexJson({
+        operation,
+        cwd,
+        prompt,
+        outputSchemaJson,
+        imagePaths,
+        modelSelection,
+      });
+    }
+
     const schemaJson = yield* encodeJsonForOperation(
       operation,
       toJsonSchemaObject(outputSchemaJson),

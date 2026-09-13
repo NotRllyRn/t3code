@@ -62,6 +62,7 @@ import {
 import { type CodexAdapterShape } from "../Services/CodexAdapter.ts";
 import { resolveAttachmentPath } from "../../attachmentStore.ts";
 import { ServerConfig } from "../../config.ts";
+import { classifyCodexBrokerFailure } from "./CodexBrokerAuth.ts";
 import type {
   CodexBrokerFailureKind,
   CodexBrokerSession,
@@ -156,34 +157,6 @@ interface CodexTurnTokenUsageState {
   baseline: CodexCumulativeTokenUsage | undefined;
   activeTurnId: string | undefined;
   readonly byTurnId: Map<string, CodexTurnTokenUsageAccumulator>;
-}
-
-export function classifyCodexBrokerFailure(
-  payload: EffectCodexSchema.V2ErrorNotification,
-): CodexBrokerFailureKind | undefined {
-  const info = payload.error.codexErrorInfo;
-  if (info === "unauthorized") return "auth";
-  if (info === "usageLimitExceeded") return "quota";
-  if (typeof info === "object" && info !== null) {
-    const status =
-      ("httpConnectionFailed" in info
-        ? info.httpConnectionFailed.httpStatusCode
-        : "responseStreamConnectionFailed" in info
-          ? info.responseStreamConnectionFailed.httpStatusCode
-          : "responseStreamDisconnected" in info
-            ? info.responseStreamDisconnected.httpStatusCode
-            : "responseTooManyFailedAttempts" in info
-              ? info.responseTooManyFailedAttempts.httpStatusCode
-              : undefined) ?? undefined;
-    if (status === 401 || status === 403) return "auth";
-    if (status === 429) return "rate_limit";
-  }
-
-  const message = payload.error.message;
-  if (/unauthori[sz]ed|authentication failed|\b40[13]\b/i.test(message)) return "auth";
-  if (/quota|usage.?limit|plan.{0,20}(?:exhaust|limit)/i.test(message)) return "quota";
-  if (/rate.?limit|too many requests|\b429\b/i.test(message)) return "rate_limit";
-  return undefined;
 }
 
 function isMeaningfulBrokerOutput(event: ProviderEvent): boolean {

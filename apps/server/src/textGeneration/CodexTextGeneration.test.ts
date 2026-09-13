@@ -1,4 +1,5 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
+import type * as CodexClient from "effect-codex-app-server/client";
 import { it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -15,6 +16,11 @@ import * as ServerConfig from "../config.ts";
 import * as TextGeneration from "./TextGeneration.ts";
 import { makeCodexTextGeneration } from "./CodexTextGeneration.ts";
 import { writeFakeCli } from "../testUtils/fakeCli.ts";
+import type {
+  CodexBrokerIntegration,
+  CodexBrokerSession,
+} from "../provider/Layers/CodexBrokerAuth.ts";
+import type { CodexBrokerLease } from "../provider/Layers/CodexBrokerClient.ts";
 const decodeCodexSettings = Schema.decodeSync(CodexSettings);
 
 const DEFAULT_TEST_MODEL_SELECTION = createModelSelection(
@@ -148,6 +154,111 @@ function withFakeCodexEnv<A, E, R>(
 }
 
 it.layer(CodexTextGenerationTestLayer)("CodexTextGeneration", (it) => {
+  it.effect("uses an ephemeral app-server with memory-only broker auth", () =>
+    Effect.gen(function* () {
+      const handlers = new Map<string, (payload: unknown) => Effect.Effect<void>>();
+      const requests: Array<{ readonly method: string; readonly payload: unknown }> = [];
+      const client = {
+        request: (method: string, payload: unknown) => {
+          requests.push({ method, payload });
+          if (method === "thread/start") {
+            return Effect.succeed({ thread: { id: "provider-thread" } });
+          }
+          if (method === "turn/start") {
+            return Effect.gen(function* () {
+              yield* (
+                handlers.get("item/completed")?.({
+                  completedAtMs: 1,
+                  threadId: "provider-thread",
+                  turnId: "provider-turn",
+                  item: {
+                    id: "message",
+                    type: "agentMessage",
+                    text: JSON.stringify({ subject: "Broker generated subject", body: "" }),
+                  },
+                }) ?? Effect.void
+              );
+              yield* (
+                handlers.get("turn/completed")?.({
+                  threadId: "provider-thread",
+                  turn: { id: "provider-turn", items: [], status: "completed" },
+                }) ?? Effect.void
+              );
+              return { turn: { id: "provider-turn" } };
+            });
+          }
+          return Effect.succeed({});
+        },
+        handleServerRequest: () => Effect.void,
+        handleServerNotification: (
+          method: string,
+          handler: (payload: unknown) => Effect.Effect<void>,
+        ) =>
+          Effect.sync(() => {
+            handlers.set(method, handler);
+          }),
+      } as unknown as CodexClient.CodexAppServerClient["Service"];
+      const lease: CodexBrokerLease = {
+        status: "ok",
+        accountId: "account",
+        accountLabel: "Account",
+        accessToken: "memory-only-token",
+        chatgptAccountId: "chatgpt-account",
+        expiresAt: "2099-01-01T00:00:00Z",
+        shortRemainingPercent: 90,
+        weeklyRemainingPercent: 80,
+        shortResetsAt: null,
+        weeklyResetsAt: null,
+      };
+      const session: CodexBrokerSession = {
+        brokerSessionId: "session",
+        lease: Effect.succeed(lease),
+        applyLogin: (appClient) =>
+          appClient
+            .request("account/login/start", {
+              type: "chatgptAuthTokens",
+              accessToken: lease.accessToken,
+              chatgptAccountId: lease.chatgptAccountId,
+            })
+            .pipe(Effect.asVoid),
+        registerRefreshHandler: () => Effect.void,
+        beginLogicalTurn: () => Effect.succeed({ lease, accountChanged: false }),
+        reportTerminalFailure: () => Effect.succeed({ lease, accountChanged: false }),
+        completeLogicalTurn: () => Effect.void,
+      };
+      const brokerIntegration: CodexBrokerIntegration = {
+        instanceId: "instance",
+        client: { health: Effect.void, route: () => Effect.die("unused") },
+        acquireEphemeralAuth: () => Effect.succeed(session),
+        newEphemeralSession: () => Effect.succeed(session),
+        newInteractiveSession: () => Effect.succeed(session),
+      };
+      const textGeneration = yield* makeCodexTextGeneration(
+        decodeCodexSettings({}),
+        {},
+        brokerIntegration,
+        { withAppServerClient: () => Effect.succeed({ client }) },
+      );
+
+      const generated = yield* textGeneration.generateCommitMessage({
+        cwd: process.cwd(),
+        branch: "feature/broker",
+        stagedSummary: "M README.md",
+        stagedPatch: "diff --git a/README.md b/README.md",
+        modelSelection: DEFAULT_TEST_MODEL_SELECTION,
+      });
+
+      expect(generated.subject).toBe("Broker generated subject");
+      expect(requests.some(({ method }) => method === "account/login/start")).toBe(true);
+      const turnRequest = requests.find(({ method }) => method === "turn/start");
+      expect(turnRequest?.payload).toMatchObject({
+        approvalPolicy: "never",
+        sandboxPolicy: { type: "readOnly" },
+      });
+      expect(JSON.stringify(turnRequest?.payload)).not.toContain("memory-only-token");
+    }),
+  );
+
   it.effect("generates and sanitizes commit messages without branch by default", () =>
     withFakeCodexEnv(
       {
