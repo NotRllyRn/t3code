@@ -6,6 +6,7 @@ import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import type * as CodexClient from "effect-codex-app-server/client";
 import * as CodexErrors from "effect-codex-app-server/errors";
+import * as EffectCodexSchema from "effect-codex-app-server/schema";
 
 import {
   type CodexBrokerClient,
@@ -44,6 +45,34 @@ export interface CodexBrokerAuthContext {
 
 export type { CodexBrokerFailureKind };
 
+export function classifyCodexBrokerFailure(
+  payload: EffectCodexSchema.V2ErrorNotification,
+): CodexBrokerFailureKind | undefined {
+  const info = payload.error.codexErrorInfo;
+  if (info === "unauthorized") return "auth";
+  if (info === "usageLimitExceeded") return "quota";
+  if (typeof info === "object" && info !== null) {
+    const status =
+      ("httpConnectionFailed" in info
+        ? info.httpConnectionFailed.httpStatusCode
+        : "responseStreamConnectionFailed" in info
+          ? info.responseStreamConnectionFailed.httpStatusCode
+          : "responseStreamDisconnected" in info
+            ? info.responseStreamDisconnected.httpStatusCode
+            : "responseTooManyFailedAttempts" in info
+              ? info.responseTooManyFailedAttempts.httpStatusCode
+              : undefined) ?? undefined;
+    if (status === 401 || status === 403) return "auth";
+    if (status === 429) return "rate_limit";
+  }
+
+  const message = payload.error.message;
+  if (/unauthori[sz]ed|authentication failed|\b40[13]\b/i.test(message)) return "auth";
+  if (/quota|usage.?limit|plan.{0,20}(?:exhaust|limit)/i.test(message)) return "quota";
+  if (/rate.?limit|too many requests|\b429\b/i.test(message)) return "rate_limit";
+  return undefined;
+}
+
 export interface CodexBrokerLeaseSelection {
   readonly lease: CodexBrokerLease;
   readonly accountChanged: boolean;
@@ -78,6 +107,10 @@ export interface CodexBrokerIntegration {
   readonly acquireEphemeralAuth: (
     operation: string,
   ) => Effect.Effect<CodexBrokerAuthContext, CodexBrokerAuthError>;
+  readonly newEphemeralSession: (
+    operation: string,
+    brokerTurnId: string,
+  ) => Effect.Effect<CodexBrokerSession, CodexBrokerAuthError>;
   readonly newInteractiveSession: (
     threadId: string,
   ) => Effect.Effect<CodexBrokerSession, CodexBrokerAuthError>;
@@ -254,6 +287,12 @@ export function makeCodexBrokerIntegration(
       const nonce = NodeCrypto.randomUUID();
       return yield* acquire(brokerId("t3-util", instanceId, operation, nonce), nonce);
     }),
+    newEphemeralSession: Effect.fn("CodexBrokerAuth.newEphemeralSession")(
+      function* (operation, brokerTurnId) {
+        const nonce = NodeCrypto.randomUUID();
+        return yield* acquire(brokerId("t3-util", instanceId, operation, nonce), brokerTurnId);
+      },
+    ),
     newInteractiveSession: Effect.fn("CodexBrokerAuth.newInteractiveSession")(function* (threadId) {
       const bootstrapTurnId = NodeCrypto.randomUUID();
       return yield* acquire(brokerId("t3", instanceId, threadId), bootstrapTurnId);
