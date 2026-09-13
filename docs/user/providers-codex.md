@@ -25,6 +25,25 @@ T3 Code can use your installed Codex and its existing login. Run `codex login`
 on the environment's machine to sign in. [Provider setup](./install.md#providers)
 covers installation and custom configuration.
 
+## Use Codex Broker
+
+A server-managed [Codex Broker](https://github.com/NotRllyRn/codex-broker) can route
+Codex work across an account pool without storing those accounts' refresh tokens in
+T3 Code. Add these environment variables to the Codex provider instance:
+
+```text
+CODEX_BROKER_URL=https://broker.example.internal
+CODEX_BROKER_CLIENT_KEY=<client key>
+CODEX_BROKER_CA_CERT=/path/to/private-ca.pem  # optional
+```
+
+Mark `CODEX_BROKER_CLIENT_KEY` as **Sensitive**. The URL must use HTTPS, and the URL
+and key must be configured together. The CA certificate is only needed for a private
+certificate authority; TLS verification cannot be disabled.
+
+Broker mode covers provider checks and interactive threads. A local `codex login` is not required.
+Broker access tokens remain in server memory and are not written to `auth.json`.
+
 ## Use multiple accounts
 
 Add another ChatGPT account in **Settings → Providers**, then select the account
