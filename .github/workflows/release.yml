@@ -359,13 +359,25 @@ jobs:
   # the Windows desktop entry embeds it as the WSL runtime. Building it once
   # here means the WSL backend runs the exact bytes a Linux user downloads.
   build_linux_cli:
-    name: Build CLI archive (linux-x64)
+    name: Build CLI archive (linux-${{ matrix.arch }})
     # Same gating as relay_public_config: only the release commit is needed, so
     # this runs alongside preflight. See the condition comment there.
     needs: [resolve_commit, preflight, relay_public_config]
     if: ${{ !cancelled() && needs.preflight.result == 'success' && needs.relay_public_config.result == 'success' }}
-    runs-on: blacksmith-32vcpu-ubuntu-2404
-    timeout-minutes: 20
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: blacksmith-32vcpu-ubuntu-2404
+            rust_target: x86_64-unknown-linux-gnu
+          # node-pty has no Linux prebuild and compiles from source, so the
+          # arm64 archive is built on arm64 hardware rather than cross-built.
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            rust_target: aarch64-unknown-linux-gnu
     env:
       T3CODE_CLERK_PUBLISHABLE_KEY: ${{ needs.relay_public_config.outputs.clerk_publishable_key }}
       T3CODE_CLERK_JWT_TEMPLATE: ${{ needs.relay_public_config.outputs.clerk_jwt_template }}
@@ -396,18 +408,18 @@ jobs:
         id: resource_monitor_cache
         uses: actions/cache@v6
         with:
-          path: native/resource-monitor/target/x86_64-unknown-linux-gnu/release/t3-resource-monitor
-          key: resource-monitor-x86_64-unknown-linux-gnu-${{ hashFiles('native/resource-monitor/Cargo.lock', 'native/resource-monitor/Cargo.toml', 'native/resource-monitor/src/**') }}
+          path: native/resource-monitor/target/${{ matrix.rust_target }}/release/t3-resource-monitor
+          key: resource-monitor-${{ matrix.rust_target }}-${{ hashFiles('native/resource-monitor/Cargo.lock', 'native/resource-monitor/Cargo.toml', 'native/resource-monitor/src/**') }}
 
       - name: Setup Rust
         if: steps.resource_monitor_cache.outputs.cache-hit != 'true'
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: x86_64-unknown-linux-gnu
+          targets: ${{ matrix.rust_target }}
 
       - name: Build resource monitor
         if: steps.resource_monitor_cache.outputs.cache-hit != 'true'
-        run: cargo build --locked --release --manifest-path native/resource-monitor/Cargo.toml --target x86_64-unknown-linux-gnu
+        run: cargo build --locked --release --manifest-path native/resource-monitor/Cargo.toml --target ${{ matrix.rust_target }}
 
       - name: Download relay client tracing config
         uses: actions/download-artifact@v8
@@ -442,15 +454,15 @@ jobs:
       - name: Stage resource monitor for the CLI archive
         run: |
           set -euo pipefail
-          target_dir="$RUNNER_TEMP/cli-resource-monitor/linux-x64"
+          target_dir="$RUNNER_TEMP/cli-resource-monitor/linux-${{ matrix.arch }}"
           mkdir -p "$target_dir"
-          cp native/resource-monitor/target/x86_64-unknown-linux-gnu/release/t3-resource-monitor "$target_dir/"
+          cp native/resource-monitor/target/${{ matrix.rust_target }}/release/t3-resource-monitor "$target_dir/"
 
       - name: Build CLI archive
         run: |
           node scripts/build-cli-archive.ts \
             --platform linux \
-            --arch x64 \
+            --arch ${{ matrix.arch }} \
             --version "${{ needs.preflight.outputs.version }}" \
             --resource-monitor-dir "$RUNNER_TEMP/cli-resource-monitor" \
             --output-dir release-cli
@@ -461,7 +473,7 @@ jobs:
       - name: Upload CLI archive
         uses: actions/upload-artifact@v7
         with:
-          name: cli-linux-x64
+          name: cli-linux-${{ matrix.arch }}
           path: release-cli/*
           if-no-files-found: error
 
@@ -488,11 +500,15 @@ jobs:
       matrix:
         include:
           # cli_archive: whether the job also builds the self-contained CLI
-          # archive. The executable is built on the runner's own Node, so only
-          # native runners qualify. macOS x64 has no native runner: a
-          # cross-built executable crashed under Rosetta in the smoke test and
-          # cannot be verified on real x64 hardware in CI, so it is skipped
-          # until it can be.
+          # archive for its own platform/arch. cli_extra_targets: additional
+          # archives cross-built on this runner for targets without a runner
+          # of their own. The executable is a Node single-executable whose
+          # code cache is off, so injecting the bundle into another target's
+          # Node is exact; the native packages come from pnpm's per-target
+          # prebuilds through supportedArchitectures. This is the same
+          # mechanism the macOS x64 desktop app has always been built with on
+          # the arm64 runner. A cross-built archive is smoke-tested only where
+          # the runner can execute it (macOS runs x64 through Rosetta).
           - label: macOS arm64
             runner: blacksmith-12vcpu-macos-26
             platform: mac
@@ -508,7 +524,7 @@ jobs:
             arch: x64
             rust_target: x86_64-apple-darwin
             resource_key: darwin-x64
-            cli_archive: false
+            cli_archive: true
           # The Linux CLI archive is produced by build_linux_cli, not here.
           - label: Linux x64
             runner: blacksmith-32vcpu-ubuntu-2404
@@ -526,6 +542,9 @@ jobs:
             rust_target: x86_64-pc-windows-msvc
             resource_key: win32-x64
             cli_archive: true
+            # No Windows arm64 runner; cross-built here and not smoke-tested.
+            cli_extra_arch: arm64
+            cli_extra_rust_target: aarch64-pc-windows-msvc
           # - label: Windows arm64
           #   runner: windows-11-arm
           #   platform: win
@@ -819,7 +838,17 @@ jobs:
           # the runner, and only exact versions have a dist directory. Keep in
           # step with SEA_NODE_VERSION in apps/server/vite.config.ts.
           VP_NODE_VERSION: "26.8.2"
-        run: node apps/server/scripts/cli.ts build-exe --verbose
+        run: |
+          set -euo pipefail
+          # Always name the target: the macOS x64 row runs on an arm64 runner.
+          # SEA targets use nodejs.org naming (darwin/linux/win), not the
+          # electron-builder platform names this workflow uses (mac/linux/win).
+          sea_platform="${{ matrix.platform }}"
+          [[ "$sea_platform" == "mac" ]] && sea_platform="darwin"
+          node apps/server/scripts/cli.ts build-exe --target "${sea_platform}-${{ matrix.arch }}" --verbose
+          if [[ -n "${{ matrix.cli_extra_arch }}" ]]; then
+            node apps/server/scripts/cli.ts build-exe --target "${sea_platform}-${{ matrix.cli_extra_arch }}" --verbose
+          fi
 
       - name: Import macOS signing certificate for the CLI archive
         if: matrix.cli_archive && matrix.platform == 'mac'
@@ -852,6 +881,14 @@ jobs:
           echo "T3CODE_CLI_MAC_SIGN_IDENTITY=$identity" >> "$GITHUB_ENV"
           echo "macOS CLI signing enabled."
 
+      - name: Build resource monitor for the extra CLI target
+        if: matrix.cli_archive && matrix.cli_extra_arch
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup target add "${{ matrix.cli_extra_rust_target }}"
+          cargo build --locked --release --manifest-path native/resource-monitor/Cargo.toml --target "${{ matrix.cli_extra_rust_target }}"
+
       - name: Stage resource monitor for the CLI archive
         if: matrix.cli_archive
         shell: bash
@@ -861,9 +898,18 @@ jobs:
           if [[ "${{ matrix.platform }}" == "win" ]]; then
             binary_name="${binary_name}.exe"
           fi
-          target_dir="$RUNNER_TEMP/cli-resource-monitor/${{ matrix.resource_key }}"
-          mkdir -p "$target_dir"
-          cp "native/resource-monitor/target/${{ matrix.rust_target }}/release/${binary_name}" "$target_dir/$binary_name"
+          stage() {
+            target_dir="$RUNNER_TEMP/cli-resource-monitor/$1"
+            mkdir -p "$target_dir"
+            cp "native/resource-monitor/target/$2/release/${binary_name}" "$target_dir/$binary_name"
+          }
+          stage "${{ matrix.resource_key }}" "${{ matrix.rust_target }}"
+          if [[ -n "${{ matrix.cli_extra_arch }}" ]]; then
+            resource_platform="${{ matrix.platform }}"
+            [[ "$resource_platform" == "win" ]] && resource_platform="win32"
+            [[ "$resource_platform" == "mac" ]] && resource_platform="darwin"
+            stage "${resource_platform}-${{ matrix.cli_extra_arch }}" "${{ matrix.cli_extra_rust_target }}"
+          fi
 
       - name: Build CLI archive
         if: matrix.cli_archive
@@ -885,17 +931,37 @@ jobs:
             printf '%s' "$APPLE_API_KEY" > "$key_path"
             export APPLE_API_KEY="$key_path"
           fi
-          node scripts/build-cli-archive.ts \
-            --platform "${{ matrix.platform }}" \
-            --arch "${{ matrix.arch }}" \
-            --version "${{ needs.preflight.outputs.version }}" \
-            --resource-monitor-dir "$RUNNER_TEMP/cli-resource-monitor" \
-            --output-dir release-cli
+          build_archive() {
+            node scripts/build-cli-archive.ts \
+              --platform "${{ matrix.platform }}" \
+              --arch "$1" \
+              --version "${{ needs.preflight.outputs.version }}" \
+              --resource-monitor-dir "$RUNNER_TEMP/cli-resource-monitor" \
+              --output-dir release-cli
+          }
+          build_archive "${{ matrix.arch }}"
+          if [[ -n "${{ matrix.cli_extra_arch }}" ]]; then
+            build_archive "${{ matrix.cli_extra_arch }}"
+          fi
 
+      # The runner can execute its own arch, and macOS runs x64 through
+      # Rosetta. Anything else (Windows arm64 on an x64 runner) is uploaded
+      # untested; its executable was injected into a Node that nodejs.org
+      # ships for that target, and its natives are that target's prebuilds.
       - name: Smoke-test CLI archive
         if: matrix.cli_archive
         shell: bash
-        run: node scripts/smoke-cli-archive.ts --archive release-cli/* --expect-version "${{ needs.preflight.outputs.version }}"
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          for archive in release-cli/*; do
+            case "$archive" in
+              *-${{ matrix.platform == 'win' && 'win32' || matrix.platform == 'mac' && 'darwin' || 'linux' }}-${{ matrix.arch }}.*) ;;
+              *-darwin-x64.*) [[ "${{ matrix.platform }}" == "mac" ]] || { echo "skip smoke: $archive"; continue; } ;;
+              *) echo "skip smoke (no runner can execute it): $archive"; continue ;;
+            esac
+            node scripts/smoke-cli-archive.ts --archive "$archive" --expect-version "${{ needs.preflight.outputs.version }}"
+          done
 
       - name: Upload CLI archive
         if: matrix.cli_archive
