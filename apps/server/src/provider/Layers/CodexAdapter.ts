@@ -34,12 +34,14 @@ import {
 import * as Effect from "effect/Effect";
 import * as NodeCrypto from "node:crypto";
 import * as Crypto from "effect/Crypto";
+import * as DateTime from "effect/DateTime";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
 import * as FileSystem from "effect/FileSystem";
 import * as Queue from "effect/Queue";
 import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
+import * as Semaphore from "effect/Semaphore";
 import * as Stream from "effect/Stream";
 import { ChildProcessSpawner } from "effect/unstable/process";
 import * as CodexErrors from "effect-codex-app-server/errors";
@@ -60,6 +62,11 @@ import {
 import { type CodexAdapterShape } from "../Services/CodexAdapter.ts";
 import { resolveAttachmentPath } from "../../attachmentStore.ts";
 import { ServerConfig } from "../../config.ts";
+import type {
+  CodexBrokerFailureKind,
+  CodexBrokerSession,
+  CodexBrokerIntegration,
+} from "./CodexBrokerAuth.ts";
 import {
   CodexResumeCursorSchema,
   CodexSessionRuntimeThreadIdMissingError,
@@ -93,6 +100,17 @@ export interface CodexAdapterLiveOptions {
   >;
   readonly nativeEventLogPath?: string;
   readonly nativeEventLogger?: EventNdjsonLogger;
+  readonly brokerIntegration?: CodexBrokerIntegration;
+}
+
+interface BrokerLogicalTurnState {
+  readonly brokerTurnId: string;
+  readonly providerTurnIds: Set<string>;
+  meaningfulOutputSeen: boolean;
+  sideEffectSeen: boolean;
+  recoveryAttempts: number;
+  recoveryInProgress: boolean;
+  pendingFailure: CodexBrokerFailureKind | undefined;
 }
 
 interface CodexRuntimeSlot {
@@ -106,7 +124,13 @@ interface CodexAdapterSessionContext {
   readonly threadId: ThreadId;
   readonly baseRuntimeInput: Omit<CodexSessionRuntimeOptions, "resumeCursor">;
   readonly turnTokenUsage: CodexTurnTokenUsageState;
+  readonly brokerSession?: CodexBrokerSession;
+  readonly brokerTurns: Map<string, BrokerLogicalTurnState>;
+  readonly recoveryScope: Scope.Closeable;
+  readonly recoveryLock: Semaphore.Semaphore;
+  readonly consumeEvent: (event: ProviderEvent, generation: number) => Effect.Effect<void>;
   slot: CodexRuntimeSlot;
+  activeBrokerTurn: BrokerLogicalTurnState | undefined;
   stopped: boolean;
 }
 
@@ -132,6 +156,65 @@ interface CodexTurnTokenUsageState {
   baseline: CodexCumulativeTokenUsage | undefined;
   activeTurnId: string | undefined;
   readonly byTurnId: Map<string, CodexTurnTokenUsageAccumulator>;
+}
+
+export function classifyCodexBrokerFailure(
+  payload: EffectCodexSchema.V2ErrorNotification,
+): CodexBrokerFailureKind | undefined {
+  const info = payload.error.codexErrorInfo;
+  if (info === "unauthorized") return "auth";
+  if (info === "usageLimitExceeded") return "quota";
+  if (typeof info === "object" && info !== null) {
+    const status =
+      ("httpConnectionFailed" in info
+        ? info.httpConnectionFailed.httpStatusCode
+        : "responseStreamConnectionFailed" in info
+          ? info.responseStreamConnectionFailed.httpStatusCode
+          : "responseStreamDisconnected" in info
+            ? info.responseStreamDisconnected.httpStatusCode
+            : "responseTooManyFailedAttempts" in info
+              ? info.responseTooManyFailedAttempts.httpStatusCode
+              : undefined) ?? undefined;
+    if (status === 401 || status === 403) return "auth";
+    if (status === 429) return "rate_limit";
+  }
+
+  const message = payload.error.message;
+  if (/unauthori[sz]ed|authentication failed|\b40[13]\b/i.test(message)) return "auth";
+  if (/quota|usage.?limit|plan.{0,20}(?:exhaust|limit)/i.test(message)) return "quota";
+  if (/rate.?limit|too many requests|\b429\b/i.test(message)) return "rate_limit";
+  return undefined;
+}
+
+function isMeaningfulBrokerOutput(event: ProviderEvent): boolean {
+  if (
+    event.method === "item/agentMessage/delta" ||
+    event.method === "item/plan/delta" ||
+    event.method === "item/reasoning/summaryTextDelta" ||
+    event.method === "item/reasoning/textDelta"
+  ) {
+    return true;
+  }
+  if (event.method !== "item/completed") return false;
+  const payload = readPayload(EffectCodexSchema.V2ItemCompletedNotification, event.payload);
+  return payload?.item.type === "agentMessage" || payload?.item.type === "plan";
+}
+
+function isBrokerSideEffect(event: ProviderEvent): boolean {
+  if (event.method.startsWith("collabAgent/")) return true;
+  if (event.method !== "item/started" && event.method !== "item/completed") return false;
+  const item =
+    event.method === "item/started"
+      ? readPayload(EffectCodexSchema.V2ItemStartedNotification, event.payload)?.item
+      : readPayload(EffectCodexSchema.V2ItemCompletedNotification, event.payload)?.item;
+  const type = toCanonicalItemType(item?.type);
+  return (
+    type === "command_execution" ||
+    type === "file_change" ||
+    type === "mcp_tool_call" ||
+    type === "dynamic_tool_call" ||
+    type === "collab_agent_tool_call"
+  );
 }
 
 function mapCodexRuntimeError(
@@ -2258,6 +2341,19 @@ export const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
             ? getCodexServiceTierOptionValue(input.modelSelection)
             : undefined;
         const mcpSession = McpProviderSession.readMcpProviderSession(input.threadId);
+        const brokerSession = options?.brokerIntegration
+          ? yield* options.brokerIntegration.newInteractiveSession(input.threadId).pipe(
+              Effect.mapError(
+                (cause) =>
+                  new ProviderAdapterProcessError({
+                    provider: PROVIDER,
+                    threadId: input.threadId,
+                    detail: cause.message,
+                    cause,
+                  }),
+              ),
+            )
+          : undefined;
         const runtimeInput: CodexSessionRuntimeOptions = {
           threadId: input.threadId,
           providerInstanceId: boundInstanceId,
@@ -2274,6 +2370,7 @@ export const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
             ? { model: input.modelSelection.model }
             : {}),
           ...(serviceTier ? { serviceTier } : {}),
+          ...(brokerSession ? { brokerAuth: brokerSession } : {}),
           ...(mcpSession
             ? {
                 environment: {
@@ -2293,9 +2390,15 @@ export const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
         const generation = nextGeneration++;
         activeGenerations.set(input.threadId, generation);
         const sessionScope = yield* Scope.make("sequential");
+        const recoveryScope = yield* Scope.make("sequential");
+        const recoveryLock = yield* Semaphore.make(1);
         let sessionScopeTransferred = false;
         yield* Effect.addFinalizer(() =>
-          sessionScopeTransferred ? Effect.void : Scope.close(sessionScope, Exit.void),
+          sessionScopeTransferred
+            ? Effect.void
+            : Scope.close(sessionScope, Exit.void).pipe(
+                Effect.andThen(Scope.close(recoveryScope, Exit.void)),
+              ),
         );
         const createRuntime = options?.makeRuntime ?? makeCodexSessionRuntime;
         const runtime = yield* createRuntime(runtimeInput).pipe(
@@ -2317,10 +2420,35 @@ export const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
         // this a child of `startSession`, and Effect interrupts a fiber's
         // children when it completes, so the consumer died on return and every
         // runtime event the session emitted afterwards was dropped.
-        const eventFiber = yield* Stream.runForEach(runtime.events, (event) =>
+        const consumeEvent = (event: ProviderEvent, eventGeneration: number) =>
           Effect.gen(function* () {
-            if (activeGenerations.get(input.threadId) !== generation) return;
+            if (activeGenerations.get(input.threadId) !== eventGeneration) return;
             yield* writeNativeEvent(event);
+
+            const adapterSession = sessions.get(input.threadId);
+            if (adapterSession?.brokerSession) {
+              if (event.method === "turn/started" && event.turnId) {
+                const active = adapterSession.activeBrokerTurn;
+                if (active && !adapterSession.brokerTurns.has(event.turnId)) {
+                  active.providerTurnIds.add(event.turnId);
+                  adapterSession.brokerTurns.set(event.turnId, active);
+                }
+              }
+              const brokerTurn = event.turnId
+                ? adapterSession.brokerTurns.get(event.turnId)
+                : adapterSession.activeBrokerTurn;
+              if (brokerTurn) {
+                brokerTurn.meaningfulOutputSeen ||= isMeaningfulBrokerOutput(event);
+                brokerTurn.sideEffectSeen ||= isBrokerSideEffect(event);
+                if (event.method === "error") {
+                  const payload = readPayload(EffectCodexSchema.V2ErrorNotification, event.payload);
+                  if (payload && !payload.willRetry) {
+                    brokerTurn.pendingFailure = classifyCodexBrokerFailure(payload);
+                  }
+                }
+              }
+            }
+
             if (event.method === "turn/started" && event.turnId) {
               if (turnTokenUsage.activeTurnId !== event.turnId) {
                 turnTokenUsage.byTurnId.clear();
@@ -2350,7 +2478,7 @@ export const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
               }
             }
 
-            const runtimeEvents = mapToRuntimeEvents(event, event.threadId).map((runtimeEvent) => {
+            let runtimeEvents = mapToRuntimeEvents(event, event.threadId).map((runtimeEvent) => {
               if (runtimeEvent.type === "turn.completed" && runtimeEvent.turnId) {
                 return {
                   ...runtimeEvent,
@@ -2379,6 +2507,22 @@ export const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
               }
               return runtimeEvent;
             });
+            if (adapterSession?.brokerSession) {
+              runtimeEvents = runtimeEvents
+                .filter((runtimeEvent) => runtimeEvent.type !== "account.rate-limits.updated")
+                .map((runtimeEvent) =>
+                  event.method === "error" &&
+                  runtimeEvent.type === "runtime.error" &&
+                  event.turnId &&
+                  adapterSession.brokerTurns.get(event.turnId)?.pendingFailure
+                    ? {
+                        ...runtimeEvent,
+                        type: "runtime.warning" as const,
+                        payload: { message: "Codex Broker is preparing account recovery." },
+                      }
+                    : runtimeEvent,
+                );
+            }
             if (runtimeEvents.length === 0) {
               yield* Effect.logDebug("ignoring unhandled Codex provider event", {
                 method: event.method,
@@ -2388,9 +2532,32 @@ export const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
               });
               return;
             }
-            if (activeGenerations.get(input.threadId) !== generation) return;
+            if (activeGenerations.get(input.threadId) !== eventGeneration) return;
             yield* Queue.offerAll(runtimeEventQueue, runtimeEvents);
-          }),
+
+            if (
+              adapterSession?.brokerSession &&
+              event.method === "turn/completed" &&
+              event.turnId
+            ) {
+              const brokerTurn = adapterSession.brokerTurns.get(event.turnId);
+              if (brokerTurn?.pendingFailure) {
+                yield* scheduleBrokerRecovery(adapterSession, brokerTurn).pipe(
+                  Effect.forkIn(adapterSession.recoveryScope),
+                );
+              } else if (brokerTurn) {
+                yield* adapterSession.brokerSession.completeLogicalTurn(brokerTurn.brokerTurnId);
+                for (const providerTurnId of brokerTurn.providerTurnIds) {
+                  adapterSession.brokerTurns.delete(providerTurnId);
+                }
+                if (adapterSession.activeBrokerTurn === brokerTurn) {
+                  adapterSession.activeBrokerTurn = undefined;
+                }
+              }
+            }
+          });
+        const eventFiber = yield* Stream.runForEach(runtime.events, (event) =>
+          consumeEvent(event, generation),
         ).pipe(Effect.forkIn(sessionScope));
 
         const started = yield* runtime.start().pipe(
@@ -2424,6 +2591,12 @@ export const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
             eventFiber,
           },
           turnTokenUsage,
+          ...(brokerSession ? { brokerSession } : {}),
+          brokerTurns: new Map(),
+          activeBrokerTurn: undefined,
+          recoveryScope,
+          recoveryLock,
+          consumeEvent,
           stopped: false,
         });
         sessionScopeTransferred = true;
@@ -2483,7 +2656,47 @@ export const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
       input.modelSelection?.instanceId === boundInstanceId
         ? getCodexServiceTierOptionValue(input.modelSelection)
         : undefined;
-    return yield* session.slot.runtime
+    let brokerTurn: BrokerLogicalTurnState | undefined;
+    if (session.brokerSession) {
+      const brokerTurnId = NodeCrypto.randomUUID();
+      brokerTurn = {
+        brokerTurnId,
+        providerTurnIds: new Set(),
+        meaningfulOutputSeen: false,
+        sideEffectSeen: false,
+        pendingFailure: undefined,
+        recoveryAttempts: 0,
+        recoveryInProgress: false,
+      };
+      const providerSession = yield* session.slot.runtime.getSession.pipe(
+        Effect.mapError((cause) => mapCodexRuntimeError(session.threadId, "thread/read", cause)),
+      );
+      if (!providerSession.activeTurnId) {
+        const selection = yield* session.brokerSession.beginLogicalTurn(brokerTurnId).pipe(
+          Effect.mapError(
+            (cause) =>
+              new ProviderAdapterRequestError({
+                provider: PROVIDER,
+                method: "turn/start",
+                detail: cause.message,
+                cause,
+              }),
+          ),
+        );
+        if (selection.accountChanged) {
+          yield* replaceRuntimeSlot(session);
+        } else if (session.slot.runtime.applyBrokerAuth) {
+          yield* session.slot.runtime.applyBrokerAuth.pipe(
+            Effect.mapError((cause) =>
+              mapCodexRuntimeError(session.threadId, "account/login/start", cause),
+            ),
+          );
+        }
+      }
+      session.activeBrokerTurn = brokerTurn;
+    }
+
+    const result = yield* session.slot.runtime
       .sendTurn({
         ...(input.input !== undefined ? { input: input.input } : {}),
         ...(input.modelSelection?.instanceId === boundInstanceId
@@ -2499,6 +2712,11 @@ export const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
         ...(codexAttachments.length > 0 ? { attachments: codexAttachments } : {}),
       })
       .pipe(Effect.mapError((cause) => mapCodexRuntimeError(input.threadId, "turn/start", cause)));
+    if (brokerTurn) {
+      brokerTurn.providerTurnIds.add(result.turnId);
+      session.brokerTurns.set(result.turnId, brokerTurn);
+    }
+    return result;
   });
 
   const requireSession = Effect.fn("requireSession")(function* (threadId: ThreadId) {
@@ -2510,6 +2728,143 @@ export const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
       });
     }
     return session;
+  });
+
+  const replaceRuntimeSlot = Effect.fn("CodexAdapter.replaceRuntimeSlot")(function* (
+    session: CodexAdapterSessionContext,
+  ) {
+    const providerSession = yield* session.slot.runtime.getSession.pipe(
+      Effect.mapError((cause) => mapCodexRuntimeError(session.threadId, "thread/read", cause)),
+    );
+    const resumeCursor = isCodexResumeCursorSchema(providerSession.resumeCursor)
+      ? providerSession.resumeCursor
+      : undefined;
+    const oldSlot = session.slot;
+    const generation = nextGeneration++;
+    activeGenerations.set(session.threadId, generation);
+
+    yield* oldSlot.runtime.close.pipe(Effect.ignore);
+    yield* Effect.ignore(Scope.close(oldSlot.scope, Exit.void));
+    yield* Fiber.interrupt(oldSlot.eventFiber).pipe(Effect.ignore);
+
+    const scope = yield* Scope.make("sequential");
+    const createRuntime = options?.makeRuntime ?? makeCodexSessionRuntime;
+    const runtime = yield* createRuntime({
+      ...session.baseRuntimeInput,
+      ...(resumeCursor ? { resumeCursor } : {}),
+    }).pipe(
+      Effect.provideService(Scope.Scope, scope),
+      Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, childProcessSpawner),
+      Effect.provideService(Crypto.Crypto, crypto),
+      Effect.mapError(
+        (cause) =>
+          new ProviderAdapterProcessError({
+            provider: PROVIDER,
+            threadId: session.threadId,
+            detail: cause.message,
+            cause,
+          }),
+      ),
+      Effect.onError(() => Scope.close(scope, Exit.void).pipe(Effect.ignore)),
+    );
+    const eventFiber = yield* Stream.runForEach(runtime.events, (event) =>
+      session.consumeEvent(event, generation),
+    ).pipe(Effect.forkIn(scope));
+    yield* runtime.start().pipe(
+      Effect.mapError(
+        (cause) =>
+          new ProviderAdapterProcessError({
+            provider: PROVIDER,
+            threadId: session.threadId,
+            detail: cause.message,
+            cause,
+          }),
+      ),
+      Effect.onError(() =>
+        runtime.close.pipe(
+          Effect.andThen(Scope.close(scope, Exit.void)),
+          Effect.andThen(Fiber.interrupt(eventFiber)),
+          Effect.ignore,
+        ),
+      ),
+    );
+    session.slot = { generation, scope, runtime, eventFiber };
+  });
+
+  const scheduleBrokerRecovery = Effect.fn("CodexAdapter.scheduleBrokerRecovery")(function* (
+    session: CodexAdapterSessionContext,
+    brokerTurn: BrokerLogicalTurnState,
+  ) {
+    yield* session.recoveryLock.withPermits(1)(
+      Effect.gen(function* () {
+        const failureKind = brokerTurn.pendingFailure;
+        if (
+          session.stopped ||
+          brokerTurn.recoveryInProgress ||
+          !failureKind ||
+          brokerTurn.recoveryAttempts >= 32 ||
+          !session.brokerSession
+        ) {
+          return;
+        }
+        brokerTurn.recoveryInProgress = true;
+        brokerTurn.pendingFailure = undefined;
+        brokerTurn.recoveryAttempts += 1;
+
+        yield* Queue.offer(runtimeEventQueue, {
+          type: "runtime.warning",
+          eventId: EventId.make(NodeCrypto.randomUUID()),
+          provider: PROVIDER,
+          threadId: session.threadId,
+          createdAt: DateTime.formatIso(yield* DateTime.now),
+          payload: { message: "Codex Broker is switching accounts and resuming the thread." },
+        });
+
+        const selection = yield* session.brokerSession.reportTerminalFailure(
+          brokerTurn.brokerTurnId,
+          failureKind,
+        );
+        if (session.stopped) return;
+        if (selection.accountChanged) {
+          yield* replaceRuntimeSlot(session);
+        } else if (session.slot.runtime.applyBrokerAuth) {
+          yield* session.slot.runtime.applyBrokerAuth;
+        }
+
+        const continuation =
+          brokerTurn.meaningfulOutputSeen || brokerTurn.sideEffectSeen
+            ? "Continue exactly where the interrupted turn stopped. Do not repeat completed work, tool calls, file edits, commands, or previously emitted explanation. Codex Broker verified an available account."
+            : "Retry the interrupted request now. Codex Broker verified an available account; do not ask the user to repeat it.";
+        const result = yield* session.slot.runtime.sendTurn({ input: continuation });
+        brokerTurn.providerTurnIds.add(result.turnId);
+        session.brokerTurns.set(result.turnId, brokerTurn);
+        session.activeBrokerTurn = brokerTurn;
+      }).pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            brokerTurn.recoveryInProgress = false;
+          }),
+        ),
+        Effect.catch((error) =>
+          session.stopped
+            ? Effect.void
+            : Effect.gen(function* () {
+                const message = error instanceof Error ? error.message : String(error);
+                yield* Queue.offer(runtimeEventQueue, {
+                  type: "runtime.error",
+                  eventId: EventId.make(NodeCrypto.randomUUID()),
+                  provider: PROVIDER,
+                  threadId: session.threadId,
+                  createdAt: DateTime.formatIso(yield* DateTime.now),
+                  payload: {
+                    class: "provider_error",
+                    message: `Codex Broker recovery failed: ${message}`,
+                  },
+                });
+              }),
+        ),
+      ),
+    );
   });
 
   const interruptTurn: CodexAdapterShape["interruptTurn"] = (threadId, turnId) =>
@@ -2629,6 +2984,7 @@ export const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
     session.stopped = true;
     sessions.delete(session.threadId);
     activeGenerations.delete(session.threadId);
+    yield* Effect.ignore(Scope.close(session.recoveryScope, Exit.void));
     yield* session.slot.runtime.close.pipe(Effect.ignore);
     yield* Effect.ignore(Scope.close(session.slot.scope, Exit.void));
     yield* Fiber.interrupt(session.slot.eventFiber).pipe(Effect.ignore);

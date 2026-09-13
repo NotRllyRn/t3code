@@ -23,6 +23,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { it, vi } from "@effect/vitest";
 
 import * as Context from "effect/Context";
+import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
@@ -46,7 +47,9 @@ import {
   type CodexSessionRuntimeShape,
   type CodexThreadSnapshot,
 } from "./CodexSessionRuntime.ts";
-import { makeCodexAdapter } from "./CodexAdapter.ts";
+import { classifyCodexBrokerFailure, makeCodexAdapter } from "./CodexAdapter.ts";
+import type { CodexBrokerIntegration, CodexBrokerSession } from "./CodexBrokerAuth.ts";
+import type { CodexBrokerLease } from "./CodexBrokerClient.ts";
 const decodeCodexSettings = Schema.decodeSync(CodexSettings);
 
 // Test-local service tag so the rest of the file can keep using `yield* CodexAdapter`.
@@ -59,11 +62,46 @@ const asTurnId = (value: string): TurnId => TurnId.make(value);
 const asEventId = (value: string): EventId => EventId.make(value);
 const asItemId = (value: string): ProviderItemId => ProviderItemId.make(value);
 
+it.effect("classifies terminal Codex broker failures from structured errors", () =>
+  Effect.sync(() => {
+    NodeAssert.equal(
+      classifyCodexBrokerFailure({
+        threadId: "provider-thread",
+        turnId: "turn",
+        willRetry: false,
+        error: { message: "redacted", codexErrorInfo: "unauthorized" },
+      }),
+      "auth",
+    );
+    NodeAssert.equal(
+      classifyCodexBrokerFailure({
+        threadId: "provider-thread",
+        turnId: "turn",
+        willRetry: false,
+        error: {
+          message: "redacted",
+          codexErrorInfo: { responseStreamConnectionFailed: { httpStatusCode: 429 } },
+        },
+      }),
+      "rate_limit",
+    );
+    NodeAssert.equal(
+      classifyCodexBrokerFailure({
+        threadId: "provider-thread",
+        turnId: "turn",
+        willRetry: false,
+        error: { message: "usage quota exhausted", codexErrorInfo: "other" },
+      }),
+      "quota",
+    );
+  }),
+);
+
 class FakeCodexRuntime implements CodexSessionRuntimeShape {
   private readonly eventQueue = Effect.runSync(Queue.unbounded<ProviderEvent>());
   private readonly now = "2026-01-01T00:00:00.000Z";
 
-  public readonly startImpl = vi.fn(() =>
+  public readonly startImpl = vi.fn((): Promise<ProviderSession> =>
     Promise.resolve({
       provider: ProviderDriverKind.make("codex"),
       status: "ready" as const,
@@ -132,8 +170,12 @@ class FakeCodexRuntime implements CodexSessionRuntimeShape {
 
   getSession = Effect.promise(() => this.startImpl());
 
+  sendTurnOverride?: (
+    input: CodexSessionRuntimeSendTurnInput,
+  ) => Effect.Effect<ProviderTurnStartResult>;
+
   sendTurn(input: CodexSessionRuntimeSendTurnInput) {
-    return Effect.promise(() => this.sendTurnImpl(input));
+    return this.sendTurnOverride?.(input) ?? Effect.promise(() => this.sendTurnImpl(input));
   }
 
   interruptTurn(turnId?: TurnId) {
@@ -179,11 +221,132 @@ function makeRuntimeFactory() {
 
   return {
     factory,
+    get runtimes(): ReadonlyArray<FakeCodexRuntime> {
+      return runtimes;
+    },
     get lastRuntime(): FakeCodexRuntime | undefined {
       return runtimes.at(-1);
     },
   };
 }
+
+it.effect("rotates runtimes and resumes after a broker-account failure", () =>
+  Effect.gen(function* () {
+    const continuationSent = yield* Deferred.make<CodexSessionRuntimeSendTurnInput>();
+    const runtimes: FakeCodexRuntime[] = [];
+    const runtimeFactory = (options: CodexSessionRuntimeOptions) =>
+      Effect.sync(() => {
+        const runtime = new FakeCodexRuntime(options);
+        runtimes.push(runtime);
+        if (runtimes.length === 2) {
+          runtime.sendTurnOverride = (input) =>
+            Deferred.succeed(continuationSent, input).pipe(
+              Effect.as({
+                threadId: options.threadId,
+                turnId: asTurnId("turn-continuation"),
+              }),
+            );
+        }
+        return runtime;
+      });
+    const lease = (accountId: string): CodexBrokerLease => ({
+      status: "ok",
+      accountId,
+      accountLabel: "Account",
+      accessToken: `token-${accountId}`,
+      chatgptAccountId: `chatgpt-${accountId}`,
+      expiresAt: "2099-01-01T00:00:00Z",
+      shortRemainingPercent: 90,
+      weeklyRemainingPercent: 80,
+      shortResetsAt: null,
+      weeklyResetsAt: null,
+    });
+    const brokerTurnIds: string[] = [];
+    const brokerSession: CodexBrokerSession = {
+      brokerSessionId: "session",
+      lease: Effect.succeed(lease("a")),
+      applyLogin: () => Effect.void,
+      registerRefreshHandler: () => Effect.void,
+      beginLogicalTurn: (brokerTurnId) => {
+        brokerTurnIds.push(brokerTurnId);
+        return Effect.succeed({ lease: lease("a"), accountChanged: false });
+      },
+      reportTerminalFailure: (brokerTurnId) => {
+        brokerTurnIds.push(brokerTurnId);
+        return Effect.succeed({ lease: lease("b"), accountChanged: true });
+      },
+      completeLogicalTurn: () => Effect.void,
+    };
+    const brokerIntegration: CodexBrokerIntegration = {
+      instanceId: "instance",
+      client: { health: Effect.void, route: () => Effect.die("unused") },
+      acquireEphemeralAuth: () => Effect.die("unused"),
+      newInteractiveSession: () => Effect.succeed(brokerSession),
+    };
+    const adapter = yield* makeCodexAdapter(decodeCodexSettings({}), {
+      makeRuntime: runtimeFactory,
+      brokerIntegration,
+    });
+    yield* adapter.startSession({
+      provider: ProviderDriverKind.make("codex"),
+      threadId: asThreadId("thread-1"),
+      runtimeMode: "full-access",
+    });
+    const firstRuntime = runtimes[0];
+    NodeAssert.ok(firstRuntime);
+    firstRuntime.startImpl.mockResolvedValue({
+      provider: ProviderDriverKind.make("codex"),
+      status: "ready",
+      runtimeMode: "full-access",
+      threadId: asThreadId("thread-1"),
+      cwd: process.cwd(),
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      resumeCursor: { threadId: "provider-thread-1" },
+    });
+    yield* adapter.sendTurn({ threadId: asThreadId("thread-1"), input: "original request" });
+    yield* firstRuntime.emit({
+      id: asEventId("broker-error"),
+      kind: "notification",
+      provider: ProviderDriverKind.make("codex"),
+      threadId: asThreadId("thread-1"),
+      turnId: asTurnId("turn-1"),
+      createdAt: "2026-01-01T00:00:00.000Z",
+      method: "error",
+      payload: {
+        threadId: "provider-thread-1",
+        turnId: "turn-1",
+        willRetry: false,
+        error: { message: "usage limit exceeded", codexErrorInfo: "usageLimitExceeded" },
+      },
+    });
+    yield* firstRuntime.emit({
+      ...codexTurnEvent("turn/completed", "turn-1"),
+      payload: {
+        threadId: "provider-thread-1",
+        turn: { id: "turn-1", items: [], status: "failed" },
+      },
+    });
+
+    const continuation = yield* Deferred.await(continuationSent);
+    NodeAssert.equal(runtimes.length, 2);
+    NodeAssert.deepStrictEqual(runtimes[1]?.options.resumeCursor, {
+      threadId: "provider-thread-1",
+    });
+    NodeAssert.notEqual(continuation.input, "original request");
+    NodeAssert.equal(brokerTurnIds.length, 2);
+    NodeAssert.equal(brokerTurnIds[0], brokerTurnIds[1]);
+  }).pipe(
+    Effect.scoped,
+    Effect.provide(
+      Layer.mergeAll(
+        ServerConfig.layerTest(process.cwd(), process.cwd()),
+        ServerSettingsService.layerTest(),
+        providerSessionDirectoryTestLayer,
+      ).pipe(Layer.provideMerge(NodeServices.layer)),
+    ),
+  ),
+);
 
 function makeScopedRuntimeFactory(options?: { readonly failConstruction?: boolean }) {
   const runtimes: Array<FakeCodexRuntime> = [];
