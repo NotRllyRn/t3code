@@ -36,6 +36,7 @@ import * as CodexErrors from "effect-codex-app-server/errors";
 import * as CodexRpc from "effect-codex-app-server/rpc";
 import * as EffectCodexSchema from "effect-codex-app-server/schema";
 
+import type { CodexBrokerAuthContext } from "./CodexBrokerAuth.ts";
 import { buildCodexInitializeParams } from "./CodexProvider.ts";
 import { codexSessionAppServerArgs } from "./codexLaunchArgs.ts";
 import { expandHomePath } from "../../pathExpansion.ts";
@@ -166,6 +167,7 @@ export interface CodexSessionRuntimeOptions {
   readonly serviceTier?: CodexServiceTier | undefined;
   readonly resumeCursor?: CodexResumeCursor;
   readonly appServerArgs?: ReadonlyArray<string>;
+  readonly brokerAuth?: CodexBrokerAuthContext;
 }
 
 export interface CodexSessionRuntimeSendTurnInput {
@@ -197,6 +199,7 @@ export interface CodexSessionRuntimeShape {
     input: CodexSessionRuntimeSendTurnInput,
   ) => Effect.Effect<ProviderTurnStartResult, CodexSessionRuntimeError>;
   readonly compactThread: Effect.Effect<void, CodexSessionRuntimeError>;
+  readonly applyBrokerAuth?: Effect.Effect<void, CodexSessionRuntimeError>;
   readonly interruptTurn: (turnId?: TurnId) => Effect.Effect<void, CodexSessionRuntimeError>;
   readonly readThread: Effect.Effect<CodexThreadSnapshot, CodexSessionRuntimeError>;
   readonly rollbackThread: (
@@ -2172,6 +2175,10 @@ export const makeCodexSessionRuntime = (
       }),
     );
 
+    if (options.brokerAuth) {
+      yield* options.brokerAuth.registerRefreshHandler(client);
+    }
+
     yield* client.handleUnknownServerRequest((method) =>
       Effect.fail(CodexErrors.CodexAppServerRequestError.methodNotFound(method)),
     );
@@ -2260,6 +2267,7 @@ export const makeCodexSessionRuntime = (
       yield* emitSessionEvent("session/connecting", "Starting Codex App Server session.");
       yield* client.request("initialize", buildCodexInitializeParams());
       yield* client.notify("initialized", undefined);
+      if (options.brokerAuth) yield* options.brokerAuth.applyLogin(client);
 
       const requestedModel = normalizeCodexModelSlug(options.model);
 
@@ -2321,6 +2329,7 @@ export const makeCodexSessionRuntime = (
     return {
       start,
       getSession: Ref.get(sessionRef),
+      ...(options.brokerAuth ? { applyBrokerAuth: options.brokerAuth.applyLogin(client) } : {}),
       compactThread: Effect.gen(function* () {
         const providerThreadId = yield* readProviderThreadId;
         yield* client.request("thread/compact/start", { threadId: providerThreadId });
