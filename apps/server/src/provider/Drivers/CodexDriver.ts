@@ -37,6 +37,8 @@ import { expandHomePath } from "../../pathExpansion.ts";
 import { ServerSettingsService } from "../../serverSettings.ts";
 import { ProviderDriverError } from "../Errors.ts";
 import { makeCodexAdapter } from "../Layers/CodexAdapter.ts";
+import { makeCodexBrokerIntegration } from "../Layers/CodexBrokerAuth.ts";
+import { parseCodexBrokerConfig } from "../Layers/CodexBrokerClient.ts";
 import {
   CODEX_RESET_CREDIT_TIMEOUT,
   CodexResetCreditCoordinator,
@@ -134,7 +136,27 @@ export const CodexDriver: ProviderDriver<CodexSettings, CodexDriverEnv> = {
       const serverSettings = yield* ServerSettingsService;
       const eventLoggers = yield* ProviderEventLoggers;
       const modelManifest = yield* ModelManifest.ModelManifest;
-      const processEnv = mergeProviderInstanceEnvironment(environment);
+      const mergedEnvironment = mergeProviderInstanceEnvironment(environment);
+      const brokerConfig = yield* parseCodexBrokerConfig(mergedEnvironment).pipe(
+        Effect.mapError(
+          (cause) =>
+            new ProviderDriverError({
+              driver: DRIVER_KIND,
+              instanceId,
+              detail: cause.message,
+              cause,
+            }),
+        ),
+      );
+      const brokerIntegration = brokerConfig
+        ? makeCodexBrokerIntegration(brokerConfig, instanceId)
+        : undefined;
+      const {
+        CODEX_BROKER_URL: _brokerUrl,
+        CODEX_BROKER_CLIENT_KEY: _brokerClientKey,
+        CODEX_BROKER_CA_CERT: _brokerCaCert,
+        ...processEnv
+      } = mergedEnvironment;
       const homeLayout = yield* resolveCodexHomeLayout(config);
       const continuationIdentity = codexContinuationIdentity(homeLayout);
       const stampIdentity = withInstanceIdentity({
@@ -185,8 +207,13 @@ export const CodexDriver: ProviderDriver<CodexSettings, CodexDriverEnv> = {
         instanceId,
         environment: processEnv,
         ...(eventLoggers.native ? { nativeEventLogger: eventLoggers.native } : {}),
+        ...(brokerIntegration ? { brokerIntegration } : {}),
       });
-      const textGeneration = yield* makeCodexTextGeneration(effectiveConfig, processEnv);
+      const textGeneration = yield* makeCodexTextGeneration(
+        effectiveConfig,
+        processEnv,
+        brokerIntegration,
+      );
 
       // Build a managed snapshot whose settings never change — mutations come
       // in as instance rebuilds from the registry rather than in-place
@@ -198,7 +225,7 @@ export const CodexDriver: ProviderDriver<CodexSettings, CodexDriverEnv> = {
       const checkProvider = modelManifest.refreshInBackground.pipe(
         Effect.andThen(
           Effect.zipWith(
-            checkCodexProviderStatus(effectiveConfig, undefined, processEnv),
+            checkCodexProviderStatus(effectiveConfig, undefined, processEnv, brokerIntegration),
             modelManifest.current,
             (draft, manifest) =>
               stampIdentity(ModelManifest.applyModelManifest(draft, manifest, DRIVER_KIND)),
@@ -253,6 +280,7 @@ export const CodexDriver: ProviderDriver<CodexSettings, CodexDriverEnv> = {
                 launchArgs: resolveCodexLaunchArgs(effectiveConfig.launchArgs, processEnv),
                 cwd,
                 environment: processEnv,
+                ...(brokerIntegration ? { brokerIntegration } : {}),
               }).pipe(
                 Effect.scoped,
                 Effect.timeout("20 seconds"),
@@ -342,7 +370,7 @@ export const CodexDriver: ProviderDriver<CodexSettings, CodexDriverEnv> = {
         enabled,
         snapshot,
         snapshotForCwd,
-        consumeResetCredit,
+        ...(brokerIntegration ? {} : { consumeResetCredit }),
         adapter,
         textGeneration,
       } satisfies ProviderInstance;
