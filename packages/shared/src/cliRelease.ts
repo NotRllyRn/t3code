@@ -17,7 +17,7 @@ export const CLI_RELEASE_BASE_URL_ENV = "T3CODE_RELEASE_BASE_URL";
  * download URLs that 404, and a build there without a key here is
  * unreachable from every installer.
  */
-const CLI_ARCHIVE_PLATFORM_KEYS = [
+export const CLI_ARCHIVE_PLATFORM_KEYS = [
   "darwin-arm64",
   "darwin-x64",
   "linux-arm64",
