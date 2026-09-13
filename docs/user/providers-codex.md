@@ -4,6 +4,26 @@ For one account, use the default Codex provider with your normal Codex login.
 [Provider setup](./install.md#providers) covers installation, Settings > Providers,
 and custom binaries or environment variables.
 
+## Use Codex Broker
+
+A server-managed [Codex Broker](https://github.com/NotRllyRn/codex-broker) can route
+Codex work across an account pool without storing those accounts' refresh tokens in
+T3 Code. Add these environment variables to the Codex provider instance:
+
+```text
+CODEX_BROKER_URL=https://broker.example.internal
+CODEX_BROKER_CLIENT_KEY=<client key>
+CODEX_BROKER_CA_CERT=/path/to/private-ca.pem  # optional
+```
+
+Mark `CODEX_BROKER_CLIENT_KEY` as **Sensitive**. The URL must use HTTPS, and the URL
+and key must be configured together. The CA certificate is only needed for a private
+certificate authority; TLS verification cannot be disabled.
+
+Broker mode covers provider checks, interactive threads, and generated titles,
+branches, commits, and pull-request text. A local `codex login` is not required.
+Broker access tokens remain in server memory and are not written to `auth.json`.
+
 ## Use multiple accounts
 
 A shared Codex home with a shadow home lets work and personal accounts continue

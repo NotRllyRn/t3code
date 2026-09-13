@@ -1,6 +1,9 @@
 import { assert, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
+import * as TestClock from "effect/testing/TestClock";
 import type * as CodexClient from "effect-codex-app-server/client";
+import * as CodexErrors from "effect-codex-app-server/errors";
 
 import { makeCodexBrokerIntegration } from "./CodexBrokerAuth.ts";
 import type {
@@ -42,13 +45,16 @@ it.effect("maps broker identities to external auth and refreshes only the same a
     const auth = yield* integration.acquireEphemeralAuth("probe");
 
     const logins: unknown[] = [];
-    let refresh: (() => Effect.Effect<unknown, unknown>) | undefined;
+    let refresh: (() => Effect.Effect<unknown, CodexErrors.CodexAppServerError>) | undefined;
     const appClient = {
       request: (_method: string, payload: unknown) => {
         logins.push(payload);
         return Effect.succeed({});
       },
-      handleServerRequest: (_method: string, handler: () => Effect.Effect<unknown, unknown>) =>
+      handleServerRequest: (
+        _method: string,
+        handler: () => Effect.Effect<unknown, CodexErrors.CodexAppServerError>,
+      ) =>
         Effect.sync(() => {
           refresh = handler;
         }),
@@ -99,9 +105,12 @@ it.effect("routes each interactive turn and defers refresh account switches", ()
     assert.isFalse(selected.accountChanged);
     assert.strictEqual(routed[1]?.turnId, "logical-turn");
 
-    let refresh: (() => Effect.Effect<unknown, unknown>) | undefined;
+    let refresh: (() => Effect.Effect<unknown, CodexErrors.CodexAppServerError>) | undefined;
     const appClient = {
-      handleServerRequest: (_method: string, handler: () => Effect.Effect<unknown, unknown>) =>
+      handleServerRequest: (
+        _method: string,
+        handler: () => Effect.Effect<unknown, CodexErrors.CodexAppServerError>,
+      ) =>
         Effect.sync(() => {
           refresh = handler;
         }),
@@ -114,6 +123,47 @@ it.effect("routes each interactive turn and defers refresh account switches", ()
     assert.isTrue(replacement.accountChanged);
     assert.strictEqual(replacement.lease.accountId, "broker-b");
     assert.strictEqual(routed.length, 3);
+  }),
+);
+
+it.effect("waits for pool availability without re-reporting the failure", () =>
+  Effect.gen(function* () {
+    const routed: CodexBrokerRouteInput[] = [];
+    const responses = [
+      lease("broker-a", "bootstrap"),
+      {
+        status: "wait" as const,
+        code: "POOL_EXHAUSTED",
+        nextRetryAt: "2099-01-01T00:00:12Z",
+        retryAfterSeconds: 12,
+      },
+      lease("broker-b", "replacement"),
+    ];
+    const broker: CodexBrokerClient = {
+      health: Effect.void,
+      route: (input) => {
+        routed.push(input);
+        const response = responses.shift();
+        return response ? Effect.succeed(response) : Effect.die("missing test response");
+      },
+    };
+    const session = yield* makeCodexBrokerIntegration(
+      { url: new URL("https://broker.test"), clientKey: "secret" },
+      "instance",
+      broker,
+    ).newInteractiveSession("thread");
+
+    const recovery = yield* session
+      .reportTerminalFailure("logical-turn", "quota")
+      .pipe(Effect.forkChild);
+    yield* TestClock.adjust("12 seconds");
+    const selected = yield* Fiber.join(recovery);
+
+    assert.strictEqual(selected.lease.accountId, "broker-b");
+    assert.strictEqual(routed[1]?.failedAccountId, "broker-a");
+    assert.strictEqual(routed[1]?.failureKind, "quota");
+    assert.strictEqual(routed[2]?.failedAccountId, undefined);
+    assert.strictEqual(routed[2]?.failureKind, undefined);
   }),
 );
 
@@ -133,9 +183,12 @@ it.effect("rejects a mid-request account switch", () =>
       broker,
     ).acquireEphemeralAuth("probe");
 
-    let refresh: (() => Effect.Effect<unknown, unknown>) | undefined;
+    let refresh: (() => Effect.Effect<unknown, CodexErrors.CodexAppServerError>) | undefined;
     const appClient = {
-      handleServerRequest: (_method: string, handler: () => Effect.Effect<unknown, unknown>) =>
+      handleServerRequest: (
+        _method: string,
+        handler: () => Effect.Effect<unknown, CodexErrors.CodexAppServerError>,
+      ) =>
         Effect.sync(() => {
           refresh = handler;
         }),

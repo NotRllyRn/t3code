@@ -1,3 +1,5 @@
+// @effect-diagnostics nodeBuiltinImport:off
+// @effect-diagnostics preferSchemaOverJson:off
 import * as NodeChildProcess from "node:child_process";
 import * as NodeFSP from "node:fs/promises";
 import * as NodeHttps from "node:https";
@@ -121,12 +123,12 @@ it.effect("uses bearer auth and a custom CA, validates responses, and sanitizes 
         );
 
         yield* Effect.acquireUseRelease(
-          Effect.callback<number, Error>((resume) => {
-            server.once("error", (error) => resume(Effect.fail(error)));
+          Effect.callback<number>((resume) => {
+            server.once("error", (error) => resume(Effect.die(error)));
             server.listen(0, "127.0.0.1", () => {
               const address = server.address();
               if (!address || typeof address === "string") {
-                resume(Effect.fail(new Error("HTTPS test server did not bind to a TCP port")));
+                resume(Effect.die("HTTPS test server did not bind to a TCP port"));
                 return;
               }
               resume(Effect.succeed(address.port));

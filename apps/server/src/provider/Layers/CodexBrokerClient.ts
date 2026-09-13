@@ -1,3 +1,4 @@
+// @effect-diagnostics nodeBuiltinImport:off
 import * as NodeFSP from "node:fs/promises";
 import * as NodeHttp from "node:http";
 import * as NodeHttps from "node:https";
@@ -86,12 +87,13 @@ const WireLease = Schema.Union([
 ]);
 const WireWait = Schema.Struct({
   status: Schema.Literal("wait"),
-  code: Schema.String,
+  code: Schema.Literal("POOL_EXHAUSTED"),
   next_retry_at: NullableString,
-  retry_after_seconds: Schema.Number,
+  retry_after_seconds: Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0)),
 });
 const decodeLease = Schema.decodeUnknownSync(WireLease, { onExcessProperty: "error" });
 const decodeWait = Schema.decodeUnknownSync(WireWait, { onExcessProperty: "error" });
+const decodeJson = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Unknown));
 
 export function parseCodexBrokerConfig(
   environment: NodeJS.ProcessEnv,
@@ -155,7 +157,7 @@ function requestBuffer(input: {
       const ca = input.config.caCertPath
         ? await NodeFSP.readFile(input.config.caCertPath)
         : undefined;
-      return await new Promise<{ readonly statusCode: number | undefined; readonly body: Buffer }>(
+      return new Promise<{ readonly statusCode: number | undefined; readonly body: Buffer }>(
         (resolve, reject) => {
           let url: URL;
           try {
@@ -250,12 +252,7 @@ export function makeCodexBrokerClient(config: CodexBrokerConfig): CodexBrokerCli
       Effect.flatMap(({ statusCode, body: responseBody }) =>
         Effect.try({
           try: (): CodexBrokerLease | CodexBrokerWait => {
-            let parsed: unknown;
-            try {
-              parsed = JSON.parse(responseBody.toString("utf8"));
-            } catch {
-              throw new Error("invalid JSON");
-            }
+            const parsed = decodeJson(responseBody.toString("utf8"));
             if (statusCode === 200) {
               const lease = decodeLease(parsed);
               return {

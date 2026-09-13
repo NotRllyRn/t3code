@@ -10,6 +10,7 @@ import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 import type * as CodexClient from "effect-codex-app-server/client";
+import * as CodexErrors from "effect-codex-app-server/errors";
 import * as EffectCodexSchema from "effect-codex-app-server/schema";
 
 import {
@@ -44,12 +45,14 @@ import { getCodexServiceTierOptionValue } from "../codexModelOptions.ts";
 import {
   authenticateCodexAppServer,
   classifyCodexBrokerFailure,
+  type CodexBrokerAuthError,
   type CodexBrokerIntegration,
 } from "../provider/Layers/CodexBrokerAuth.ts";
 import { withCodexAppServerClient } from "../provider/Layers/CodexProvider.ts";
 
 const CODEX_TIMEOUT_MS = 180_000;
 const encodeJsonString = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
+const isTextGenerationError = Schema.is(TextGenerationError);
 
 interface CodexTextGenerationOptions {
   readonly withAppServerClient?: (input: {
@@ -60,7 +63,7 @@ interface CodexTextGenerationOptions {
     readonly environment?: NodeJS.ProcessEnv | undefined;
   }) => Effect.Effect<
     { readonly client: CodexClient.CodexAppServerClient["Service"] },
-    unknown,
+    CodexErrors.CodexAppServerError | CodexBrokerAuthError,
     Scope.Scope
   >;
 }
@@ -316,7 +319,7 @@ export const makeCodexTextGeneration = Effect.fn("makeCodexTextGeneration")(func
         const result = yield* runAttempt().pipe(
           Effect.scoped,
           Effect.mapError((cause) =>
-            cause instanceof TextGenerationError
+            isTextGenerationError(cause)
               ? cause
               : new TextGenerationError({
                   operation,

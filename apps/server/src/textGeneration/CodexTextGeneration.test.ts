@@ -1,3 +1,4 @@
+// @effect-diagnostics preferSchemaOverJson:off
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import type * as CodexClient from "effect-codex-app-server/client";
 import { it } from "@effect/vitest";
