@@ -55,6 +55,8 @@ import * as CodexInstallation from "../CodexInstallation.ts";
 import * as ServerSecretStore from "../../auth/ServerSecretStore.ts";
 import * as ServerEnvironment from "../../environment/ServerEnvironment.ts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
+import { makeCodexBrokerIntegration } from "../CodexBrokerAuth.ts";
+import { parseCodexBrokerConfig } from "../CodexBrokerClient.ts";
 const decodeCodexSettings = Schema.decodeSync(CodexSettings);
 
 const DRIVER_KIND = ProviderDriverKind.make("codex");
@@ -125,7 +127,27 @@ export const CodexDriver: ProviderDriver<CodexSettings, CodexDriverEnv, Path.Pat
       const latestVersions = yield* ProviderLatestVersions.ProviderLatestVersions;
       const modelCatalog = yield* ModelCatalog.ModelCatalog;
       const currentCatalog = modelCatalog.current(DRIVER_KIND);
-      const processEnv = yield* mergeProviderInstanceEnvironment(environment);
+      const mergedEnvironment = yield* mergeProviderInstanceEnvironment(environment);
+      const brokerConfig = yield* parseCodexBrokerConfig(mergedEnvironment).pipe(
+        Effect.mapError(
+          (cause) =>
+            new ProviderDriverError({
+              driver: DRIVER_KIND,
+              instanceId,
+              detail: cause.message,
+              cause,
+            }),
+        ),
+      );
+      const brokerIntegration = brokerConfig
+        ? makeCodexBrokerIntegration(brokerConfig, instanceId)
+        : undefined;
+      const {
+        CODEX_BROKER_URL: _brokerUrl,
+        CODEX_BROKER_CLIENT_KEY: _brokerClientKey,
+        CODEX_BROKER_CA_CERT: _brokerCaCert,
+        ...processEnv
+      } = mergedEnvironment;
       const homeLayout = yield* resolveCodexHomeLayout(config);
       const continuationIdentity = codexContinuationIdentity(homeLayout);
       const stampIdentity = withInstanceIdentity({
@@ -171,11 +193,19 @@ export const CodexDriver: ProviderDriver<CodexSettings, CodexDriverEnv, Path.Pat
           instanceId,
           displayName,
           accentColor,
-          environment,
+          environment: environment.filter(
+            ({ name }) =>
+              name !== "CODEX_BROKER_URL" &&
+              name !== "CODEX_BROKER_CLIENT_KEY" &&
+              name !== "CODEX_BROKER_CA_CERT",
+          ),
           enabled,
           config,
         },
-        { onUsageLimits: (update) => snapshot.applyUsageLimits(update) },
+        {
+          onUsageLimits: (update) => snapshot.applyUsageLimits(update),
+          ...(brokerIntegration ? { brokerIntegration } : {}),
+        },
       ).pipe(
         Effect.mapError(
           (cause) =>
@@ -193,7 +223,13 @@ export const CodexDriver: ProviderDriver<CodexSettings, CodexDriverEnv, Path.Pat
       const checkProvider = modelCatalog.refreshInBackground.pipe(
         Effect.andThen(
           Effect.zipWith(
-            checkCodexProviderStatus(effectiveConfig, undefined, processEnv),
+            checkCodexProviderStatus(
+              effectiveConfig,
+              undefined,
+              processEnv,
+              undefined,
+              brokerIntegration,
+            ),
             currentCatalog,
             (draft, catalog) => stampIdentity(applyCodexModelCatalog(draft, catalog)),
             { concurrent: true },
@@ -254,6 +290,7 @@ export const CodexDriver: ProviderDriver<CodexSettings, CodexDriverEnv, Path.Pat
                 launchArgs: resolveCodexLaunchArgs(effectiveConfig.launchArgs, processEnv),
                 cwd,
                 environment: processEnv,
+                ...(brokerIntegration ? { brokerIntegration } : {}),
               }).pipe(
                 Effect.scoped,
                 Effect.timeout("20 seconds"),
@@ -343,7 +380,7 @@ export const CodexDriver: ProviderDriver<CodexSettings, CodexDriverEnv, Path.Pat
         enabled,
         snapshot,
         snapshotForCwd,
-        consumeResetCredit,
+        ...(brokerIntegration ? {} : { consumeResetCredit }),
         orchestrationAdapter,
         textGeneration,
       } satisfies ProviderInstance;
