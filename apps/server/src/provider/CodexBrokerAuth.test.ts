@@ -73,6 +73,50 @@ it.effect("maps broker identities to external auth and refreshes only the same a
   }),
 );
 
+it.effect("routes each interactive turn and defers refresh account switches", () =>
+  Effect.gen(function* () {
+    const routed: CodexBrokerRouteInput[] = [];
+    const leases = [
+      lease("broker-a", "bootstrap"),
+      lease("broker-a", "turn"),
+      lease("broker-b", "replacement"),
+    ];
+    const broker: CodexBrokerClient = {
+      health: Effect.void,
+      route: (input) => {
+        routed.push(input);
+        const next = leases.shift();
+        return next ? Effect.succeed(next) : Effect.die("missing test lease");
+      },
+    };
+    const session = yield* makeCodexBrokerIntegration(
+      { url: new URL("https://broker.test"), clientKey: "secret" },
+      "instance",
+      broker,
+    ).newInteractiveSession("thread");
+
+    const selected = yield* session.beginLogicalTurn("logical-turn");
+    assert.isFalse(selected.accountChanged);
+    assert.strictEqual(routed[1]?.turnId, "logical-turn");
+
+    let refresh: (() => Effect.Effect<unknown, unknown>) | undefined;
+    const appClient = {
+      handleServerRequest: (_method: string, handler: () => Effect.Effect<unknown, unknown>) =>
+        Effect.sync(() => {
+          refresh = handler;
+        }),
+    } as unknown as CodexClient.CodexAppServerClient["Service"];
+    yield* session.registerRefreshHandler(appClient);
+    assert.isDefined(refresh);
+    assert.strictEqual((yield* Effect.exit(refresh()))._tag, "Failure");
+
+    const replacement = yield* session.reportTerminalFailure("logical-turn", "auth");
+    assert.isTrue(replacement.accountChanged);
+    assert.strictEqual(replacement.lease.accountId, "broker-b");
+    assert.strictEqual(routed.length, 3);
+  }),
+);
+
 it.effect("rejects a mid-request account switch", () =>
   Effect.gen(function* () {
     const leases = [lease("broker-a", "token-1"), lease("broker-b", "token-2")];
