@@ -386,10 +386,14 @@ jobs:
           VP_NODE_VERSION: "26.8.2"
         run: |
           set -euo pipefail
-          # Always name the target: the macOS x64 row runs on an arm64 runner.
-          node apps/server/scripts/cli.ts build-exe --target "${{ inputs.platform }}-${{ inputs.arch }}" --verbose
+          # Always name the target: the macOS x64 job runs on an arm64 runner.
+          # SEA targets use nodejs.org naming (darwin/linux/win), not the
+          # electron-builder platform names this workflow uses (mac/linux/win).
+          sea_platform="${{ inputs.platform }}"
+          [[ "$sea_platform" == "mac" ]] && sea_platform="darwin"
+          node apps/server/scripts/cli.ts build-exe --target "${sea_platform}-${{ inputs.arch }}" --verbose
           if [[ -n "${{ inputs.cli_extra_arch }}" ]]; then
-            node apps/server/scripts/cli.ts build-exe --target "${{ inputs.platform }}-${{ inputs.cli_extra_arch }}" --verbose
+            node apps/server/scripts/cli.ts build-exe --target "${sea_platform}-${{ inputs.cli_extra_arch }}" --verbose
           fi
 
       - name: Import macOS signing certificate for the CLI archive
