@@ -41,6 +41,17 @@ export interface CodexBrokerAuthContext {
   ) => Effect.Effect<void>;
 }
 
+export const authenticateCodexAppServer = Effect.fn("CodexBrokerAuth.authenticateCodexAppServer")(
+  function* (
+    client: CodexClient.CodexAppServerClient["Service"],
+    auth: CodexBrokerAuthContext | undefined,
+  ) {
+    if (!auth) return;
+    yield* auth.registerRefreshHandler(client);
+    yield* auth.applyLogin(client);
+  },
+);
+
 export interface CodexBrokerIntegration {
   readonly instanceId: string;
   readonly client: CodexBrokerClient;

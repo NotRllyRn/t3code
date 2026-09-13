@@ -51,7 +51,7 @@ import {
 } from "./codexUsageLimits.ts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import packageJson from "../../package.json" with { type: "json" };
-import type { CodexBrokerIntegration } from "./CodexBrokerAuth.ts";
+import { authenticateCodexAppServer, type CodexBrokerIntegration } from "./CodexBrokerAuth.ts";
 const isCodexAppServerSpawnError = Schema.is(CodexErrors.CodexAppServerSpawnError);
 const RATE_LIMITS_PROBE_TIMEOUT_MS = 3_000;
 
@@ -460,8 +460,7 @@ export const withCodexAppServerClient = Effect.fn("withCodexAppServerClient")(fu
     const auth = yield* input.brokerIntegration.acquireEphemeralAuth(
       input.brokerOperation ?? "app-server",
     );
-    yield* auth.registerRefreshHandler(client);
-    yield* auth.applyLogin(client);
+    yield* authenticateCodexAppServer(client, auth);
   }
   return { client, initialize };
 });
