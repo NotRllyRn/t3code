@@ -47,7 +47,7 @@ import {
   type CodexSessionRuntimeShape,
   type CodexThreadSnapshot,
 } from "./CodexSessionRuntime.ts";
-import { makeCodexAdapter } from "./CodexAdapter.ts";
+import { codexBrokerAccountMessage, makeCodexAdapter } from "./CodexAdapter.ts";
 import { classifyCodexBrokerFailure } from "./CodexBrokerAuth.ts";
 import type { CodexBrokerIntegration, CodexBrokerSession } from "./CodexBrokerAuth.ts";
 import type { CodexBrokerLease } from "./CodexBrokerClient.ts";
@@ -97,6 +97,27 @@ it.effect("classifies terminal Codex broker failures from structured errors", ()
     );
   }),
 );
+
+it("formats broker account usage without exposing account ids", () => {
+  const message = codexBrokerAccountMessage(
+    {
+      status: "ok",
+      accountId: "private-account-id",
+      accountLabel: "person@example.com",
+      accessToken: "private-token",
+      chatgptAccountId: "private-chatgpt-id",
+      expiresAt: "2099-01-01T00:00:00Z",
+      shortRemainingPercent: 80,
+      weeklyRemainingPercent: 60,
+      shortResetsAt: "2026-01-01T02:02:00Z",
+      weeklyResetsAt: "2026-01-03T02:00:00Z",
+    },
+    Date.parse("2026-01-01T00:00:00Z"),
+  );
+
+  NodeAssert.equal(message, "person@example.com · 5h 80% 2h2m · 7d 60% 2d2h");
+  NodeAssert.equal(message.includes("private"), false);
+});
 
 class FakeCodexRuntime implements CodexSessionRuntimeShape {
   private readonly eventQueue = Effect.runSync(Queue.unbounded<ProviderEvent>());
@@ -253,7 +274,7 @@ it.effect("rotates runtimes and resumes after a broker-account failure", () =>
     const lease = (accountId: string): CodexBrokerLease => ({
       status: "ok",
       accountId,
-      accountLabel: "Account",
+      accountLabel: `Account ${accountId}`,
       accessToken: `token-${accountId}`,
       chatgptAccountId: `chatgpt-${accountId}`,
       expiresAt: "2099-01-01T00:00:00Z",
@@ -306,7 +327,15 @@ it.effect("rotates runtimes and resumes after a broker-account failure", () =>
       updatedAt: "2026-01-01T00:00:00.000Z",
       resumeCursor: { threadId: "provider-thread-1" },
     });
+    const accountEventFiber = yield* Stream.runHead(adapter.streamEvents).pipe(Effect.forkChild);
     yield* adapter.sendTurn({ threadId: asThreadId("thread-1"), input: "original request" });
+    const accountEvent = yield* Fiber.join(accountEventFiber);
+    NodeAssert.equal(accountEvent._tag, "Some");
+    if (accountEvent._tag === "Some" && accountEvent.value.type === "runtime.warning") {
+      NodeAssert.equal(accountEvent.value.payload.message, "Account a · 5h 90% — · 7d 80% —");
+    } else {
+      NodeAssert.fail("expected broker account runtime warning");
+    }
     yield* firstRuntime.emit({
       id: asEventId("broker-error"),
       kind: "notification",

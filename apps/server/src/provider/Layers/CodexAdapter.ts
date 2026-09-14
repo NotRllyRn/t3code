@@ -68,6 +68,7 @@ import type {
   CodexBrokerSession,
   CodexBrokerIntegration,
 } from "./CodexBrokerAuth.ts";
+import type { CodexBrokerLease } from "./CodexBrokerClient.ts";
 import {
   CodexResumeCursorSchema,
   CodexSessionRuntimeThreadIdMissingError,
@@ -88,6 +89,22 @@ const isCodexSessionRuntimeThreadIdMissingError = Schema.is(
 const isCodexResumeCursorSchema = Schema.is(CodexResumeCursorSchema);
 
 const PROVIDER = ProviderDriverKind.make("codex");
+
+const brokerResetIn = (resetsAt: string | null, now: number): string => {
+  if (!resetsAt) return "—";
+  const remaining = Date.parse(resetsAt) - now;
+  if (!Number.isFinite(remaining) || remaining <= 0) return "now";
+  const minutes = Math.floor(remaining / 60_000);
+  const days = Math.floor(minutes / 1_440);
+  const hours = Math.floor((minutes % 1_440) / 60);
+  return days > 0 ? `${days}d${hours}h` : `${hours}h${minutes % 60}m`;
+};
+
+export function codexBrokerAccountMessage(lease: CodexBrokerLease, now: number): string {
+  const window = (label: string, remaining: number | null, resetsAt: string | null) =>
+    `${label} ${remaining === null ? "—" : `${remaining}%`} ${brokerResetIn(resetsAt, now)}`;
+  return `${lease.accountLabel} · ${window("5h", lease.shortRemainingPercent, lease.shortResetsAt)} · ${window("7d", lease.weeklyRemainingPercent, lease.weeklyResetsAt)}`;
+}
 
 export interface CodexAdapterLiveOptions {
   readonly instanceId?: ProviderInstanceId;
@@ -2630,6 +2647,7 @@ export const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
         ? getCodexServiceTierOptionValue(input.modelSelection)
         : undefined;
     let brokerTurn: BrokerLogicalTurnState | undefined;
+    let brokerLease: CodexBrokerLease | undefined;
     if (session.brokerSession) {
       const brokerTurnId = NodeCrypto.randomUUID();
       brokerTurn = {
@@ -2656,6 +2674,7 @@ export const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
               }),
           ),
         );
+        brokerLease = selection.lease;
         if (selection.accountChanged) {
           yield* replaceRuntimeSlot(session);
         } else if (session.slot.runtime.applyBrokerAuth) {
@@ -2666,6 +2685,7 @@ export const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
           );
         }
       }
+      brokerLease ??= yield* session.brokerSession.lease;
       session.activeBrokerTurn = brokerTurn;
     }
 
@@ -2688,6 +2708,20 @@ export const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
     if (brokerTurn) {
       brokerTurn.providerTurnIds.add(result.turnId);
       session.brokerTurns.set(result.turnId, brokerTurn);
+    }
+    if (brokerLease) {
+      const now = yield* DateTime.now;
+      yield* Queue.offer(runtimeEventQueue, {
+        type: "runtime.warning",
+        eventId: EventId.make(NodeCrypto.randomUUID()),
+        provider: PROVIDER,
+        threadId: session.threadId,
+        turnId: result.turnId,
+        createdAt: DateTime.formatIso(now),
+        payload: {
+          message: codexBrokerAccountMessage(brokerLease, DateTime.toEpochMillis(now)),
+        },
+      });
     }
     return result;
   });
@@ -2784,15 +2818,6 @@ export const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
         brokerTurn.pendingFailure = undefined;
         brokerTurn.recoveryAttempts += 1;
 
-        yield* Queue.offer(runtimeEventQueue, {
-          type: "runtime.warning",
-          eventId: EventId.make(NodeCrypto.randomUUID()),
-          provider: PROVIDER,
-          threadId: session.threadId,
-          createdAt: DateTime.formatIso(yield* DateTime.now),
-          payload: { message: "Codex Broker is switching accounts and resuming the thread." },
-        });
-
         const selection = yield* session.brokerSession.reportTerminalFailure(
           brokerTurn.brokerTurnId,
           failureKind,
@@ -2812,6 +2837,18 @@ export const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
         brokerTurn.providerTurnIds.add(result.turnId);
         session.brokerTurns.set(result.turnId, brokerTurn);
         session.activeBrokerTurn = brokerTurn;
+        const now = yield* DateTime.now;
+        yield* Queue.offer(runtimeEventQueue, {
+          type: "runtime.warning",
+          eventId: EventId.make(NodeCrypto.randomUUID()),
+          provider: PROVIDER,
+          threadId: session.threadId,
+          turnId: result.turnId,
+          createdAt: DateTime.formatIso(now),
+          payload: {
+            message: codexBrokerAccountMessage(selection.lease, DateTime.toEpochMillis(now)),
+          },
+        });
       }).pipe(
         Effect.ensuring(
           Effect.sync(() => {
