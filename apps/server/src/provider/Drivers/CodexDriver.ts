@@ -209,11 +209,6 @@ export const CodexDriver: ProviderDriver<CodexSettings, CodexDriverEnv> = {
         ...(eventLoggers.native ? { nativeEventLogger: eventLoggers.native } : {}),
         ...(brokerIntegration ? { brokerIntegration } : {}),
       });
-      const textGeneration = yield* makeCodexTextGeneration(
-        effectiveConfig,
-        processEnv,
-        brokerIntegration,
-      );
 
       // Build a managed snapshot whose settings never change — mutations come
       // in as instance rebuilds from the registry rather than in-place
@@ -269,6 +264,10 @@ export const CodexDriver: ProviderDriver<CodexSettings, CodexDriverEnv> = {
             }),
         ),
       );
+      const textGeneration = yield* makeCodexTextGeneration(effectiveConfig, processEnv, {
+        ...(brokerIntegration ? { brokerIntegration } : {}),
+        getModels: snapshot.getSnapshot.pipe(Effect.map((value) => value.models)),
+      });
       const snapshotForCwd = (cwd: string) =>
         !effectiveConfig.enabled
           ? snapshot.getSnapshot

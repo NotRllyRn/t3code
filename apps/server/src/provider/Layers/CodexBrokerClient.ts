@@ -46,12 +46,12 @@ export interface CodexBrokerRouteInput {
   readonly failureKind?: CodexBrokerFailureKind;
 }
 
-export class CodexBrokerConfigurationError extends Schema.TaggedErrorClass<CodexBrokerConfigurationError>()(
+export class CodexBrokerConfigurationError extends Schema.TaggedError<CodexBrokerConfigurationError>()(
   "CodexBrokerConfigurationError",
   { message: Schema.String },
 ) {}
 
-export class CodexBrokerRequestError extends Schema.TaggedErrorClass<CodexBrokerRequestError>()(
+export class CodexBrokerRequestError extends Schema.TaggedError<CodexBrokerRequestError>()(
   "CodexBrokerRequestError",
   { message: Schema.String },
 ) {}

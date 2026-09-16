@@ -17,6 +17,7 @@ import {
   type CodexSettings,
   DEFAULT_TEXT_GENERATION_REASONING_EFFORT,
   type ModelSelection,
+  type ServerProviderModel,
   TextGenerationError,
 } from "@t3tools/contracts";
 import { sanitizeBranchFragment, sanitizeFeatureBranchName } from "@t3tools/shared/git";
@@ -40,7 +41,7 @@ import {
   sanitizeThreadTitle,
   toJsonSchemaObject,
 } from "./TextGenerationUtils.ts";
-import { getModelSelectionStringOptionValue } from "@t3tools/shared/model";
+import { codexModelFamily, getModelSelectionStringOptionValue } from "@t3tools/shared/model";
 import { getCodexServiceTierOptionValue } from "../codexModelOptions.ts";
 import {
   authenticateCodexAppServer,
@@ -55,6 +56,8 @@ const encodeJsonString = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknow
 const isTextGenerationError = Schema.is(TextGenerationError);
 
 interface CodexTextGenerationOptions {
+  readonly brokerIntegration?: CodexBrokerIntegration;
+  readonly getModels?: Effect.Effect<ReadonlyArray<ServerProviderModel>>;
   readonly withAppServerClient?: (input: {
     readonly binaryPath: string;
     readonly homePath?: string | undefined;
@@ -75,7 +78,6 @@ interface CodexTextGenerationOptions {
 export const makeCodexTextGeneration = Effect.fn("makeCodexTextGeneration")(function* (
   codexConfig: CodexSettings,
   environment?: NodeJS.ProcessEnv,
-  brokerIntegration?: CodexBrokerIntegration,
   options?: CodexTextGenerationOptions,
 ) {
   const fileSystem = yield* FileSystem.FileSystem;
@@ -83,6 +85,21 @@ export const makeCodexTextGeneration = Effect.fn("makeCodexTextGeneration")(func
   const commandSpawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const serverConfig = yield* Effect.service(ServerConfig.ServerConfig);
   const resolvedEnvironment = environment ?? process.env;
+  const brokerIntegration = options?.brokerIntegration;
+  const getModels = options?.getModels ?? Effect.succeed([]);
+
+  const resolveModel = Effect.fn("CodexTextGeneration.resolveModel")(function* (
+    requestedModel: string,
+  ) {
+    const models = yield* getModels;
+    return (
+      models.find((candidate) => candidate.slug === requestedModel)?.slug ??
+      models.find(
+        (candidate) => !candidate.isCustom && codexModelFamily(candidate.slug) === requestedModel,
+      )?.slug ??
+      requestedModel
+    );
+  });
 
   type MaterializedImageAttachments = {
     readonly imagePaths: ReadonlyArray<string>;
@@ -221,6 +238,7 @@ export const makeCodexTextGeneration = Effect.fn("makeCodexTextGeneration")(func
     const reasoningEffort =
       getModelSelectionStringOptionValue(modelSelection, "reasoningEffort") ??
       DEFAULT_TEXT_GENERATION_REASONING_EFFORT;
+    const model = yield* resolveModel(modelSelection.model);
     const serviceTier = getCodexServiceTierOptionValue(modelSelection);
     const outputSchema = toJsonSchemaObject(outputSchemaJson);
 
@@ -273,7 +291,7 @@ export const makeCodexTextGeneration = Effect.fn("makeCodexTextGeneration")(func
         ephemeral: true,
         approvalPolicy: "never",
         sandbox: "read-only",
-        model: modelSelection.model,
+        model,
         ...(serviceTier ? { serviceTier } : {}),
       });
       providerThreadId = thread.thread.id;
@@ -283,7 +301,7 @@ export const makeCodexTextGeneration = Effect.fn("makeCodexTextGeneration")(func
           { type: "text", text: prompt },
           ...imagePaths.map((path) => ({ type: "localImage" as const, path })),
         ],
-        model: modelSelection.model,
+        model,
         effort: reasoningEffort,
         ...(serviceTier ? { serviceTier } : {}),
         approvalPolicy: "never",
@@ -411,6 +429,7 @@ export const makeCodexTextGeneration = Effect.fn("makeCodexTextGeneration")(func
     const outputPath = yield* writeTempFile(operation, "codex-output", "");
 
     const runCodexCommand = Effect.fn("runCodexJson.runCodexCommand")(function* () {
+      const model = yield* resolveModel(modelSelection.model);
       const launchArgs = resolveCodexLaunchArgs(codexConfig.launchArgs, resolvedEnvironment);
       const reasoningEffort =
         getModelSelectionStringOptionValue(modelSelection, "reasoningEffort") ??
@@ -426,7 +445,7 @@ export const makeCodexTextGeneration = Effect.fn("makeCodexTextGeneration")(func
           "-s",
           "read-only",
           "--model",
-          modelSelection.model,
+          model,
           "--config",
           `model_reasoning_effort="${reasoningEffort}"`,
           ...(serviceTier ? ["--config", `service_tier="${serviceTier}"`] : []),
@@ -621,6 +640,7 @@ export const makeCodexTextGeneration = Effect.fn("makeCodexTextGeneration")(func
       const { prompt, outputSchema } = buildThreadTitlePrompt({
         message: input.message,
         previousTitle: input.previousTitle,
+        linkedContext: input.linkedContext,
         attachments: input.attachments,
       });
 
@@ -635,6 +655,7 @@ export const makeCodexTextGeneration = Effect.fn("makeCodexTextGeneration")(func
 
       return {
         title: sanitizeThreadTitle(generated.title),
+        ...(generated.needsRefinement ? { needsRefinement: true } : {}),
       } satisfies TextGeneration.ThreadTitleGenerationResult;
     });
 
