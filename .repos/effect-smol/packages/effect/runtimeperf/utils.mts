@@ -8,11 +8,6 @@ import { aggregate } from "./stats.mts"
 export const runtimeperfDir = dirname(fileURLToPath(import.meta.url))
 export const effectDir = resolve(runtimeperfDir, "..")
 export const repoRoot = resolve(effectDir, "../..")
-export const runPath = join(runtimeperfDir, "run.mts")
-export const comparePath = join(runtimeperfDir, "compare.mts")
-export const materializePath = join(runtimeperfDir, "materialize.mts")
-export const statsPath = join(runtimeperfDir, "stats.mts")
-export const utilsPath = fileURLToPath(import.meta.url)
 export const workerPath = join(runtimeperfDir, "worker.mts")
 export const configPath = join(runtimeperfDir, "config.json")
 export const resultsRoot = join(repoRoot, "tmp", "runtimeperf", "results")
@@ -152,7 +147,7 @@ export const selectFixtures = (fixtures, options, { effectOnly = false } = {}) =
     selected = selected.filter((fixture) => fixture.implementation === options.implementation)
   }
   if (effectOnly) {
-    selected = selected.filter((fixture) => fixture.implementation.startsWith("effect"))
+    selected = selected.filter((fixture) => fixture.implementation === "effect")
   }
   if (selected.length === 0) {
     throw new Error("No runtimeperf fixtures matched the selection")
@@ -221,13 +216,6 @@ export const measureFixture = (fixture, defaults, batchSize, fixturePath = fixtu
 
 export const aggregateMeasurements = (measurements) => aggregate(measurements.map((item) => item.nsPerOp))
 
-export const scenarioBatchSize = (fixtures, calibrations) => {
-  const reference = fixtures.find((fixture) => fixture.implementation === "effect") ?? fixtures[0]
-  const calibration = calibrations.get(reference)
-  if (calibration === undefined) throw new Error("Missing scenario reference calibration")
-  return calibration.batchSize
-}
-
 export const coverageSummary = (fixtures) => ({
   tiers: [...new Set(fixtures.map((fixture) => fixture.tier))].sort(),
   families: [...new Set(fixtures.map((fixture) => fixture.family))].sort(),
@@ -235,7 +223,7 @@ export const coverageSummary = (fixtures) => ({
   effectAstTags: [
     ...new Set(
       fixtures
-        .filter((fixture) => fixture.implementation.startsWith("effect"))
+        .filter((fixture) => fixture.implementation === "effect")
         .flatMap((fixture) => fixture.astTags)
     )
   ].sort()

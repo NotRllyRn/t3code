@@ -76,7 +76,6 @@ const namespaceOf = (resource: VariableRefSource): string => {
  * ```
  *
  * @resource
- * @product Project
  */
 export const ref = (resource: VariableRefSource, key: string): VariableRef =>
   `\${{${namespaceOf(resource)}.${key}}}`;

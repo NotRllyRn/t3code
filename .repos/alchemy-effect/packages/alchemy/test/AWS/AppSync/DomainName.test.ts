@@ -41,7 +41,7 @@ test.provider(
         );
       }
     }),
-  { tags: ["provider:aws", "provider:aws:appsync", "live"], timeout: 60_000 },
+  { timeout: 60_000 },
 );
 
 test.provider.skipIf(!domainName || !certificateArn)(
@@ -91,5 +91,5 @@ test.provider.skipIf(!domainName || !certificateArn)(
         );
       expect(gone).toBe(true);
     }),
-  { tags: ["provider:aws", "provider:aws:appsync", "live"], timeout: 240_000 },
+  { timeout: 240_000 },
 );

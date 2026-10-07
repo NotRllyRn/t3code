@@ -146,14 +146,6 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:keylesscertificate",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-  },
 );
 
 // `list()` enumerates every zone in the account and lists its Keyless SSL
@@ -161,39 +153,30 @@ test.provider(
 // assertion runs on every plan: the testing account has no Keyless SSL
 // configurations (Enterprise-only), so the exhaustively-paginated result is a
 // well-typed (possibly empty) array whose elements match `read`'s Attributes.
-test.provider(
-  "list enumerates keyless certificates across zones",
-  (stack) =>
-    Effect.gen(function* () {
-      yield* stack.destroy();
+test.provider("list enumerates keyless certificates across zones", (stack) =>
+  Effect.gen(function* () {
+    yield* stack.destroy();
 
-      const provider = yield* Provider.findProvider(
-        Cloudflare.KeylessCertificate.KeylessCertificate,
-      );
-      const all = yield* provider.list().pipe(
-        Effect.retry({
-          while: (e) => e._tag === "Forbidden",
-          schedule: forbiddenRetrySchedule,
-          times: 8,
-        }),
-      );
+    const provider = yield* Provider.findProvider(
+      Cloudflare.KeylessCertificate.KeylessCertificate,
+    );
+    const all = yield* provider.list().pipe(
+      Effect.retry({
+        while: (e) => e._tag === "Forbidden",
+        schedule: forbiddenRetrySchedule,
+        times: 8,
+      }),
+    );
 
-      expect(Array.isArray(all)).toBe(true);
-      for (const item of all) {
-        expect(typeof item.keylessCertificateId).toBe("string");
-        expect(typeof item.zoneId).toBe("string");
-        expect(item.status).not.toEqual("deleted");
-      }
+    expect(Array.isArray(all)).toBe(true);
+    for (const item of all) {
+      expect(typeof item.keylessCertificateId).toBe("string");
+      expect(typeof item.zoneId).toBe("string");
+      expect(item.status).not.toEqual("deleted");
+    }
 
-      yield* stack.destroy();
-    }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:keylesscertificate",
-      "live",
-    ],
-  },
+    yield* stack.destroy();
+  }).pipe(logLevel),
 );
 
 // On an entitled Enterprise zone, the deployed configuration must appear in the
@@ -236,14 +219,7 @@ test.provider.skipIf(!enterpriseZoneId)(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:keylesscertificate",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider.skipIf(!enterpriseZoneId)(
@@ -326,12 +302,5 @@ test.provider.skipIf(!enterpriseZoneId)(
 
       yield* expectGone(zoneId, replaced.keylessCertificateId);
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:keylesscertificate",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

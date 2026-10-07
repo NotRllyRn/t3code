@@ -21,7 +21,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:opensearch", "live"] },
 );
 
 // Deletion is verified as INITIATED (Deleted=true / Processing, irreversible)
@@ -156,13 +155,5 @@ test.provider.skipIf(!process.env.AWS_TEST_SLOW)(
       yield* assertDomainDeleting(domain.domainName);
     }),
   // create (~15-25 min) + delete initiation, one test.
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:iam",
-      "provider:aws:opensearch",
-      "live",
-    ],
-    timeout: 3_000_000,
-  },
+  { timeout: 3_000_000 },
 );

@@ -187,7 +187,6 @@ export interface Issue extends Resource<
  * ```
  *
  * @resource
- * @product Issue
  */
 export const Issue = Resource<Issue>("GitHub.Issue", {
   defaultRemovalPolicy: "retain",

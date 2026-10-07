@@ -4,8 +4,6 @@ import type { MemoOptions } from "../../Command/Memo.ts";
 import type { InputProps } from "../../Input.ts";
 import { effectClass } from "../../Util/effect.ts";
 import type { Providers } from "../Providers.ts";
-import type { Namespace } from "../KV/Namespace.ts";
-import { DurableObject } from "../Workers/DurableObject.ts";
 import type { AssetsConfig } from "../Workers/Assets.ts";
 import {
   Self,
@@ -31,7 +29,8 @@ export interface NextjsProps<
   "vite" | "main" | "assets" | "script" | "bundle" | "source" | "rules" | "dev"
 > {
   /**
-   * The Next.js project root. Defaults to the process working directory.
+   * The Next.js project root (the directory containing `next.config.*` and
+   * `open-next.config.ts`). Defaults to the process working directory.
    */
   rootDir?: string;
   /**
@@ -40,36 +39,11 @@ export interface NextjsProps<
    * outputs (`.next`, `.open-next`, `dist`) and `node_modules` is hashed,
    * plus the nearest package-manager lockfile. Narrow the scope with
    * `include`/`exclude` globs when the default is too broad.
-   * `open-next.config.ts` itself is always hashed. When narrowing `include`,
-   * also include any helpers imported by that config.
    */
   memo?: MemoOptions;
-  /**
-   * Binds KV caches and the same-worker Durable Object revalidation queue.
-   * Without `open-next.config.ts`, Alchemy selects matching KV adapters;
-   * omitting `isr` instead selects the read-only static-assets cache.
-   * A native config controls adapter selection and must choose adapters
-   * matching these bindings. KV fills on demand; build-time cache entries
-   * are not uploaded to KV.
-   */
-  isr?: {
-    /** KV namespace storing rendered pages and fetch results. */
-    incrementalCache: Namespace;
-    /** KV namespace storing cache-tag invalidations. */
-    tagCache: Namespace;
-  };
-  /** Build controls, separate from the optional native `open-next.config.ts`. */
-  openNext?: {
-    /**
-     * Overrides the native config's `buildCommand` when set. If neither sets
-     * a command, defaults to `npx next build`.
-     */
-    buildCommand?: string;
-    /** Minify the generated Worker. Defaults to false. */
-    minify?: boolean;
-    /** Enable OpenNext build diagnostics. Defaults to false. */
-    debug?: boolean;
-  };
+  // The OpenNext build pipeline (buildCommand, minify, debug, ...) is
+  // configured in YOUR `open-next.config.ts`, which OpenNext loads
+  // natively — this resource only deploys the result.
   /**
    * Local dev (`alchemy dev`) behavior.
    */
@@ -99,13 +73,6 @@ export interface NextjsProps<
   assets?: AssetsConfig;
 }
 
-// These options are inspected while constructing the Worker. Resolve them in
-// the outer props Effect; pass-through properties can remain deferred Inputs.
-type NextjsInput<Bindings extends WorkerBindingProps> = InputProps<
-  NextjsProps<Bindings>,
-  "dev" | "isr" | "env" | "compatibility" | "assets" | "openNext"
->;
-
 /**
  * A Cloudflare Worker deployed from a Next.js project.
  *
@@ -123,15 +90,16 @@ type NextjsInput<Bindings extends WorkerBindingProps> = InputProps<
  * `import()`.
  *
  * Local dev (`alchemy dev`) defaults to preview parity — the built worker
- * served under workerd. Set `dev: { mode: "hmr" }` for the real `next dev`
+ * served under workerd. Set `devMode: "hmr"` for the real `next dev`
  * (Turbopack HMR) with the Worker's bindings proxied onto
  * `getCloudflareContext()`.
  *
- * If `open-next.config.ts` exists in the project root, Alchemy loads it through
- * OpenNext's native compiler without rewriting it. Otherwise, Alchemy generates
- * temporary defaults: a read-only static-assets cache, or KV adapters when
- * `isr` is set. Static-assets revalidation writes are a no-op.
- * Native Next.js and Tailwind configuration files are left unchanged.
+ * ISR comes in two flavors, chosen by the project's `open-next.config.ts`:
+ * the zero-infra static-assets incremental cache (prerendered pages serve
+ * as built; revalidation writes are a no-op), or the fully writable
+ * KV-backed setup (`revalidatePath`/`revalidateTag` and time-based
+ * regeneration all work) — see the Writable ISR section below. OpenNext's
+ * `WORKER_SELF_REFERENCE` self service binding is always wired on deploy.
  *
  * Known limitations (upstream `@opennextjs/cloudflare`):
  * - Edge-runtime routes/pages (`export const runtime = "edge"`) are not
@@ -145,8 +113,19 @@ type NextjsInput<Bindings extends WorkerBindingProps> = InputProps<
  *
  *
  * ### Deploying a Next.js App
- * A single call builds the app and deploys the Worker plus static assets.
- * No `open-next.config.ts`, Wrangler config, or Alchemy plugin is required.
+ * A single call builds the app with OpenNext and deploys the worker plus
+ * its static assets. The project needs an `open-next.config.ts` — the
+ * read-only static-assets incremental cache is a good default:
+ *
+ * ```typescript
+ * // open-next.config.ts
+ * import { defineCloudflareConfig } from "@opennextjs/cloudflare";
+ * import staticAssetsIncrementalCache from "@opennextjs/cloudflare/overrides/incremental-cache/static-assets-incremental-cache";
+ *
+ * export default defineCloudflareConfig({
+ *   incrementalCache: staticAssetsIncrementalCache,
+ * });
+ * ```
  *
  * **Example:** Basic Next.js site
  * ```typescript
@@ -158,25 +137,6 @@ type NextjsInput<Bindings extends WorkerBindingProps> = InputProps<
  * const site = yield* Cloudflare.Website.Nextjs("Site", {
  *   rootDir: "./apps/web",
  * });
- * ```
- *
- * ### Optional Native OpenNext Configuration
- * The same `Cloudflare.Website.Nextjs("Site")` call works with or without a
- * config file. To customize OpenNext, add `open-next.config.ts` under `rootDir`
- * (the working directory by default). Imports and callbacks are preserved;
- * the native `OpenNextConfig` is passed to OpenNext's compiler, subject to
- * Cloudflare's adapter constraints rather than AWS runtime feature parity.
- *
- * **Example:** Native config with the read-only static-assets cache
- * ```typescript
- * // open-next.config.ts
- * import { defineCloudflareConfig, type OpenNextConfig } from "@opennextjs/cloudflare";
- * import staticAssetsIncrementalCache from "@opennextjs/cloudflare/overrides/incremental-cache/static-assets-incremental-cache";
- *
- * export default {
- *   ...defineCloudflareConfig({ incrementalCache: staticAssetsIncrementalCache }),
- *   buildCommand: "pnpm exec next build",
- * } satisfies OpenNextConfig;
  * ```
  *
  * ### Bindings
@@ -206,11 +166,25 @@ type NextjsInput<Bindings extends WorkerBindingProps> = InputProps<
  * ```
  *
  * ### Writable ISR
- * Supply the cache namespaces on the resource. Alchemy binds them and adds
- * the Durable Object queue for background regeneration. Without a native
- * config, it also selects the matching adapters. With a native config, select
- * `kv-incremental-cache`, `kv-next-tag-cache`, and `do-queue` there; `isr`
- * does not override the file's adapter choices.
+ * With the KV incremental cache, ISR revalidation actually writes:
+ * `revalidatePath` / `revalidateTag` purge entries, and time-based
+ * `revalidate` windows regenerate pages in the background through the
+ * same-worker Durable Object queue. Configure OpenNext for it and bind
+ * the pieces — `WORKER_SELF_REFERENCE` is wired automatically:
+ *
+ * ```typescript
+ * // open-next.config.ts
+ * import { defineCloudflareConfig } from "@opennextjs/cloudflare";
+ * import kvIncrementalCache from "@opennextjs/cloudflare/overrides/incremental-cache/kv-incremental-cache";
+ * import doQueue from "@opennextjs/cloudflare/overrides/queue/do-queue";
+ * import kvNextTagCache from "@opennextjs/cloudflare/overrides/tag-cache/kv-next-tag-cache";
+ *
+ * export default defineCloudflareConfig({
+ *   incrementalCache: kvIncrementalCache,
+ *   queue: doQueue,
+ *   tagCache: kvNextTagCache,
+ * });
+ * ```
  *
  * **Example:** Binding the writable-ISR resources
  * ```typescript
@@ -218,7 +192,15 @@ type NextjsInput<Bindings extends WorkerBindingProps> = InputProps<
  * const tagCache = yield* Cloudflare.KV.Namespace("NextTagCache");
  *
  * const site = yield* Cloudflare.Website.Nextjs("Site", {
- *   isr: { incrementalCache: incCache, tagCache },
+ *   env: {
+ *     NEXT_INC_CACHE_KV: incCache,
+ *     NEXT_TAG_CACHE_KV: tagCache,
+ *     // The revalidation queue: a Durable Object class shipped in the
+ *     // OpenNext worker bundle itself.
+ *     NEXT_CACHE_DO_QUEUE: Cloudflare.DurableObject("NEXT_CACHE_DO_QUEUE", {
+ *       className: "DOQueueHandler",
+ *     }),
+ *   },
  * });
  * ```
  *
@@ -226,28 +208,20 @@ type NextjsInput<Bindings extends WorkerBindingProps> = InputProps<
  * By default, every project file outside build outputs is hashed to decide
  * whether a rebuild is needed. Use `memo` to narrow the scope when the
  * project has large directories that don't affect the build output.
- * `open-next.config.ts` itself is always hashed. Include any imported config
- * helpers in a narrowed `memo.include` too (for example, `config/**`).
  *
  * **Example:** Narrowing the memo scope
  * ```typescript
  * const site = yield* Cloudflare.Website.Nextjs("Site", {
  *   memo: {
- *     include: ["app/**", "public/**", "package.json", "next.config.mjs", "config/**"],
+ *     include: ["app/**", "public/**", "package.json", "next.config.mjs", "open-next.config.ts"],
  *   },
  * });
  * ```
  *
  * ### Build Configuration
- * An explicit `openNext.buildCommand` overrides the native config's command.
- * `openNext.minify` and `openNext.debug` remain resource-level build controls.
- *
- * **Example:** Customize the build
- * ```typescript
- * const site = yield* Cloudflare.Website.Nextjs("Site", {
- *   openNext: { buildCommand: "pnpm exec next build", minify: true },
- * });
- * ```
+ * The OpenNext build pipeline (build command, minification, ...) is
+ * configured in your project's `open-next.config.ts`, which loads
+ * natively — the resource only deploys the result.
  *
  * ### Class Form
  * Calling `Nextjs` with no arguments returns a constructor you can
@@ -273,8 +247,8 @@ export const Nextjs: {
     <const Bindings extends WorkerBindingProps = {}, Req = never>(
       id: string,
       propsEff?:
-        | NextjsInput<Bindings>
-        | Effect.Effect<NextjsInput<Bindings>, never, Req>,
+        | InputProps<NextjsProps<Bindings>>
+        | Effect.Effect<InputProps<NextjsProps<Bindings>>, never, Req>,
     ): Effect.Effect<Self, never, Req | Providers> & {
       new (): Worker<{
         [
@@ -286,8 +260,8 @@ export const Nextjs: {
   <const Bindings extends WorkerBindingProps = {}, Req = never>(
     id: string,
     propsEff?:
-      | NextjsInput<Bindings>
-      | Effect.Effect<NextjsInput<Bindings>, never, Req>,
+      | InputProps<NextjsProps<Bindings>>
+      | Effect.Effect<InputProps<NextjsProps<Bindings>>, never, Req>,
   ): Effect.Effect<
     Worker<{
       [
@@ -297,19 +271,9 @@ export const Nextjs: {
     never,
     Req | Providers
   >;
-} = (<const Bindings extends WorkerBindingProps = {}, Req = never>(
-  id?: string,
-  propsEff?:
-    | NextjsInput<Bindings>
-    | Effect.Effect<NextjsInput<Bindings>, never, Req>,
-) =>
+} = ((id?: any, propsEff?: any) =>
   id === undefined
-    ? <const Bindings extends WorkerBindingProps = {}, Req = never>(
-        id: string,
-        propsEff?:
-          | NextjsInput<Bindings>
-          | Effect.Effect<NextjsInput<Bindings>, never, Req>,
-      ) => effectClass(Nextjs(id, propsEff))
+    ? (id: string, propsEff: any) => effectClass(Nextjs(id, propsEff))
     : Worker(
         id,
         Effect.map(
@@ -331,15 +295,6 @@ export const Nextjs: {
             env: {
               WORKER_SELF_REFERENCE: Self,
               ...props?.env,
-              ...(props?.isr
-                ? {
-                    NEXT_INC_CACHE_KV: props.isr.incrementalCache,
-                    NEXT_TAG_CACHE_KV: props.isr.tagCache,
-                    NEXT_CACHE_DO_QUEUE: DurableObject("NEXT_CACHE_DO_QUEUE", {
-                      className: "DOQueueHandler",
-                    }),
-                  }
-                : {}),
             },
             // OpenNext requires Node.js APIs. The 2026-08-31 default date
             // enables both nodejs_compat modes, so no redundant flag is sent.
@@ -351,8 +306,8 @@ export const Nextjs: {
             // leave asset-path rewriting off. Users can still override.
             assets: {
               runWorkerFirst: true,
-              htmlHandling: "none" as const,
-              notFoundHandling: "none" as const,
+              htmlHandling: "none",
+              notFoundHandling: "none",
               ...props?.assets,
             },
             source: {
@@ -365,8 +320,6 @@ export const Nextjs: {
               options: {
                 root: props?.rootDir,
                 memo: props?.memo,
-                cache: props?.isr ? "kv" : "static-assets",
-                ...props?.openNext,
                 ...(props?.dev?.mode !== undefined
                   ? { dev: { mode: props.dev.mode } }
                   : {}),

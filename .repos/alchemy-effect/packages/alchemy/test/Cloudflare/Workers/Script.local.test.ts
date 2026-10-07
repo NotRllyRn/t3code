@@ -5,7 +5,7 @@ import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import { MinimumLogLevel } from "effect/References";
 import * as Schedule from "effect/Schedule";
-import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClient from "effect/unstable/http/HttpClient";
 
 const { test } = Test.make({
   providers: Cloudflare.providers(),
@@ -97,8 +97,5 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:worker", "local"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

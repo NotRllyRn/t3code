@@ -7,7 +7,6 @@ import { makeHttpStripeIdBinding } from "./StripeHttp.ts";
  * HTTP implementation of {@link RetrieveEntitlementsFeature}.
  *
  * @layer
- * @product Entitlements
  * @provides Stripe.RetrieveEntitlementsFeature
  */
 export const RetrieveEntitlementsFeatureHttp = Layer.effect(

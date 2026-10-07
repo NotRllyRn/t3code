@@ -83,5 +83,5 @@ test.provider(
       const after = yield* getAdapter(deployed.adapterId);
       expect(after).toBeUndefined();
     }),
-  { tags: ["provider:aws", "provider:aws:textract", "live"], timeout: 180_000 },
+  { timeout: 180_000 },
 );

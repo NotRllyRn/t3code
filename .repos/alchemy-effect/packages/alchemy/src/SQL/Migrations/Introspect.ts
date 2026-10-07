@@ -1,6 +1,6 @@
 import * as Effect from "effect/Effect";
 import type { SqlExecutor } from "./Format.ts";
-import { quoteIdentifier, sqlLiteral } from "./Utils.ts";
+import { quoteIdentifier, sqlLiteral } from "./Records.ts";
 
 export interface TableColumn {
   name: string;

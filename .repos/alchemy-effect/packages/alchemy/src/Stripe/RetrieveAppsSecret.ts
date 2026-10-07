@@ -25,7 +25,6 @@ export interface RetrieveAppsSecretRequest extends Omit<
  * ```
  *
  * @binding
- * @product Secrets
  */
 export interface RetrieveAppsSecret extends Binding.Service<
   RetrieveAppsSecret,

@@ -64,7 +64,7 @@ const withLockfileFixture = <A, E, R>(
     }
   });
 
-describe("Lambda external packages", { tags: ["unit", "local"] }, () => {
+describe("Lambda external packages", () => {
   it("accepts only package roots, not subpaths", () => {
     expect(parsePackageRoot("sharp")).toBe("sharp");
     expect(parsePackageRoot("@img/tool")).toBe("@img/tool");
@@ -1522,7 +1522,6 @@ describe("Lambda external packages", { tags: ["unit", "local"] }, () => {
 
 describe.skipIf(!integrationEnabled)(
   "Lambda external packages integration",
-  { tags: ["live"] },
   () => {
     it.effect(
       "npm-installs aliases with pinned transitive dependencies",

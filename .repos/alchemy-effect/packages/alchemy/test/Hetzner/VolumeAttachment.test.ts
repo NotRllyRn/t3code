@@ -1,8 +1,7 @@
 import * as Hetzner from "@/Hetzner";
 import * as Provider from "@/Provider";
 import * as Test from "@/Test/Alchemy";
-import * as servers from "@distilled.cloud/hetzner/servers";
-import * as volumes from "@distilled.cloud/hetzner/volumes";
+import { Services } from "@distilled.cloud/hetzner";
 import { expect } from "alchemy-test";
 import * as Effect from "effect/Effect";
 import { MinimumLogLevel } from "effect/References";
@@ -18,7 +17,7 @@ const logLevel = Effect.provideService(
 const hasHetznerCreds = !!process.env.HCLOUD_TOKEN;
 
 const waitUntilVolumeGone = (id: number) =>
-  volumes.getVolume({ id }).pipe(
+  Services.volumes.getVolume({ id }).pipe(
     Effect.as("found" as const),
     Effect.catchTag("NotFound", () => Effect.succeed("gone" as const)),
     Effect.repeat({
@@ -29,7 +28,7 @@ const waitUntilVolumeGone = (id: number) =>
   );
 
 const waitUntilServerGone = (id: number) =>
-  servers.getServer({ id }).pipe(
+  Services.servers.getServer({ id }).pipe(
     Effect.as("found" as const),
     Effect.catchTag("NotFound", () => Effect.succeed("gone" as const)),
     Effect.repeat({
@@ -72,7 +71,7 @@ test.provider.skipIf(!hasHetznerCreds)(
       expect(created.attachment.linuxDevice).toMatch(/^\/dev\//);
       expect(created.volume.serverId).toBeNull();
 
-      const fetched = yield* volumes.getVolume({
+      const fetched = yield* Services.volumes.getVolume({
         id: created.volume.id,
       });
       expect(fetched.volume.server).toEqual(created.server.id);
@@ -97,16 +96,5 @@ test.provider.skipIf(!hasHetznerCreds)(
       const serverGone = yield* waitUntilServerGone(created.server.id);
       expect(serverGone).toEqual("gone");
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:hetzner",
-      "provider:hetzner:server",
-      "provider:hetzner:service",
-      "provider:hetzner:volume",
-      "provider:hetzner:volumeattachment",
-      "live",
-    ],
-    timeout: 180_000,
-    exclusive: true,
-  },
+  { timeout: 180_000, exclusive: true },
 );

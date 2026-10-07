@@ -31,7 +31,6 @@ export interface SignResult {
  * ```
  *
  * @binding
- * @product Secret Key
  */
 export interface Sign extends Binding.Service<
   Sign,

@@ -100,13 +100,5 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:pipelines",
-      "provider:cloudflare:r2",
-      "live",
-    ],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );

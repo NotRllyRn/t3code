@@ -275,15 +275,5 @@ test.provider.skipIf(!process.env.AWS_TEST_METRICSTREAM)(
         expect(gone).toBe(true);
       }).pipe(Effect.ensuring(cleanup.pipe(Effect.orDie)));
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:cloudwatch",
-      "provider:aws:firehose",
-      "provider:aws:iam",
-      "provider:aws:s3",
-      "live",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

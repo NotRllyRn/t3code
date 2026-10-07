@@ -24,7 +24,7 @@ const state = () =>
     { app: { dev: { url: "https://example.com" } } },
   );
 
-describe("State tree", { tags: ["unit", "local"] }, () => {
+describe("State tree", () => {
   it.effect("queries state as structured data", () =>
     Effect.gen(function* () {
       expect(yield* listState({})).toEqual(["app/"]);

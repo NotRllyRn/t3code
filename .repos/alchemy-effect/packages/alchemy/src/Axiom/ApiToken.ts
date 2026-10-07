@@ -68,7 +68,6 @@ export type ApiToken = Resource<
  * ```
  *
  * @resource
- * @product API Token
  */
 export const ApiToken = Resource<ApiToken>("Axiom.ApiToken");
 

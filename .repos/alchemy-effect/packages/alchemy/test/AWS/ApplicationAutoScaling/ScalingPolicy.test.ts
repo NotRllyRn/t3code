@@ -120,15 +120,7 @@ test.provider(
       });
       expect(targets.ScalableTargets ?? []).toHaveLength(0);
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:applicationautoscaling",
-      "provider:aws:dynamodb",
-      "live",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );
 
 // Deregistering a scalable target implicitly deletes its policies. Simulate
@@ -196,15 +188,7 @@ test.provider(
       // it as success.
       yield* stack.destroy();
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:applicationautoscaling",
-      "provider:aws:dynamodb",
-      "live",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );
 
 const getState = Effect.fn(function* (fqn: string) {
@@ -317,13 +301,5 @@ test.provider(
       const gone = yield* waitUntilPolicyGone(created.policyName);
       expect(gone).toBeUndefined();
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:applicationautoscaling",
-      "provider:aws:dynamodb",
-      "live",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

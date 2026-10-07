@@ -128,15 +128,7 @@ test.provider(
 
       yield* expectGone(accountId, v1.resourceGroupId);
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:iam",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -174,8 +166,5 @@ test.provider(
 
       yield* expectGone(accountId, deployed.resourceGroupId);
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:iam", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

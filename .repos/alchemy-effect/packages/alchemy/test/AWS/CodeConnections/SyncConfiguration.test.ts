@@ -32,10 +32,7 @@ test.provider(
         );
       expect(tag).toBe("ResourceNotFoundException");
     }),
-  {
-    tags: ["provider:aws", "provider:aws:codeconnections", "live"],
-    timeout: 60_000,
-  },
+  { timeout: 60_000 },
 );
 
 test.provider.skipIf(!REPOSITORY_LINK_ID || !GIT_SYNC_ROLE_ARN)(
@@ -96,8 +93,5 @@ test.provider.skipIf(!REPOSITORY_LINK_ID || !GIT_SYNC_ROLE_ARN)(
         );
       expect(after).toBeUndefined();
     }),
-  {
-    tags: ["provider:aws", "provider:aws:codeconnections", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

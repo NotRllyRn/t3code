@@ -42,7 +42,6 @@ import type { Zone } from "./Zone.ts";
  * ```
  *
  * @binding
- * @product DNS
  */
 export interface ReadDns extends Binding.Service<
   ReadDns,

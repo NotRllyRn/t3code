@@ -28,7 +28,6 @@ test.provider(
       );
       expect(error._tag).toBe("NoSuchResourceException");
     }),
-  { tags: ["provider:aws", "provider:aws:servicequotas", "live"] },
 );
 
 // Full engine lifecycle on the SAFE path: a desired value at or below the
@@ -79,10 +78,7 @@ test.provider(
 
       yield* stack.destroy();
     }),
-  {
-    tags: ["provider:aws", "provider:aws:servicequotas", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // Submitting a REAL quota increase request may open an AWS Support case and
@@ -144,8 +140,5 @@ test.provider.skipIf(!process.env.AWS_TEST_SERVICE_QUOTAS)(
       // Destroy only forgets the request — Service Quotas has no cancel API.
       yield* stack.destroy();
     }),
-  {
-    tags: ["provider:aws", "provider:aws:servicequotas", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

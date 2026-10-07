@@ -113,10 +113,7 @@ test.provider(
       const gone = yield* waitUntilGone(LIFECYCLE_NAME);
       expect(gone).toEqual("gone");
     }).pipe(logLevel),
-  {
-    tags: ["provider:stripe", "provider:stripe:appssecret", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -165,10 +162,7 @@ test.provider(
       const gone = yield* waitUntilGone(REPLACE_TO_NAME);
       expect(gone).toEqual("gone");
     }).pipe(logLevel),
-  {
-    tags: ["provider:stripe", "provider:stripe:appssecret", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -199,8 +193,5 @@ test.provider(
       const gone = yield* waitUntilGone(LIST_NAME);
       expect(gone).toEqual("gone");
     }).pipe(logLevel),
-  {
-    tags: ["provider:stripe", "provider:stripe:appssecret", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

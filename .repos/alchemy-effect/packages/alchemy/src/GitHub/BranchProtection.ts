@@ -351,7 +351,6 @@ export interface BranchProtection extends Resource<
  * ```
  *
  * @resource
- * @product Repository
  */
 export const BranchProtection = Resource<BranchProtection>(
   "GitHub.BranchProtection",

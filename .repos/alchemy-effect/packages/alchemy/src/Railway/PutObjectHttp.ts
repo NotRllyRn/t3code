@@ -8,7 +8,6 @@ import { PutObject } from "./PutObject.ts";
  * `putObject` against the Railway endpoint with the bucket's credentials.
  *
  * @layer
- * @product Bucket
  * @provides Railway.PutObject
  */
 export const PutObjectHttp = Layer.effect(

@@ -8,7 +8,7 @@ import * as PlatformError from "effect/PlatformError";
 
 import * as WorkspacePaths from "./WorkspacePaths.ts";
 
-const layerTest = Layer.empty.pipe(
+const TestLayer = Layer.empty.pipe(
   Layer.provideMerge(WorkspacePaths.layer),
   Layer.provideMerge(NodeServices.layer),
 );
@@ -34,7 +34,7 @@ const writeTextFile = Effect.fn("writeTextFile")(function* (
   yield* fileSystem.writeFileString(absolutePath, contents).pipe(Effect.orDie);
 });
 
-it.layer(layerTest)("WorkspacePathsLive", (it) => {
+it.layer(TestLayer)("WorkspacePathsLive", (it) => {
   describe("normalizeWorkspaceRoot", () => {
     it.effect("resolves an existing directory", () =>
       Effect.gen(function* () {

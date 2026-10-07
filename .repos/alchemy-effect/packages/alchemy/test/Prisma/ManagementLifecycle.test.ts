@@ -39,8 +39,6 @@ import {
   page,
   unhandled,
 } from "./fixtures/FakeManagementApi.ts";
-import { testStackContext } from "./fixtures/StackContext.ts";
-import { PlatformServices } from "@/Util/PlatformServices";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
@@ -297,7 +295,6 @@ it.effect(
       expect(rotations).toBe(1);
     }).pipe(Effect.provide(fake.layer), Effect.provide(TestClock.layer()));
   },
-  { tags: ["unit", "provider:prisma", "provider:prisma:database", "local"] },
 );
 
 it.effect(
@@ -338,7 +335,6 @@ it.effect(
       }
     }).pipe(Effect.provide(fake.layer), Effect.provide(TestClock.layer()));
   },
-  { tags: ["unit", "provider:prisma", "provider:prisma:database", "local"] },
 );
 
 const makeProjectCloud = (initial: ApiProject[] = []) => {
@@ -614,15 +610,6 @@ refusal.test.provider(
 
       yield* stack.destroy();
     }),
-  {
-    tags: [
-      "unit",
-      "provider:prisma",
-      "provider:prisma:database",
-      "provider:prisma:project",
-      "local",
-    ],
-  },
 );
 
 const generatedProjectRecoveryCloud = makeProjectCloud();
@@ -724,15 +711,6 @@ generatedProjectRecovery.test.provider(
       generatedProjectRecoveryCloud.databases.clear();
       yield* stack.destroy();
     }),
-  {
-    tags: [
-      "unit",
-      "provider:prisma",
-      "provider:prisma:database",
-      "provider:prisma:project",
-      "local",
-    ],
-  },
 );
 
 const adoptionCloud = makeProjectCloud([foreignProject]);
@@ -767,15 +745,6 @@ adoption.test.provider(
 
       yield* stack.destroy();
     }),
-  {
-    tags: [
-      "unit",
-      "provider:prisma",
-      "provider:prisma:database",
-      "provider:prisma:project",
-      "local",
-    ],
-  },
 );
 
 const replacementCloud = makeProjectCloud();
@@ -827,15 +796,6 @@ replacement.test.provider(
 
       yield* stack.destroy();
     }),
-  {
-    tags: [
-      "unit",
-      "provider:prisma",
-      "provider:prisma:database",
-      "provider:prisma:project",
-      "local",
-    ],
-  },
 );
 
 const eventuallyConsistentRegionCloud = makeProjectCloud();
@@ -885,15 +845,6 @@ eventuallyConsistentRegion.test.provider(
 
       yield* stack.destroy();
     }),
-  {
-    tags: [
-      "unit",
-      "provider:prisma",
-      "provider:prisma:database",
-      "provider:prisma:project",
-      "local",
-    ],
-  },
 );
 
 const conflictingRegionCloud = makeProjectCloud();
@@ -943,15 +894,6 @@ conflictingRegion.test.provider(
       conflictingRegionCloud.databases.clear();
       yield* stack.destroy();
     }),
-  {
-    tags: [
-      "unit",
-      "provider:prisma",
-      "provider:prisma:database",
-      "provider:prisma:project",
-      "local",
-    ],
-  },
 );
 
 const addDefaultCloud = makeProjectCloud();
@@ -994,15 +936,6 @@ addDefault.test.provider(
 
       yield* stack.destroy();
     }),
-  {
-    tags: [
-      "unit",
-      "provider:prisma",
-      "provider:prisma:database",
-      "provider:prisma:project",
-      "local",
-    ],
-  },
 );
 
 const removeDefaultCloud = makeProjectCloud();
@@ -1043,15 +976,6 @@ removeDefault.test.provider(
 
       yield* stack.destroy();
     }),
-  {
-    tags: [
-      "unit",
-      "provider:prisma",
-      "provider:prisma:database",
-      "provider:prisma:project",
-      "local",
-    ],
-  },
 );
 
 const apiDatabase = (
@@ -1368,52 +1292,44 @@ generatedDatabaseRecovery.test.provider(
       generatedDatabaseRecoveryCloud.databases.clear();
       yield* stack.destroy();
     }),
-  { tags: ["unit", "provider:prisma", "provider:prisma:database", "local"] },
 );
 
-it.effect(
-  "refuses an undeletable standalone default database",
-  () => {
-    let created = false;
-    const client = {
-      createDatabase: () =>
-        Effect.sync(() => {
-          created = true;
-          throw new Error("must fail before create");
-        }),
-    } as unknown as PrismaManagementClient;
+it.effect("refuses an undeletable standalone default database", () => {
+  let created = false;
+  const client = {
+    createDatabase: () =>
+      Effect.sync(() => {
+        created = true;
+        throw new Error("must fail before create");
+      }),
+  } as unknown as PrismaManagementClient;
 
-    return Effect.gen(function* () {
-      const provider = yield* PrismaDatabase.Provider;
-      const error = yield* provider
-        .reconcile({
-          id: "Database",
-          instanceId: "00000000000000000000000000000000",
-          news: {
-            project: "project-1",
-            name: "primary",
-            region: "us-east-1",
-            isDefault: true,
-          },
-          olds: undefined,
-          output: undefined,
-          bindings: [],
-        } as never)
-        .pipe(Effect.flip);
+  return Effect.gen(function* () {
+    const provider = yield* PrismaDatabase.Provider;
+    const error = yield* provider
+      .reconcile({
+        id: "Database",
+        instanceId: "00000000000000000000000000000000",
+        news: {
+          project: "project-1",
+          name: "primary",
+          region: "us-east-1",
+          isDefault: true,
+        },
+        olds: undefined,
+        output: undefined,
+        bindings: [],
+      } as never)
+      .pipe(Effect.flip);
 
-      expect(String(error)).toContain("could never be destroyed");
-      expect(created).toBe(false);
-    }).pipe(
-      Effect.provide(DatabaseProvider()),
-      Effect.provide(Layer.succeed(PrismaClient, client)),
-      Effect.provide(liveProviderContext),
-      Effect.provide(testStackContext),
-      Effect.provide(makeFakeManagementApi(unhandled).layer),
-      Effect.provide(PlatformServices),
-    );
-  },
-  { tags: ["unit", "provider:prisma", "provider:prisma:database", "local"] },
-);
+    expect(String(error)).toContain("could never be destroyed");
+    expect(created).toBe(false);
+  }).pipe(
+    Effect.provide(DatabaseProvider()),
+    Effect.provide(Layer.succeed(PrismaClient, client)),
+    Effect.provide(liveProviderContext),
+  );
+});
 
 const inheritedRegionCloud = makeDatabaseCloud();
 const inheritedRegion = Test.make({
@@ -1479,7 +1395,6 @@ inheritedRegion.test.provider(
       yield* stack.destroy();
       inheritedRegionCloud.databases.clear();
     }),
-  { tags: ["unit", "provider:prisma", "provider:prisma:database", "local"] },
 );
 
 const environmentVariable = {
@@ -1559,14 +1474,6 @@ environmentAdoption.test.provider(
 
       yield* stack.destroy();
     }),
-  {
-    tags: [
-      "unit",
-      "provider:prisma",
-      "provider:prisma:environmentvariable",
-      "local",
-    ],
-  },
 );
 
 const customDomainCalls: Array<[string, unknown?]> = [];
@@ -1801,15 +1708,6 @@ customDomains.test.provider(
 
       yield* stack.destroy();
     }),
-  {
-    tags: [
-      "unit",
-      "provider:prisma",
-      "provider:prisma:app",
-      "provider:prisma:customdomain",
-      "local",
-    ],
-  },
 );
 
 const sourceRepositoryCloud = new Map<string, ApiSourceRepository>();
@@ -1973,15 +1871,6 @@ sourceRepositories.test.provider(
         "archived",
       );
     }),
-  {
-    tags: [
-      "unit",
-      "provider:prisma",
-      "provider:prisma:project",
-      "provider:prisma:sourcerepository",
-      "local",
-    ],
-  },
 );
 
 const branchCloud = new Map<string, ApiBranch>();
@@ -2296,13 +2185,4 @@ branches.test.provider(
         "createBranch",
       );
     }),
-  {
-    tags: [
-      "unit",
-      "provider:prisma",
-      "provider:prisma:branch",
-      "provider:prisma:project",
-      "local",
-    ],
-  },
 );

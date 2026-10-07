@@ -8,7 +8,6 @@ import { makeHttpStripeIdBinding } from "./StripeHttp.ts";
  * Function or Worker Effect.
  *
  * @layer
- * @product Webhook
  * @provides Stripe.RetrieveWebhookEndpoint
  */
 export const RetrieveWebhookEndpointHttp = Layer.effect(

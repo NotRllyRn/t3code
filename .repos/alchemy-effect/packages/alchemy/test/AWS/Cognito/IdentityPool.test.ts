@@ -98,7 +98,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertIdentityPoolDeleted(outputs.identities.identityPoolId);
     }),
-  { tags: ["provider:aws", "provider:aws:cognito", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -149,8 +149,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertIdentityPoolDeleted(outputs.identities.identityPoolId);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:cognito", "provider:aws:iam", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

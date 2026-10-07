@@ -115,10 +115,7 @@ test.provider(
       const gone = yield* waitUntilGone(created.id);
       expect(gone).toEqual("gone");
     }).pipe(logLevel),
-  {
-    tags: ["provider:stripe", "provider:stripe:customer", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -150,8 +147,5 @@ test.provider(
       const gone = yield* waitUntilGone(deployed.id);
       expect(gone).toEqual("gone");
     }).pipe(logLevel),
-  {
-    tags: ["provider:stripe", "provider:stripe:customer", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

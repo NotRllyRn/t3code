@@ -89,8 +89,5 @@ test.provider(
       const afterDestroy = yield* findConfiguration(template.id, accountId);
       expect(afterDestroy).toBeUndefined();
     }),
-  {
-    tags: ["provider:aws", "provider:aws:fis", "provider:aws:iam", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

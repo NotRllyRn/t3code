@@ -24,7 +24,6 @@ export interface UpdateIssuingCardRequest extends Omit<
  * ```
  *
  * @binding
- * @product Issuing
  */
 export interface UpdateIssuingCard extends Binding.Service<
   UpdateIssuingCard,

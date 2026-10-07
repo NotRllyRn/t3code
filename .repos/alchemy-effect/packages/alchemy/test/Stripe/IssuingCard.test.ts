@@ -68,10 +68,7 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:stripe", "provider:stripe:issuingcard", "live"],
-    timeout: 60_000,
-  },
+  { timeout: 60_000 },
 );
 
 test.provider.skipIf(!ISSUING_ENABLED)(
@@ -179,15 +176,7 @@ test.provider.skipIf(!ISSUING_ENABLED)(
       const canceled = yield* waitUntilCanceled(created.card.id);
       expect(canceled).toEqual("canceled");
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:stripe",
-      "provider:stripe:issuingcard",
-      "provider:stripe:issuingcardholder",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider.skipIf(!ISSUING_ENABLED)(
@@ -235,13 +224,5 @@ test.provider.skipIf(!ISSUING_ENABLED)(
         after.find((card) => card.id === deployed.card.id),
       ).toBeUndefined();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:stripe",
-      "provider:stripe:issuingcard",
-      "provider:stripe:issuingcardholder",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

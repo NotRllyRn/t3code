@@ -87,8 +87,5 @@ test.provider(
       const after = yield* firstDetectorId;
       expect(after).toBeUndefined();
     }),
-  {
-    tags: ["provider:aws", "provider:aws:guardduty", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

@@ -6,11 +6,11 @@ import * as MobilePreferences from "./mobile-preferences";
 import * as MobileSecureStorage from "./mobile-secure-storage";
 import * as MobileStorage from "./mobile-storage";
 
-const layerBase = Layer.merge(MobileDatabase.layer, MobileSecureStorage.layer);
-const layerDependent = Layer.mergeAll(
+const baseLayer = Layer.merge(MobileDatabase.layer, MobileSecureStorage.layer);
+const dependentLayer = Layer.mergeAll(
   MobilePreferences.layer,
   MobileStorage.layer,
   EnvironmentCacheStore.layer,
-).pipe(Layer.provide(layerBase));
+).pipe(Layer.provide(baseLayer));
 
-export const layer = Layer.merge(layerBase, layerDependent);
+export const layer = Layer.merge(baseLayer, dependentLayer);

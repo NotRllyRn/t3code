@@ -4,7 +4,7 @@ import { expect } from "alchemy-test";
 import * as Effect from "effect/Effect";
 import { MinimumLogLevel } from "effect/References";
 import * as Schedule from "effect/Schedule";
-import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClient from "effect/unstable/http/HttpClient";
 import {
   materializeIsolatedProject,
   removeIsolatedProject,
@@ -61,14 +61,5 @@ test.provider.skipIf(!hasHetznerCreds)(
         yield* removeIsolatedProject(project);
       }
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:hetzner",
-      "provider:hetzner:server",
-      "provider:hetzner:service",
-      "live",
-    ],
-    timeout: 180_000,
-    exclusive: true,
-  },
+  { timeout: 180_000, exclusive: true },
 );

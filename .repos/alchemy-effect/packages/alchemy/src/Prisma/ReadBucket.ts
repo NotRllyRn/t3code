@@ -104,7 +104,6 @@ export interface ReadBucketClient {
  * ```
  *
  * @binding
- * @product Bucket
  */
 export const ReadBucket = Binding.Service<ReadBucket>("Prisma.ReadBucket");
 

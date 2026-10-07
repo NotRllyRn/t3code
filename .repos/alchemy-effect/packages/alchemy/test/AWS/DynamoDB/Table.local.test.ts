@@ -55,8 +55,5 @@ test.provider.skipIf(!dockerAvailable)(
       });
       expect(after.status).toBe(400);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:dynamodb", "local"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

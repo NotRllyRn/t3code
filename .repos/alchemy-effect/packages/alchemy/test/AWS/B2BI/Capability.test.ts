@@ -122,8 +122,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertCapabilityGone(created.capabilityId);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:b2bi", "provider:aws:s3", "live"],
-    timeout: 150_000,
-  },
+  { timeout: 150_000 },
 );

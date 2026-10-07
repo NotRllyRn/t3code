@@ -217,13 +217,5 @@ test.provider(
         ),
       );
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:worker",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );

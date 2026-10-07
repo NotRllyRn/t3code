@@ -8,12 +8,11 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
-import { dotAlchemyDirectory } from "../../AlchemyContext.ts";
 import * as Predicate from "effect/Predicate";
 import * as Redacted from "effect/Redacted";
 import * as Schedule from "effect/Schedule";
 import * as Stream from "effect/Stream";
-import { isHttpClientError } from "effect/http/HttpClientError";
+import { isHttpClientError } from "effect/unstable/http/HttpClientError";
 import * as crypto from "node:crypto";
 import { Unowned } from "../../AdoptPolicy.ts";
 import * as Artifacts from "../../Artifacts.ts";
@@ -60,11 +59,10 @@ import {
   isContainerDecl,
   resolveObservability,
 } from "./WorkerAsyncBindings.ts";
-import {
-  type WireWorkerBinding,
-  type WorkerBinding,
-  type WorkerSettingsBinding,
-  withoutDevOnlyBindings,
+import type {
+  WireWorkerBinding,
+  WorkerBinding,
+  WorkerSettingsBinding,
 } from "./WorkerBinding.ts";
 import { readPrebuiltWorkerBundle } from "./Sources/Prebuilt.ts";
 import { isPythonMain, readPythonWorkerBundle } from "./Sources/Python.ts";
@@ -888,7 +886,8 @@ const putWorkerScript = (params: {
           accountId: params.accountId,
           dispatchNamespace: params.dispatchNamespace,
           scriptName: params.scriptName,
-          metadata: params.metadata,
+          metadata:
+            params.metadata as unknown as wfp.PutDispatchNamespaceScriptRequest["metadata"],
           files: params.files,
         })
         .pipe(
@@ -1239,7 +1238,6 @@ export const LiveWorkerProvider = () =>
 
       const bundler = yield* WorkerBundle;
       const stack = yield* Stack;
-      const dotAlchemy = yield* dotAlchemyDirectory;
 
       // const createScriptSubdomain = yield* workers.createScriptSubdomain;
       // const deleteScript = yield* workers.deleteScript;
@@ -2151,120 +2149,42 @@ export const LiveWorkerProvider = () =>
         logicalId: string;
         className: string;
         sources: readonly string[];
-        observedNamespaces: readonly {
-          id?: string | null;
-          script: string;
-          class: string;
-        }[];
+        observedNamespaces: readonly { script: string; class: string }[];
       }) {
         if (params.sources.length === 0) {
           return undefined;
         }
-        const observedScripts = yield* workers.listScripts
-          .items({ accountId: params.accountId })
-          .pipe(Stream.runCollect);
-        const logicalSources = new Set(
-          observedScripts.flatMap((script) =>
-            script.id != null &&
-            params.sources.some((source) =>
-              hasAlchemyWorkerTags(source, script.tags ?? []),
-            )
-              ? [script.id]
-              : [],
+        const candidates = Array.from(
+          new Set(
+            params.observedNamespaces.flatMap((ns) =>
+              ns.class === params.className &&
+              ns.script !== params.selfScriptName
+                ? [ns.script]
+                : [],
+            ),
           ),
         );
-        // Direct names remain candidates even when both listings omit the script.
-        const candidates = new Set([
-          ...params.sources,
-          ...logicalSources,
-          ...params.observedNamespaces.flatMap((ns) =>
-            ns.class === params.className ? [ns.script] : [],
-          ),
-        ]);
         const matched: string[] = [];
         for (const script of candidates) {
-          if (script === params.selfScriptName) continue;
-          // A same-class namespace alone does not identify a declared source.
-          const knownSource =
-            logicalSources.has(script) ||
-            (params.sources.includes(script) &&
-              (observedScripts.some((observed) => observed.id === script) ||
-                params.observedNamespaces.some((ns) => ns.script === script)));
+          if (params.sources.includes(script)) {
+            matched.push(script);
+            continue;
+          }
           const settings = yield* getScriptSettings(
             params.accountId,
             script,
             undefined,
           ).pipe(
-            Effect.catchTag("WorkerNotFound", (error) =>
-              knownSource ? Effect.fail(error) : Effect.succeed(undefined),
-            ),
-            Effect.catchTag("WorkerHasNoVersions", (error) =>
-              knownSource || params.sources.includes(script)
-                ? Effect.fail(error)
-                : Effect.succeed(undefined),
+            Effect.catchTag("WorkerNotFound", () => Effect.succeed(undefined)),
+            Effect.catchTag("WorkerHasNoVersions", () =>
+              Effect.succeed(undefined),
             ),
           );
+          const tags = new Set(settings?.tags ?? []);
           if (
-            settings === undefined ||
-            (!params.sources.includes(script) &&
-              !logicalSources.has(script) &&
-              !params.sources.some((source) =>
-                hasAlchemyWorkerTags(source, settings.tags ?? []),
-              ))
-          ) {
-            continue;
-          }
-          const localBinding = settings.bindings?.find(
-            (binding) =>
-              binding.type === "durable_object_namespace" &&
-              binding.className === params.className &&
-              (binding.scriptName == null || binding.scriptName === script),
-          );
-          const namespaceId =
-            localBinding?.type === "durable_object_namespace"
-              ? (localBinding.namespaceId ?? undefined)
-              : undefined;
-          const findNamespace = (
-            namespaces: typeof params.observedNamespaces,
-          ) =>
-            namespaces.find((ns) =>
-              namespaceId === undefined
-                ? ns.script === script && ns.class === params.className
-                : ns.id === namespaceId,
-            );
-          let namespace = findNamespace(params.observedNamespaces);
-          if (
-            namespace === undefined &&
-            (localBinding !== undefined ||
-              Object.values(
-                getDurableObjectTagMap(settings.tags ?? []),
-              ).includes(params.className))
-          ) {
-            // A known source namespace must be located, not replaced with a fresh one.
-            namespace = yield* listDurableObjectNamespaces(
-              params.accountId,
-            ).pipe(
-              Effect.flatMap((namespaces) => {
-                const namespace = findNamespace(namespaces);
-                return namespace
-                  ? Effect.succeed(namespace)
-                  : Effect.fail(
-                      new MissingDurableObjects({
-                        scriptName: script,
-                        expected: [params.className],
-                      }),
-                    );
-              }),
-              Effect.retry({
-                while: (error) => error._tag === "MissingDurableObjects",
-                schedule: Schedule.spaced("2 seconds"),
-                times: 5,
-              }),
-            );
-          }
-          if (
-            namespace?.script === script &&
-            namespace.class === params.className
+            tags.has(`alchemy:stack:${stack.name}`) &&
+            tags.has(`alchemy:stage:${stack.stage}`) &&
+            params.sources.some((source) => tags.has(`alchemy:id:${source}`))
           ) {
             matched.push(script);
           }
@@ -2376,11 +2296,6 @@ export const LiveWorkerProvider = () =>
         if (typeof assets === "object" && "hash" in assets) {
           const { hash: _, ...config } = assets;
           return yield* readAssets(config);
-        }
-
-        // Framework sources supply the directory; routing-only config has no files to read.
-        if (typeof assets === "object" && assets.directory === undefined) {
-          return undefined;
         }
 
         // Handle string path or AssetsProps
@@ -2555,7 +2470,6 @@ export const LiveWorkerProvider = () =>
           if (props.source) {
             const source = yield* resolveSource(props);
             const ctx = makeSourceContext({
-              dotAlchemy,
               id,
               fqn,
               workerName,
@@ -2913,7 +2827,7 @@ export const LiveWorkerProvider = () =>
         const subdomain = yield* workers
           .getScriptSubdomain({ accountId, scriptName })
           .pipe(
-            Effect.orElseSucceed((): workers.GetScriptSubdomainResponse => ({
+            Effect.orElseSucceed<workers.GetScriptSubdomainResponse>(() => ({
               enabled: false,
               previewsEnabled: false,
             })),
@@ -3078,7 +2992,7 @@ export const LiveWorkerProvider = () =>
         // service binding on the parent script (versions have no name of
         // their own).
         const metadataBindings = bindings.flatMap((b) =>
-          withoutDevOnlyBindings(b.data.bindings ?? []).map((item) =>
+          (b.data.bindings ?? []).map((item) =>
             item.type === "self_url"
               ? { type: "plain_text" as const, name: item.name, text: selfUrl! }
               : item.type === "self_service"
@@ -3411,21 +3325,6 @@ export const LiveWorkerProvider = () =>
               ignoreBaseConfig: true,
             })
             .pipe(
-              Effect.catchTag("PreviewAlreadyExists", () =>
-                workers
-                  .getPreview({
-                    accountId,
-                    workerId: parentName,
-                    previewId: previewName,
-                  })
-                  .pipe(
-                    Effect.retry({
-                      while: (error) => error._tag === "PreviewNotFound",
-                      schedule: Schedule.spaced("500 millis"),
-                      times: 8,
-                    }),
-                  ),
-              ),
               Effect.catchTag("WorkerNotFound", () =>
                 Effect.fail(
                   new WorkerPreviewConfigError({
@@ -3474,7 +3373,7 @@ export const LiveWorkerProvider = () =>
         } satisfies Worker["Attributes"]["hash"];
 
         const metadataBindings = bindings.flatMap((b) =>
-          withoutDevOnlyBindings(b.data.bindings ?? []).map((item) =>
+          (b.data.bindings ?? []).map((item) =>
             item.type === "self_url"
               ? { type: "plain_text" as const, name: item.name, text: selfUrl! }
               : item.type === "self_service"
@@ -3711,38 +3610,36 @@ export const LiveWorkerProvider = () =>
         // `transferred_classes` migration below and must be stripped from the
         // wire-shape binding before upload.
         const metadataBindings = bindings.flatMap((b) =>
-          withoutDevOnlyBindings(b.data.bindings ?? []).map(
-            (item): WireWorkerBinding => {
-              // Lower the `Worker.URL` sentinel into the resolved URL —
-              // Cloudflare has no native binding for it.
-              if (item.type === "self_url") {
-                return { type: "plain_text", name: item.name, text: selfUrl! };
-              }
-              // Lower the `Worker.Self` sentinel into a service
-              // binding targeting this Worker's own physical name.
-              if (item.type === "self_service") {
-                return { type: "service", name: item.name, service: name };
-              }
-              if (
-                item.type === "durable_object_namespace" &&
-                item.transferredFrom !== undefined
-              ) {
-                const { transferredFrom: _, ...rest } = item;
-                return rest;
-              }
-              // `queueId` (mode discrimination) and `shim` (dev-mode remote
-              // producer) are alchemy-only metadata on queue bindings — strip
-              // them from the wire shape.
-              if (
-                item.type === "queue" &&
-                (item.queueId !== undefined || item.shim !== undefined)
-              ) {
-                const { queueId: _, shim: __, ...rest } = item;
-                return rest;
-              }
-              return item;
-            },
-          ),
+          (b.data.bindings ?? []).map((item): WireWorkerBinding => {
+            // Lower the `Worker.URL` sentinel into the resolved URL —
+            // Cloudflare has no native binding for it.
+            if (item.type === "self_url") {
+              return { type: "plain_text", name: item.name, text: selfUrl! };
+            }
+            // Lower the `Worker.Self` sentinel into a service
+            // binding targeting this Worker's own physical name.
+            if (item.type === "self_service") {
+              return { type: "service", name: item.name, service: name };
+            }
+            if (
+              item.type === "durable_object_namespace" &&
+              item.transferredFrom !== undefined
+            ) {
+              const { transferredFrom: _, ...rest } = item;
+              return rest;
+            }
+            // `queueId` (mode discrimination) and `shim` (dev-mode remote
+            // producer) are alchemy-only metadata on queue bindings — strip
+            // them from the wire shape.
+            if (
+              item.type === "queue" &&
+              (item.queueId !== undefined || item.shim !== undefined)
+            ) {
+              const { queueId: _, shim: __, ...rest } = item;
+              return rest;
+            }
+            return item;
+          }),
         );
         const expectedDurableObjectClassNames =
           getExpectedDurableObjectClassNames(metadataBindings, name);
@@ -3941,6 +3838,9 @@ export const LiveWorkerProvider = () =>
           namespaces.some(
             (ns) => ns.script === scriptName && ns.class === className,
           );
+        const scriptHostsClass = (scriptName: string, className: string) =>
+          hosts(observedNamespaces, scriptName, className);
+
         const deletedClasses: string[] = [];
         for (const className of deletedClassCandidates) {
           if (dispatchNamespace) {
@@ -3948,76 +3848,35 @@ export const LiveWorkerProvider = () =>
             continue;
           }
           const targetScriptName = crossScriptClassTargets.get(className);
-          const namespaceId =
-            oldBindings.flatMap((binding) =>
-              binding.type === "durable_object_namespace" &&
-              "className" in binding &&
-              binding.className === className &&
-              (!("scriptName" in binding) ||
-                binding.scriptName === undefined ||
-                binding.scriptName === name) &&
-              "namespaceId" in binding &&
-              typeof binding.namespaceId === "string"
-                ? [binding.namespaceId]
-                : [],
-            )[0] ??
-            output?.durableObjectNamespaces?.[className] ??
-            observedNamespaces.find(
-              (ns) => ns.script === name && ns.class === className,
-            )?.id;
           if (targetScriptName === undefined) {
-            const findNamespace = (namespaces: typeof observedNamespaces) =>
-              namespaces.find((ns) =>
-                namespaceId === undefined
-                  ? ns.script === name && ns.class === className
-                  : ns.id === namespaceId,
-              );
-            // Absence from an account listing does not prove a transfer.
-            const namespace =
-              findNamespace(observedNamespaces) ??
-              (yield* listDurableObjectNamespaces(accountId).pipe(
-                Effect.flatMap((namespaces) => {
-                  const namespace = findNamespace(namespaces);
-                  return namespace
-                    ? Effect.succeed(namespace)
-                    : Effect.fail(
-                        new MissingDurableObjects({
-                          scriptName: name,
-                          expected: [className],
-                        }),
-                      );
-                }),
-                Effect.retry({
-                  while: (error) => error._tag === "MissingDurableObjects",
-                  schedule: Schedule.spaced("2 seconds"),
-                  times: 5,
-                }),
-              ));
-            if (namespace.script === name && namespace.class === className) {
+            // Plain removal. Delete only if the namespace actually still
+            // lives here — it may have been transferred to another script by
+            // that script's deploy, or removed out-of-band. The stale
+            // alchemy:do tag drops out either way because tags are recomputed
+            // from current bindings.
+            if (scriptHostsClass(name, className)) {
               deletedClasses.push(className);
             }
             continue;
           }
-          // A missing listing is inconclusive; the original namespace must appear on the new host.
-          const transferred = (namespaces: typeof observedNamespaces) =>
-            namespaceId !== undefined &&
-            namespaces.some(
-              (ns) =>
-                ns.id === namespaceId &&
-                ns.script === targetScriptName &&
-                ns.class === className,
-            );
+          // The class went local → cross-script. When the new host's deploy
+          // ran a `transferred_classes` migration moments ago, the account
+          // listing can briefly still attribute the namespace to this script,
+          // so re-observe with a short bounded budget until the transfer
+          // becomes visible (namespace off this script) or the state is
+          // conclusively a conflict (still here — including the case where
+          // the target created a *fresh* namespace for the same class name).
           const namespaces = yield* listDurableObjectNamespaces(accountId).pipe(
             Effect.repeat({
               schedule: Schedule.spaced("2 seconds"),
               until: (observed) =>
-                transferred(observed) ||
-                (hosts(observed, name, className) &&
-                  hosts(observed, targetScriptName, className)),
+                !hosts(observed, name, className) ||
+                hosts(observed, targetScriptName, className),
               times: 5,
             }),
           );
-          if (transferred(namespaces)) {
+          if (!hosts(namespaces, name, className)) {
+            // Transferred away — nothing to delete.
             continue;
           }
           // local → cross-script transition without a transfer. Fail before
@@ -4180,12 +4039,6 @@ export const LiveWorkerProvider = () =>
           news.streamingTailConsumers,
         );
         const metadata: workers.PutScriptRequest["metadata"] = {
-          annotations: news.version
-            ? {
-                workersMessage: news.version.message,
-                workersTag: news.version.tag,
-              }
-            : undefined,
           assets: metadataAssets,
           bindings: metadataBindings,
           bodyPart: undefined,
@@ -4412,7 +4265,7 @@ export const LiveWorkerProvider = () =>
             scriptName: name,
           })
           .pipe(
-            Effect.orElseSucceed((): workers.GetScriptSubdomainResponse => ({
+            Effect.orElseSucceed<workers.GetScriptSubdomainResponse>(() => ({
               enabled: false,
               previewsEnabled: false,
             })),
@@ -4781,7 +4634,6 @@ export const LiveWorkerProvider = () =>
           const source = yield* resolveSource(props);
           const slots = yield* source.hash(
             makeSourceContext({
-              dotAlchemy,
               id,
               fqn,
               workerName: output.workerName,
@@ -5333,7 +5185,7 @@ export const LiveWorkerProvider = () =>
             yield* session.note("Pre-creating worker...", { kind: "status" });
             const compatibility = getCompatibility(news);
             const mainModule = "main.js";
-            const placeholderScript = `${doClasses.length > 0 ? 'import { DurableObject } from "cloudflare:workers";\n\n' : ""}export default { fetch() { return new Response("Alchemy worker is being deployed...", { status: 503, headers: { "Cache-Control": "no-store" } }) } };\n${doClasses
+            const placeholderScript = `${doClasses.length > 0 ? 'import { DurableObject } from "cloudflare:workers";\n\n' : ""}export default { fetch() { return new Response("Alchemy worker is being deployed...") } };\n${doClasses
               .map(
                 (className) =>
                   `export class ${className} extends DurableObject {}`,
@@ -6097,23 +5949,20 @@ const contentTypeFromExtension = (extension: string) => {
 };
 
 /**
- * Observe every Durable Object namespace on the account with its identity,
- * script and class. Namespace ownership is authoritative cloud state: after a
+ * Observe every Durable Object namespace on the account as `(script, class)`
+ * pairs. Namespace ownership is authoritative cloud state: after a
  * `transferred_classes` migration the namespace moves to the receiving
  * script, so this is how both sides of a transfer observe where a class
  * currently lives — the destination checks the source still hosts the class
  * before emitting the transfer, and the former host checks whether a class
- * it is about to delete has already been transferred away. Missing records
- * are inconclusive because pagination is not an atomic account snapshot.
+ * it is about to delete has already been transferred away.
  */
 const listDurableObjectNamespaces = (accountId: string) =>
   durableObjectsApi.listNamespaces.items({ accountId }).pipe(
     Stream.runCollect,
     Effect.map((namespaces) =>
       Array.from(namespaces).flatMap((ns) =>
-        ns.script && ns.class
-          ? [{ id: ns.id, script: ns.script, class: ns.class }]
-          : [],
+        ns.script && ns.class ? [{ script: ns.script, class: ns.class }] : [],
       ),
     ),
   );

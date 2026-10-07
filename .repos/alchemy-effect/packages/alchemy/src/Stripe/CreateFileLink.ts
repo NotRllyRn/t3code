@@ -21,7 +21,6 @@ import type { RuntimeContext } from "../RuntimeContext.ts";
  * ```
  *
  * @binding
- * @product Files
  */
 export interface CreateFileLink extends Binding.Service<
   CreateFileLink,

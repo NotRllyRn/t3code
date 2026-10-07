@@ -14,10 +14,7 @@
 import * as Arr from "./Array.ts"
 import * as DateTime from "./DateTime.ts"
 import * as Effect from "./Effect.ts"
-import * as Base64 from "./encoding/Base64.ts"
-import * as Base64Url from "./encoding/Base64Url.ts"
-import * as Hex from "./encoding/Hex.ts"
-import { dual } from "./Function.ts"
+import * as Encoding from "./Encoding.ts"
 import * as InternalRecord from "./internal/record.ts"
 import * as Option from "./Option.ts"
 import * as Pipeable from "./Pipeable.ts"
@@ -29,66 +26,6 @@ import * as SchemaIssue from "./SchemaIssue.ts"
 import * as Str from "./String.ts"
 
 /**
- * A transformation that returns its input unchanged.
- *
- * @category models
- * @since 4.0.0
- */
-export interface Passthrough extends Pipeable.Pipeable {
-  readonly _tag: "Passthrough"
-}
-
-/**
- * A synchronous transformation of present values.
- *
- * @category models
- * @since 4.0.0
- */
-export interface Transform<out T, in E> extends Pipeable.Pipeable {
-  readonly _tag: "Transform"
-  readonly transform: (input: E) => T
-}
-
-/**
- * A synchronous transformation of optional values.
- *
- * @category models
- * @since 4.0.0
- */
-export interface TransformOptional<out T, in E> extends Pipeable.Pipeable {
-  readonly _tag: "TransformOptional"
-  readonly transform: (input: Option.Option<E>) => Option.Option<T>
-}
-
-/**
- * An effectful transformation of present values.
- *
- * @category models
- * @since 4.0.0
- */
-export interface TransformEffect<out T, in E, R> extends Pipeable.Pipeable {
-  readonly _tag: "TransformEffect"
-  readonly transform: (
-    input: E,
-    options: SchemaAST.ParseOptions
-  ) => Effect.Effect<T, SchemaIssue.Issue, R>
-}
-
-/**
- * An effectful transformation of optional values.
- *
- * @category models
- * @since 4.0.0
- */
-export interface TransformOptionalEffect<out T, in E, R> extends Pipeable.Pipeable {
-  readonly _tag: "TransformOptionalEffect"
-  readonly transform: (
-    input: Option.Option<E>,
-    options: SchemaAST.ParseOptions
-  ) => Effect.Effect<Option.Option<T>, SchemaIssue.Issue, R>
-}
-
-/**
  * Represents a composable transformation from an encoded type `E` to a decoded type `T`.
  *
  * **When to use**
@@ -98,14 +35,14 @@ export interface TransformOptionalEffect<out T, in E, R> extends Pipeable.Pipeab
  *
  * **Details**
  *
- * A getter receives an `Option<E>` and produces an `Option<T>`. `Option.none()`
- * represents a missing struct field and can also omit a field from the output.
- * A getter may fail with a schema issue or require services through `R`. The
- * tagged representation distinguishes synchronous transformations from
- * transformations that return an `Effect`, allowing schema parsers to select
- * the corresponding execution path when they are built. Getter values expose
- * `pipe`; use the standalone {@link map}, {@link compose}, and {@link run}
- * functions to operate on them.
+ * A getter wraps a function `Option<E> -> Effect<Option<T>, Issue, R>`. It
+ * receives `Option.None` when the encoded key is absent, such as a missing
+ * struct field, and returns `Option.None` to omit the value from the decoded
+ * output. It fails with `Issue` on invalid input and may require Effect
+ * services via `R`. `.map(f)` applies `f` to the decoded value inside `Some`
+ * while leaving `None` unchanged. `.compose(other)` chains two getters by
+ * feeding the output of `this` into `other`; passthrough getters on either side
+ * are optimized away.
  *
  * **Example** (Creating and composing getters)
  *
@@ -114,207 +51,65 @@ export interface TransformOptionalEffect<out T, in E, R> extends Pipeable.Pipeab
  *
  * const parseNumber = SchemaGetter.transform<number, string>((s) => Number(s))
  * const double = SchemaGetter.transform<number, number>((n) => n * 2)
- * const composed = SchemaGetter.compose(parseNumber, double)
- * Effect.runSync(SchemaGetter.run(composed, Option.some("21"), {})) // => Option.some(42)
+ * const composed = parseNumber.compose(double)
+ * await Effect.runPromise(composed.run(Option.some("21"), {})) // => Option.some(42)
  * ```
  *
- * @see {@link passthrough} for the identity getter
  * @see {@link transform} to create a getter from a pure function
+ * @see {@link passthrough} for the identity getter
  * @see {@link transformEffect} for effectful transformation
  *
  * @category models
  * @since 4.0.0
  */
-export type Getter<T, E, R = never> =
-  | Passthrough
-  | Transform<T, E>
-  | TransformOptional<T, E>
-  | TransformEffect<T, E, R>
-  | TransformOptionalEffect<T, E, R>
-
-const runGetter = <T, E, R>(
-  self: Getter<T, E, R>,
-  input: Option.Option<E>,
-  options: SchemaAST.ParseOptions
-): Effect.Effect<Option.Option<T>, SchemaIssue.Issue, R> => {
-  switch (self._tag) {
-    case "Passthrough":
-      return Effect.succeed(input as unknown as Option.Option<T>)
-    case "Transform":
-      return Effect.succeed(Option.map(input, self.transform))
-    case "TransformOptional":
-      return Effect.succeed(self.transform(input))
-    case "TransformEffect":
-      return Option.isNone(input)
-        ? Effect.succeedNone
-        : Effect.mapEager(self.transform(input.value, options), Option.some)
-    case "TransformOptionalEffect":
-      return self.transform(input, options)
-  }
+export interface Getter<out T, in E, R = never> extends Pipeable.Pipeable {
+  readonly run: (
+    input: Option.Option<E>,
+    options: SchemaAST.ParseOptions
+  ) => Effect.Effect<Option.Option<T>, SchemaIssue.Issue, R>
+  map<T2>(f: (t: T) => T2): Getter<T2, E, R>
+  compose<T2, R2>(other: Getter<T2, T, R2>): Getter<T2, E, R | R2>
 }
 
 /**
- * Runs a getter directly.
+ * Constructs a composable schema getter.
  *
- * **Details**
- *
- * This is a convenience API for executing a getter outside a schema. When the
- * getter belongs to a schema, use the corresponding `SchemaParser` API. The
- * result is an `Effect` for every getter variant, including synchronous ones.
- *
- * **Example** (Running a getter)
- *
- * ```ts import.meta.vitest
- * import { Effect, Option, SchemaGetter } from "effect"
- *
- * const getter = SchemaGetter.transform<number, string>(Number)
- *
- * const result = Effect.runSync(
- *   SchemaGetter.run(getter, Option.some("42"), {})
- * )
- * result // => Option.some(42)
- * ```
- *
- * @category converting
+ * @category constructors
  * @since 4.0.0
  */
-export const run: {
-  <E>(
+export const Getter: new<T, E, R = never>(
+  run: (
     input: Option.Option<E>,
     options: SchemaAST.ParseOptions
-  ): <T, R>(self: Getter<T, E, R>) => Effect.Effect<Option.Option<T>, SchemaIssue.Issue, R>
-  <T, E, R>(
-    self: Getter<T, E, R>,
+  ) => Effect.Effect<Option.Option<T>, SchemaIssue.Issue, R>
+) => Getter<T, E, R> = class<out T, in E, R = never> extends Pipeable.Class {
+  readonly run: (
     input: Option.Option<E>,
     options: SchemaAST.ParseOptions
-  ): Effect.Effect<Option.Option<T>, SchemaIssue.Issue, R>
-} = dual(3, runGetter)
+  ) => Effect.Effect<Option.Option<T>, SchemaIssue.Issue, R>
 
-const makeGetter = <const A extends object>(fields: A): A & Pipeable.Pipeable =>
-  Object.assign(Object.create(Pipeable.Prototype), fields)
-
-const composeOptionalEffect = <T, E, R, T2, R2>(
-  first: Getter<T, E, R>,
-  second: Getter<T2, T, R2>
-): Getter<T2, E, R | R2> =>
-  transformOptionalEffect((input, options) =>
-    Effect.flatMapEager(runGetter(first, input, options), (output) => runGetter(second, output, options))
-  )
-
-/**
- * Composes two getters by passing the output of the first to the second.
- *
- * **When to use**
- *
- * Use when a schema conversion requires multiple transformation steps.
- *
- * **Details**
- *
- * Composition forwards `Option.none()` to getters that handle optional values
- * and skips getters that operate only on present values. Composing with
- * {@link passthrough} returns the other getter unchanged. The function supports
- * both `compose(first, second)` and `first.pipe(compose(second))`.
- *
- * **Example** (Parsing and normalizing a number)
- *
- * ```ts import.meta.vitest
- * import { Effect, Option, SchemaGetter } from "effect"
- *
- * const getter = SchemaGetter.compose(
- *   SchemaGetter.transform<number, string>(Number),
- *   SchemaGetter.transform((n) => Math.max(0, n))
- * )
- *
- * Effect.runSync(SchemaGetter.run(getter, Option.some("-1"), {})) // => Option.some(0)
- * ```
- *
- * @category combining
- * @since 4.0.0
- */
-export const compose: {
-  <T, T2, R2>(other: Getter<T2, T, R2>): <E, R>(self: Getter<T, E, R>) => Getter<T2, E, R | R2>
-  <T, E, R, T2, R2>(self: Getter<T, E, R>, other: Getter<T2, T, R2>): Getter<T2, E, R | R2>
-} = dual(2, <T, E, R, T2, R2>(
-  self: Getter<T, E, R>,
-  other: Getter<T2, T, R2>
-): Getter<T2, E, R | R2> => {
-  if (self._tag === "Passthrough") return other as Getter<T2, E, R | R2>
-  if (other._tag === "Passthrough") return self as unknown as Getter<T2, E, R | R2>
-  switch (self._tag) {
-    case "Transform": {
-      switch (other._tag) {
-        case "Transform":
-          return transform((input: E) => other.transform(self.transform(input)))
-        case "TransformOptional":
-          return transformOptional((input) => other.transform(Option.map(input, self.transform)))
-        case "TransformEffect":
-          return transformEffect((input: E, options) => other.transform(self.transform(input), options))
-        case "TransformOptionalEffect":
-          return composeOptionalEffect(self, other)
-      }
-    }
-    case "TransformOptional": {
-      switch (other._tag) {
-        case "Transform":
-          return transformOptional((input) => Option.map(self.transform(input), other.transform))
-        case "TransformOptional":
-          return transformOptional((input) => other.transform(self.transform(input)))
-        case "TransformEffect":
-        case "TransformOptionalEffect":
-          return composeOptionalEffect(self, other)
-      }
-    }
-    case "TransformEffect": {
-      switch (other._tag) {
-        case "Transform":
-          return transformEffect((input: E, options) =>
-            Effect.mapEager(self.transform(input, options), other.transform)
-          )
-        case "TransformOptional":
-        case "TransformOptionalEffect":
-          return composeOptionalEffect(self, other)
-        case "TransformEffect":
-          return transformEffect((input: E, options) =>
-            Effect.flatMapEager(self.transform(input, options), (output) => other.transform(output, options))
-          )
-      }
-    }
-    case "TransformOptionalEffect":
-      return composeOptionalEffect(self, other)
+  constructor(
+    run: (
+      input: Option.Option<E>,
+      options: SchemaAST.ParseOptions
+    ) => Effect.Effect<Option.Option<T>, SchemaIssue.Issue, R>
+  ) {
+    super()
+    this.run = run
   }
-})
-
-/**
- * Maps the output of a getter while preserving missing values.
- *
- * **When to use**
- *
- * Use to add a synchronous transformation after an existing getter.
- *
- * **Details**
- *
- * The mapping function runs only for `Option.some`. The function supports both
- * `map(self, f)` and `self.pipe(map(f))`.
- *
- * **Example** (Mapping a getter result)
- *
- * ```ts import.meta.vitest
- * import { Effect, Option, SchemaGetter } from "effect"
- *
- * const getter = SchemaGetter.transform<number, string>(Number).pipe(
- *   SchemaGetter.map((n) => n * 2)
- * )
- *
- * Effect.runSync(SchemaGetter.run(getter, Option.some("21"), {})) // => Option.some(42)
- * ```
- *
- * @category mapping
- * @since 4.0.0
- */
-export const map: {
-  <T, T2>(f: (value: T) => T2): <E, R>(self: Getter<T, E, R>) => Getter<T2, E, R>
-  <T, E, R, T2>(self: Getter<T, E, R>, f: (value: T) => T2): Getter<T2, E, R>
-} = dual(2, <T, E, R, T2>(self: Getter<T, E, R>, f: (value: T) => T2): Getter<T2, E, R> => compose(self, transform(f)))
+  map<T2>(f: (t: T) => T2): Getter<T2, E, R> {
+    return new Getter((oe, options) => this.run(oe, options).pipe(Effect.mapEager(Option.map(f))))
+  }
+  compose<T2, R2>(other: Getter<T2, T, R2>): Getter<T2, E, R | R2> {
+    if (isPassthrough(this)) {
+      return other as any
+    }
+    if (isPassthrough(other)) {
+      return this as any
+    }
+    return new Getter((oe, options) => this.run(oe, options).pipe(Effect.flatMapEager((ot) => other.run(ot, options))))
+  }
+}
 
 /**
  * Creates a getter that always produces the given constant value, ignoring the input.
@@ -335,7 +130,7 @@ export const map: {
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const alwaysZero = SchemaGetter.succeed(0)
- * Effect.runSync(SchemaGetter.run(alwaysZero, Option.none(), {})) // => Option.some(0)
+ * await Effect.runPromise(alwaysZero.run(Option.none(), {})) // => Option.some(0)
  * ```
  *
  * @see {@link transform} when you need to use the input value
@@ -345,7 +140,7 @@ export const map: {
  * @since 4.0.0
  */
 export function succeed<const T, E>(t: T): Getter<T, E> {
-  return transformOptional(() => Option.some(t))
+  return new Getter(() => Effect.succeedSome(t))
 }
 
 /**
@@ -370,9 +165,7 @@ export function succeed<const T, E>(t: T): Getter<T, E> {
  * const rejectAll = SchemaGetter.fail<string, string>(
  *   () => new SchemaIssue.InvalidValue({ message: "not allowed" })
  * )
- * const issue = await Effect.runPromise(
- *   Effect.flip(SchemaGetter.run(rejectAll, Option.some("x"), {}))
- * )
+ * const issue = await Effect.runPromise(Effect.flip(rejectAll.run(Option.some("x"), {})))
  * issue._tag // => "InvalidValue"
  * ```
  *
@@ -385,7 +178,7 @@ export function succeed<const T, E>(t: T): Getter<T, E> {
 export function fail<T, E>(
   f: (oe: Option.Option<E>, options: SchemaAST.ParseOptions) => SchemaIssue.Issue
 ): Getter<T, E> {
-  return transformOptionalEffect((oe, options) => Effect.fail(f(oe, options)))
+  return new Getter((oe, options) => Effect.fail(f(oe, options)))
 }
 
 /**
@@ -410,9 +203,7 @@ export function fail<T, E>(
  * const noEncode = SchemaGetter.forbidden<string, number>(
  *   () => "encoding is not supported"
  * )
- * const issue = await Effect.runPromise(
- *   Effect.flip(SchemaGetter.run(noEncode, Option.some(1), {}))
- * )
+ * const issue = await Effect.runPromise(Effect.flip(noEncode.run(Option.some(1), {})))
  * issue._tag // => "Forbidden"
  * ```
  *
@@ -448,7 +239,7 @@ export function forbidden<T, E>(message: (oe: Option.Option<E>) => string): Gett
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const issue = await Effect.runPromise(
- *   Effect.flip(SchemaGetter.run(SchemaGetter.forbiddenEncoding, Option.some("value"), {}))
+ *   Effect.flip(SchemaGetter.forbiddenEncoding.run(Option.some("value"), {}))
  * )
  * issue._tag // => "Forbidden"
  * ```
@@ -460,7 +251,11 @@ export function forbidden<T, E>(message: (oe: Option.Option<E>) => string): Gett
  */
 export const forbiddenEncoding: Getter<never, unknown> = forbidden(() => "Encoding is not supported")
 
-const passthrough_: Passthrough = makeGetter({ _tag: "Passthrough" })
+const passthrough_ = new Getter<any, any>(Effect.succeed)
+
+function isPassthrough<T, E, R>(getter: Getter<T, E, R>): getter is typeof passthrough_ {
+  return getter.run === passthrough_.run
+}
 
 /**
  * Returns the identity getter — passes the value through unchanged.
@@ -473,7 +268,7 @@ const passthrough_: Passthrough = makeGetter({ _tag: "Passthrough" })
  * **Details**
  *
  * - Pure, no allocation (singleton instance).
- * - Optimized away by {@link compose} — composing with a passthrough is free.
+ * - Optimized away during `.compose()` — composing with a passthrough is free.
  * - The default overload requires `T === E`. Pass `{ strict: false }` to opt
  *   out of the type constraint.
  *
@@ -524,7 +319,7 @@ export function passthrough<T>(): Getter<T, T> {
  *
  * // string extends string, so this is valid
  * const g = SchemaGetter.passthroughSupertype<string, string>()
- * Effect.runSync(SchemaGetter.run(g, Option.some("hello"), {})) // => Option.some("hello")
+ * await Effect.runPromise(g.run(Option.some("hello"), {})) // => Option.some("hello")
  * ```
  *
  * @see {@link passthrough} when types are identical
@@ -557,7 +352,7 @@ export function passthroughSupertype<T>(): Getter<T, T> {
  *
  * // "hello" extends string, so E extends T
  * const g = SchemaGetter.passthroughSubtype<string, "hello">()
- * Effect.runSync(SchemaGetter.run(g, Option.some("hello"), {})) // => Option.some("hello")
+ * await Effect.runPromise(g.run(Option.some("hello"), {})) // => Option.some("hello")
  * ```
  *
  * @see {@link passthrough} when types are identical
@@ -569,6 +364,45 @@ export function passthroughSupertype<T>(): Getter<T, T> {
 export function passthroughSubtype<T, E extends T>(): Getter<T, E>
 export function passthroughSubtype<T>(): Getter<T, T> {
   return passthrough_
+}
+
+/**
+ * Creates a getter that handles the case when the input is absent (`Option.None`).
+ *
+ * **When to use**
+ *
+ * Use when you need a schema getter to provide a fallback or computed value for
+ * missing struct keys.
+ * - Building custom "default value" logic more complex than {@link withDefault}.
+ *
+ * **Details**
+ *
+ * - When input is `None`, calls `f` to produce the result.
+ * - When input is `Some`, passes it through unchanged.
+ * - `f` receives the parse options and may return `None` to keep the value absent.
+ *
+ * **Example** (Providing a default timestamp for a missing field)
+ *
+ * ```ts import.meta.vitest
+ * import { Effect, Option, SchemaGetter } from "effect"
+ *
+ * const withTimestamp = SchemaGetter.onNone<number>(() =>
+ *   Effect.succeed(Option.some(0))
+ * )
+ * await Effect.runPromise(withTimestamp.run(Option.none(), {})) // => Option.some(0)
+ * ```
+ *
+ * @see {@link required} when absent input should fail
+ * @see {@link withDefault} for a simpler default value for undefined inputs
+ * @see {@link onSome} to handle only present values
+ *
+ * @category transforming
+ * @since 4.0.0
+ */
+export function onNone<T, E extends T = T, R = never>(
+  f: (options: SchemaAST.ParseOptions) => Effect.Effect<Option.Option<T>, SchemaIssue.Issue, R>
+): Getter<T, E, R> {
+  return new Getter((ot, options) => Option.isNone(ot) ? f(options) : Effect.succeed(ot))
 }
 
 /**
@@ -591,21 +425,57 @@ export function passthroughSubtype<T>(): Getter<T, T> {
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const mustExist = SchemaGetter.required<string>()
- * const issue = await Effect.runPromise(
- *   Effect.flip(SchemaGetter.run(mustExist, Option.none(), {}))
- * )
+ * const issue = await Effect.runPromise(Effect.flip(mustExist.run(Option.none(), {})))
  * issue._tag // => "MissingKey"
  * ```
  *
+ * @see {@link onNone} to provide a fallback instead of failing
  * @see {@link withDefault} to substitute a default for undefined values
  *
  * @category validation
  * @since 4.0.0
  */
 export function required<T, E extends T = T>(annotations?: Schema.Annotations.Key<T>): Getter<T, E> {
-  return transformOptionalEffect((input) =>
-    Option.isNone(input) ? Effect.fail(new SchemaIssue.MissingKey(annotations)) : Effect.succeed(input)
-  )
+  return onNone(() => Effect.fail(new SchemaIssue.MissingKey(annotations)))
+}
+
+/**
+ * Creates a getter that handles present values (`Option.Some`), passing `None` through.
+ *
+ * **When to use**
+ *
+ * Use when you need a schema getter to transform or validate only when a field
+ * value is present.
+ * - Missing keys should remain absent in the output.
+ *
+ * **Details**
+ *
+ * - When input is `None`, returns `None` (no-op).
+ * - When input is `Some(e)`, calls `f(e, options)` to produce the result.
+ * - `f` may return `None` to omit the value, or fail with an `Issue`.
+ *
+ * **Example** (Transforming only present values)
+ *
+ * ```ts import.meta.vitest
+ * import { Effect, Option, SchemaGetter } from "effect"
+ *
+ * const parseIfPresent = SchemaGetter.onSome<number, string>(
+ *   (s) => Effect.succeed(Option.some(Number(s)))
+ * )
+ * await Effect.runPromise(parseIfPresent.run(Option.some("42"), {})) // => Option.some(42)
+ * ```
+ *
+ * @see {@link onNone} to handle only absent values
+ * @see {@link transform} for a simpler pure transformation of present values
+ * @see {@link transformEffect} for effectful transformation of present values
+ *
+ * @category transforming
+ * @since 4.0.0
+ */
+export function onSome<T, E, R = never>(
+  f: (e: E, options: SchemaAST.ParseOptions) => Effect.Effect<Option.Option<T>, SchemaIssue.Issue, R>
+): Getter<T, E, R> {
+  return new Getter((oe, options) => Option.isNone(oe) ? Effect.succeedNone : f(oe.value, options))
 }
 
 /**
@@ -636,7 +506,7 @@ export function required<T, E extends T = T>(annotations?: Schema.Annotations.Ke
  * const nonNegative = SchemaGetter.checkEffect<number>((n) =>
  *   Effect.succeed(n >= 0 ? undefined : "must be non-negative")
  * )
- * await Effect.runPromise(SchemaGetter.run(nonNegative, Option.some(1), {})) // => Option.some(1)
+ * await Effect.runPromise(nonNegative.run(Option.some(1), {})) // => Option.some(1)
  * ```
  *
  * @see {@link transform} when you need to change the value, not just validate
@@ -652,12 +522,12 @@ export function checkEffect<T, R = never>(
     R
   >
 ): Getter<T, T, R> {
-  return transformEffect((t, options) => {
+  return onSome((t, options) => {
     return f(t, options).pipe(Effect.flatMapEager((out) => {
       const issue = SchemaIssue.makeSingle(out, t, options)
       return issue ?
         Effect.fail(issue) :
-        Effect.succeed(t)
+        Effect.succeed(Option.some(t))
     }))
   })
 }
@@ -700,7 +570,7 @@ export function checkEffect<T, R = never>(
  * @since 4.0.0
  */
 export function transform<T, E>(f: (e: E) => T): Getter<T, E> {
-  return makeGetter({ _tag: "Transform", transform: f })
+  return transformOptional(Option.map(f))
 }
 
 /**
@@ -730,11 +600,11 @@ export function transform<T, E>(f: (e: E) => T): Getter<T, E> {
  *       : Effect.succeed(n)
  *   }
  * )
- * await Effect.runPromise(SchemaGetter.run(safeParseInt, Option.some("42"), {})) // => Option.some(42)
+ * await Effect.runPromise(safeParseInt.run(Option.some("42"), {})) // => Option.some(42)
  * ```
  *
  * @see {@link transform} when transformation cannot fail
- * @see {@link transformOptionalEffect} when you need full `Option` control over the output
+ * @see {@link onSome} when you need full `Option` control over the output
  *
  * @category transforming
  * @since 4.0.0
@@ -742,7 +612,7 @@ export function transform<T, E>(f: (e: E) => T): Getter<T, E> {
 export function transformEffect<T, E, R = never>(
   f: (e: E, options: SchemaAST.ParseOptions) => Effect.Effect<T, SchemaIssue.Issue, R>
 ): Getter<T, E, R> {
-  return makeGetter({ _tag: "TransformEffect", transform: f })
+  return onSome((e, options) => f(e, options).pipe(Effect.mapEager(Option.some)))
 }
 
 /**
@@ -766,7 +636,7 @@ export function transformEffect<T, E, R = never>(
  * const skipEmpty = SchemaGetter.transformOptional<string, string>((o) =>
  *   Option.filter(o, (s) => s.length > 0)
  * )
- * Effect.runSync(SchemaGetter.run(skipEmpty, Option.some(""), {})) // => Option.none()
+ * await Effect.runPromise(skipEmpty.run(Option.some(""), {})) // => Option.none()
  * ```
  *
  * @see {@link transform} when you only need to transform present values
@@ -776,22 +646,7 @@ export function transformEffect<T, E, R = never>(
  * @since 4.0.0
  */
 export function transformOptional<T, E>(f: (oe: Option.Option<E>) => Option.Option<T>): Getter<T, E> {
-  return makeGetter({ _tag: "TransformOptional", transform: f })
-}
-
-/**
- * Creates a getter that effectfully transforms the full `Option`.
- *
- * @category transforming
- * @since 4.0.0
- */
-export function transformOptionalEffect<T, E, R = never>(
-  f: (
-    input: Option.Option<E>,
-    options: SchemaAST.ParseOptions
-  ) => Effect.Effect<Option.Option<T>, SchemaIssue.Issue, R>
-): Getter<T, E, R> {
-  return makeGetter({ _tag: "TransformOptionalEffect", transform: f })
+  return new Getter((oe) => Effect.succeed(f(oe)))
 }
 
 /**
@@ -813,7 +668,7 @@ export function transformOptionalEffect<T, E, R = never>(
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const omitField = SchemaGetter.omit<string>()
- * Effect.runSync(SchemaGetter.run(omitField, Option.some("hidden"), {})) // => Option.none()
+ * await Effect.runPromise(omitField.run(Option.some("hidden"), {})) // => Option.none()
  * ```
  *
  * @see {@link transformOptional} when you want conditional omission
@@ -823,7 +678,7 @@ export function transformOptionalEffect<T, E, R = never>(
  * @since 4.0.0
  */
 export function omit<T>(): Getter<never, T> {
-  return transformOptional(() => Option.none())
+  return new Getter(() => Effect.succeedNone)
 }
 
 /**
@@ -846,10 +701,10 @@ export function omit<T>(): Getter<never, T> {
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const withZero = SchemaGetter.withDefault(Effect.succeed(0))
- * await Effect.runPromise(SchemaGetter.run(withZero, Option.some(undefined), {})) // => Option.some(0)
+ * await Effect.runPromise(withZero.run(Option.some(undefined), {})) // => Option.some(0)
  * ```
  *
- * @see {@link transformOptionalEffect} for custom effectful missing-key handling
+ * @see {@link onNone} to handle only absent keys (not `undefined` values)
  * @see {@link required} when absent input should fail instead of using a default
  *
  * @category transforming
@@ -858,7 +713,7 @@ export function omit<T>(): Getter<never, T> {
 export function withDefault<T, R = never>(
   defaultValue: Effect.Effect<T, SchemaIssue.Issue, R>
 ): Getter<T, T | undefined, R> {
-  return transformOptionalEffect((o) => {
+  return new Getter((o) => {
     const filtered = Option.filter(o, Predicate.isNotUndefined)
     return Option.isSome(filtered) ? Effect.succeed(filtered) : Effect.mapEager(defaultValue, Option.some)
   })
@@ -882,7 +737,7 @@ export function withDefault<T, R = never>(
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const toString = SchemaGetter.String<number>()
- * Effect.runSync(SchemaGetter.run(toString, Option.some(42), {})) // => Option.some("42")
+ * await Effect.runPromise(toString.run(Option.some(42), {})) // => Option.some("42")
  * ```
  *
  * @see {@link transform} for custom string conversions
@@ -913,7 +768,7 @@ export function String<E>(): Getter<string, E> {
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const toNumber = SchemaGetter.Number<string>()
- * Effect.runSync(SchemaGetter.run(toNumber, Option.some("42"), {})) // => Option.some(42)
+ * await Effect.runPromise(toNumber.run(Option.some("42"), {})) // => Option.some(42)
  * ```
  *
  * @see {@link transformEffect} for effectful or validated number parsing
@@ -943,7 +798,7 @@ export function Number<E>(): Getter<number, E> {
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const toBool = SchemaGetter.Boolean<string>()
- * Effect.runSync(SchemaGetter.run(toBool, Option.some("true"), {})) // => Option.some(true)
+ * await Effect.runPromise(toBool.run(Option.some("true"), {})) // => Option.some(true)
  * ```
  *
  * @category converting
@@ -972,7 +827,7 @@ export function Boolean<E>(): Getter<boolean, E> {
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const toBigInt = SchemaGetter.BigInt<string>()
- * Effect.runSync(SchemaGetter.run(toBigInt, Option.some("42"), {})) // => Option.some(42n)
+ * await Effect.runPromise(toBigInt.run(Option.some("42"), {})) // => Option.some(42n)
  * ```
  *
  * @category converting
@@ -1001,7 +856,7 @@ export function BigInt<E extends string | number | bigint | boolean>(): Getter<b
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const toDate = SchemaGetter.Date<string>()
- * const result = Effect.runSync(SchemaGetter.run(toDate, Option.some("1970-01-01"), {}))
+ * const result = await Effect.runPromise(toDate.run(Option.some("1970-01-01"), {}))
  * Option.map(result, (date) => date.toISOString()) // => Option.some("1970-01-01T00:00:00.000Z")
  * ```
  *
@@ -1027,7 +882,7 @@ export function Date<E extends string | number | Date>(): Getter<Date, E> {
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const trimmed = SchemaGetter.trim<string>()
- * Effect.runSync(SchemaGetter.run(trimmed, Option.some("  hello  "), {})) // => Option.some("hello")
+ * await Effect.runPromise(trimmed.run(Option.some("  hello  "), {})) // => Option.some("hello")
  * ```
  *
  * @category transforming
@@ -1050,7 +905,7 @@ export function trim<E extends string>(): Getter<string, E> {
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const cap = SchemaGetter.capitalize<string>()
- * Effect.runSync(SchemaGetter.run(cap, Option.some("hello"), {})) // => Option.some("Hello")
+ * await Effect.runPromise(cap.run(Option.some("hello"), {})) // => Option.some("Hello")
  * ```
  *
  * @category transforming
@@ -1073,7 +928,7 @@ export function capitalize<E extends string>(): Getter<string, E> {
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const uncap = SchemaGetter.uncapitalize<string>()
- * Effect.runSync(SchemaGetter.run(uncap, Option.some("Hello"), {})) // => Option.some("hello")
+ * await Effect.runPromise(uncap.run(Option.some("Hello"), {})) // => Option.some("hello")
  * ```
  *
  * @category transforming
@@ -1096,7 +951,7 @@ export function uncapitalize<E extends string>(): Getter<string, E> {
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const toCamel = SchemaGetter.snakeToCamel<string>()
- * Effect.runSync(SchemaGetter.run(toCamel, Option.some("user_name"), {})) // => Option.some("userName")
+ * await Effect.runPromise(toCamel.run(Option.some("user_name"), {})) // => Option.some("userName")
  * ```
  *
  * @see {@link camelToSnake} for the inverse operation
@@ -1121,7 +976,7 @@ export function snakeToCamel<E extends string>(): Getter<string, E> {
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const toSnake = SchemaGetter.camelToSnake<string>()
- * Effect.runSync(SchemaGetter.run(toSnake, Option.some("userName"), {})) // => Option.some("user_name")
+ * await Effect.runPromise(toSnake.run(Option.some("userName"), {})) // => Option.some("user_name")
  * ```
  *
  * @see {@link snakeToCamel} for the inverse operation
@@ -1146,7 +1001,7 @@ export function camelToSnake<E extends string>(): Getter<string, E> {
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const lower = SchemaGetter.toLowerCase<string>()
- * Effect.runSync(SchemaGetter.run(lower, Option.some("HELLO"), {})) // => Option.some("hello")
+ * await Effect.runPromise(lower.run(Option.some("HELLO"), {})) // => Option.some("hello")
  * ```
  *
  * @see {@link toUpperCase} for the inverse operation
@@ -1171,7 +1026,7 @@ export function toLowerCase<E extends string>(): Getter<string, E> {
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const upper = SchemaGetter.toUpperCase<string>()
- * Effect.runSync(SchemaGetter.run(upper, Option.some("hello"), {})) // => Option.some("HELLO")
+ * await Effect.runPromise(upper.run(Option.some("hello"), {})) // => Option.some("HELLO")
  * ```
  *
  * @see {@link toLowerCase} for the inverse operation
@@ -1210,8 +1065,7 @@ type ParseJsonOptions = {
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const parse = SchemaGetter.parseJson<string>()
- * const result = await Effect.runPromise(SchemaGetter.run(parse, Option.some("{\"a\":1}"), {}))
- * result // => Option.some({ a: 1 })
+ * await Effect.runPromise(parse.run(Option.some("{\"a\":1}"), {})) // => Option.some({ a: 1 })
  * ```
  *
  * @see {@link stringifyJson} for the inverse operation
@@ -1222,9 +1076,9 @@ type ParseJsonOptions = {
 export function parseJson<E extends string>(): Getter<Schema.MutableJson, E>
 export function parseJson<E extends string>(options: ParseJsonOptions): Getter<unknown, E>
 export function parseJson<E extends string>(options?: ParseJsonOptions | undefined): Getter<unknown, E> {
-  return transformEffect((input, parseOptions) =>
+  return onSome((input, parseOptions) =>
     Effect.try({
-      try: () => JSON.parse(input, options?.reviver),
+      try: () => Option.some(JSON.parse(input, options?.reviver)),
       catch: () =>
         new SchemaIssue.InvalidValue(
           { expected: "a valid JSON string" },
@@ -1273,8 +1127,7 @@ type StringifyJsonOptions = {
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const stringify = SchemaGetter.stringifyJson()
- * const result = await Effect.runPromise(SchemaGetter.run(stringify, Option.some({ a: 1 }), {}))
- * result // => Option.some("{\"a\":1}")
+ * await Effect.runPromise(stringify.run(Option.some({ a: 1 }), {})) // => Option.some("{\"a\":1}")
  * ```
  *
  * @see {@link parseJson} for the inverse operation
@@ -1283,14 +1136,14 @@ type StringifyJsonOptions = {
  * @since 4.0.0
  */
 export function stringifyJson(options?: StringifyJsonOptions): Getter<string, unknown> {
-  return transformEffect((input, parseOptions) =>
+  return onSome((input, parseOptions) =>
     Effect.try({
       try: () => {
         const output = JSON.stringify(input, options?.replacer as any, options?.space)
         if (output === undefined) {
           throw new TypeError("Value cannot be represented as JSON")
         }
-        return output
+        return Option.some(output)
       },
       catch: () =>
         new SchemaIssue.InvalidValue(
@@ -1322,8 +1175,7 @@ export function stringifyJson(options?: StringifyJsonOptions): Getter<string, un
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const parse = SchemaGetter.splitKeyValue<string>()
- * const result = Effect.runSync(SchemaGetter.run(parse, Option.some("a=1,b=2"), {}))
- * result // => Option.some({ a: "1", b: "2" })
+ * await Effect.runPromise(parse.run(Option.some("a=1,b=2"), {})) // => Option.some({ a: "1", b: "2" })
  * ```
  *
  * @see {@link joinKeyValue} for the inverse operation
@@ -1369,8 +1221,7 @@ export function splitKeyValue<E extends string>(options?: {
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const join = SchemaGetter.joinKeyValue()
- * const result = Effect.runSync(SchemaGetter.run(join, Option.some({ a: "1", b: "2" }), {}))
- * result // => Option.some("a=1,b=2")
+ * await Effect.runPromise(join.run(Option.some({ a: "1", b: "2" }), {})) // => Option.some("a=1,b=2")
  * ```
  *
  * @see {@link splitKeyValue} for the inverse operation
@@ -1408,8 +1259,7 @@ export function joinKeyValue<E extends Record<PropertyKey, string>>(options?: {
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const splitComma = SchemaGetter.split<string>()
- * const result = Effect.runSync(SchemaGetter.run(splitComma, Option.some("a,b,c"), {}))
- * result // => Option.some(["a", "b", "c"])
+ * await Effect.runPromise(splitComma.run(Option.some("a,b,c"), {})) // => Option.some(["a", "b", "c"])
  * ```
  *
  * @see {@link splitKeyValue} when values are key-value pairs
@@ -1437,8 +1287,7 @@ export function split<E extends string>(options?: {
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const encode = SchemaGetter.encodeBase64<Uint8Array>()
- * const result = Effect.runSync(SchemaGetter.run(encode, Option.some(new Uint8Array([1, 2, 3])), {}))
- * result // => Option.some("AQID")
+ * await Effect.runPromise(encode.run(Option.some(new Uint8Array([1, 2, 3])), {})) // => Option.some("AQID")
  * ```
  *
  * @see {@link decodeBase64} for the inverse operation to `Uint8Array`
@@ -1449,7 +1298,7 @@ export function split<E extends string>(options?: {
  * @since 4.0.0
  */
 export function encodeBase64<E extends Uint8Array | string>(): Getter<string, E> {
-  return transform(Base64.encode)
+  return transform(Encoding.encodeBase64)
 }
 
 /**
@@ -1465,8 +1314,7 @@ export function encodeBase64<E extends Uint8Array | string>(): Getter<string, E>
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const encode = SchemaGetter.encodeBase64Url<Uint8Array>()
- * const result = Effect.runSync(SchemaGetter.run(encode, Option.some(new Uint8Array([251, 255])), {}))
- * result // => Option.some("-_8")
+ * await Effect.runPromise(encode.run(Option.some(new Uint8Array([251, 255])), {})) // => Option.some("-_8")
  * ```
  *
  * @see {@link decodeBase64Url} for the inverse operation to `Uint8Array`
@@ -1477,7 +1325,7 @@ export function encodeBase64<E extends Uint8Array | string>(): Getter<string, E>
  * @since 4.0.0
  */
 export function encodeBase64Url<E extends Uint8Array | string>(): Getter<string, E> {
-  return transform(Base64Url.encode)
+  return transform(Encoding.encodeBase64Url)
 }
 
 /**
@@ -1493,8 +1341,7 @@ export function encodeBase64Url<E extends Uint8Array | string>(): Getter<string,
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const encode = SchemaGetter.encodeHex<Uint8Array>()
- * const result = Effect.runSync(SchemaGetter.run(encode, Option.some(new Uint8Array([1, 2, 3])), {}))
- * result // => Option.some("010203")
+ * await Effect.runPromise(encode.run(Option.some(new Uint8Array([1, 2, 3])), {})) // => Option.some("010203")
  * ```
  *
  * @see {@link decodeHex} for the inverse operation to `Uint8Array`
@@ -1504,7 +1351,7 @@ export function encodeBase64Url<E extends Uint8Array | string>(): Getter<string,
  * @since 4.0.0
  */
 export function encodeHex<E extends Uint8Array | string>(): Getter<string, E> {
-  return transform(Hex.encode)
+  return transform(Encoding.encodeHex)
 }
 
 /**
@@ -1520,7 +1367,7 @@ export function encodeHex<E extends Uint8Array | string>(): Getter<string, E> {
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const decode = SchemaGetter.decodeBase64<string>()
- * const result = await Effect.runPromise(SchemaGetter.run(decode, Option.some("AQID"), {}))
+ * const result = await Effect.runPromise(decode.run(Option.some("AQID"), {}))
  * Option.map(result, Array.from) // => Option.some([1, 2, 3])
  * ```
  *
@@ -1533,7 +1380,7 @@ export function encodeHex<E extends Uint8Array | string>(): Getter<string, E> {
 export function decodeBase64<E extends string>(): Getter<Uint8Array, E> {
   return transformEffect((input, options) =>
     Effect.mapErrorEager(
-      Effect.fromResult(Base64.decode(input)),
+      Effect.fromResult(Encoding.decodeBase64(input)),
       () =>
         new SchemaIssue.InvalidValue(
           { expected: "a valid Base64 string" },
@@ -1557,8 +1404,7 @@ export function decodeBase64<E extends string>(): Getter<Uint8Array, E> {
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const decode = SchemaGetter.decodeBase64String<string>()
- * const result = await Effect.runPromise(SchemaGetter.run(decode, Option.some("aGVsbG8="), {}))
- * result // => Option.some("hello")
+ * await Effect.runPromise(decode.run(Option.some("aGVsbG8="), {})) // => Option.some("hello")
  * ```
  *
  * @see {@link decodeBase64} to decode to `Uint8Array` instead
@@ -1569,7 +1415,7 @@ export function decodeBase64<E extends string>(): Getter<Uint8Array, E> {
  */
 export function decodeBase64String<E extends string>(): Getter<string, E> {
   return transformEffect((input, options) =>
-    Result.match(Base64.decodeString(input), {
+    Result.match(Encoding.decodeBase64String(input), {
       onFailure: () =>
         Effect.fail(
           new SchemaIssue.InvalidValue(
@@ -1596,7 +1442,7 @@ export function decodeBase64String<E extends string>(): Getter<string, E> {
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const decode = SchemaGetter.decodeBase64Url<string>()
- * const result = await Effect.runPromise(SchemaGetter.run(decode, Option.some("-_8="), {}))
+ * const result = await Effect.runPromise(decode.run(Option.some("-_8="), {}))
  * Option.map(result, Array.from) // => Option.some([251, 255])
  * ```
  *
@@ -1608,7 +1454,7 @@ export function decodeBase64String<E extends string>(): Getter<string, E> {
  */
 export function decodeBase64Url<E extends string>(): Getter<Uint8Array, E> {
   return transformEffect((input, options) =>
-    Result.match(Base64Url.decode(input), {
+    Result.match(Encoding.decodeBase64Url(input), {
       onFailure: () =>
         Effect.fail(
           new SchemaIssue.InvalidValue(
@@ -1635,8 +1481,7 @@ export function decodeBase64Url<E extends string>(): Getter<Uint8Array, E> {
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const decode = SchemaGetter.decodeBase64UrlString<string>()
- * const result = await Effect.runPromise(SchemaGetter.run(decode, Option.some("aGVsbG8"), {}))
- * result // => Option.some("hello")
+ * await Effect.runPromise(decode.run(Option.some("aGVsbG8"), {})) // => Option.some("hello")
  * ```
  *
  * @see {@link decodeBase64Url} to decode to `Uint8Array` instead
@@ -1647,7 +1492,7 @@ export function decodeBase64Url<E extends string>(): Getter<Uint8Array, E> {
  */
 export function decodeBase64UrlString<E extends string>(): Getter<string, E> {
   return transformEffect((input, options) =>
-    Result.match(Base64Url.decodeString(input), {
+    Result.match(Encoding.decodeBase64UrlString(input), {
       onFailure: () =>
         Effect.fail(
           new SchemaIssue.InvalidValue(
@@ -1674,7 +1519,7 @@ export function decodeBase64UrlString<E extends string>(): Getter<string, E> {
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const decode = SchemaGetter.decodeHex<string>()
- * const result = await Effect.runPromise(SchemaGetter.run(decode, Option.some("010203"), {}))
+ * const result = await Effect.runPromise(decode.run(Option.some("010203"), {}))
  * Option.map(result, Array.from) // => Option.some([1, 2, 3])
  * ```
  *
@@ -1686,7 +1531,7 @@ export function decodeBase64UrlString<E extends string>(): Getter<string, E> {
  */
 export function decodeHex<E extends string>(): Getter<Uint8Array, E> {
   return transformEffect((input, options) =>
-    Result.match(Hex.decode(input), {
+    Result.match(Encoding.decodeHex(input), {
       onFailure: () =>
         Effect.fail(
           new SchemaIssue.InvalidValue(
@@ -1713,8 +1558,7 @@ export function decodeHex<E extends string>(): Getter<Uint8Array, E> {
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const decode = SchemaGetter.decodeHexString<string>()
- * const result = await Effect.runPromise(SchemaGetter.run(decode, Option.some("68656c6c6f"), {}))
- * result // => Option.some("hello")
+ * await Effect.runPromise(decode.run(Option.some("68656c6c6f"), {})) // => Option.some("hello")
  * ```
  *
  * @see {@link decodeHex} to decode to `Uint8Array` instead
@@ -1725,7 +1569,7 @@ export function decodeHex<E extends string>(): Getter<Uint8Array, E> {
  */
 export function decodeHexString<E extends string>(): Getter<string, E> {
   return transformEffect((input, options) =>
-    Result.match(Hex.decodeString(input), {
+    Result.match(Encoding.decodeHexString(input), {
       onFailure: () =>
         Effect.fail(
           new SchemaIssue.InvalidValue(
@@ -1754,8 +1598,7 @@ export function decodeHexString<E extends string>(): Getter<string, E> {
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const encode = SchemaGetter.encodeUriComponent<string>()
- * const result = Effect.runSync(SchemaGetter.run(encode, Option.some("hello world"), {}))
- * result // => Option.some("hello%20world")
+ * await Effect.runPromise(encode.run(Option.some("hello world"), {})) // => Option.some("hello%20world")
  * ```
  *
  * @see {@link decodeUriComponent} for the inverse operation
@@ -1780,8 +1623,7 @@ export function encodeUriComponent<E extends string>(): Getter<string, E> {
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const decode = SchemaGetter.decodeUriComponent<string>()
- * const result = await Effect.runPromise(SchemaGetter.run(decode, Option.some("hello%20world"), {}))
- * result // => Option.some("hello world")
+ * await Effect.runPromise(decode.run(Option.some("hello%20world"), {})) // => Option.some("hello world")
  * ```
  *
  * @see {@link encodeUriComponent} for the inverse operation
@@ -1828,9 +1670,7 @@ export function decodeUriComponent<E extends string>(): Getter<string, E> {
  * import { DateTime, Effect, Option, SchemaGetter } from "effect"
  *
  * const parseDate = SchemaGetter.dateTimeUtcFromInput<string>()
- * const result = await Effect.runPromise(
- *   SchemaGetter.run(parseDate, Option.some("2024-01-01T00:00:00Z"), {})
- * )
+ * const result = await Effect.runPromise(parseDate.run(Option.some("2024-01-01T00:00:00Z"), {}))
  * Option.map(result, DateTime.toEpochMillis) // => Option.some(1704067200000)
  * ```
  *
@@ -1873,8 +1713,7 @@ export function dateTimeUtcFromInput<E extends DateTime.DateTime.Input>(): Gette
  * const decode = SchemaGetter.decodeFormData()
  * const formData = new FormData()
  * formData.append("user[name]", "Alice")
- * const result = Effect.runSync(SchemaGetter.run(decode, Option.some(formData), {}))
- * result // => Option.some({ user: { name: "Alice" } })
+ * await Effect.runPromise(decode.run(Option.some(formData), {})) // => Option.some({ user: { name: "Alice" } })
  * ```
  *
  * @see {@link encodeFormData} for the corresponding encoder
@@ -1912,7 +1751,7 @@ const collectFormDataEntries = collectBracketPathEntries((value): value is strin
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const encode = SchemaGetter.encodeFormData()
- * const result = Effect.runSync(SchemaGetter.run(encode, Option.some({ name: "Alice" }), {}))
+ * const result = await Effect.runPromise(encode.run(Option.some({ name: "Alice" }), {}))
  * Option.map(result, (formData) => formData.get("name")) // => Option.some("Alice")
  * ```
  *
@@ -1957,8 +1796,7 @@ export function encodeFormData(): Getter<FormData, unknown> {
  *
  * const decode = SchemaGetter.decodeURLSearchParams()
  * const params = new URLSearchParams("user[name]=Alice")
- * const result = Effect.runSync(SchemaGetter.run(decode, Option.some(params), {}))
- * result // => Option.some({ user: { name: "Alice" } })
+ * await Effect.runPromise(decode.run(Option.some(params), {})) // => Option.some({ user: { name: "Alice" } })
  * ```
  *
  * @see {@link encodeURLSearchParams} for the corresponding encoder
@@ -1993,7 +1831,7 @@ const collectURLSearchParamsEntries = collectBracketPathEntries(Predicate.isStri
  * import { Effect, Option, SchemaGetter } from "effect"
  *
  * const encode = SchemaGetter.encodeURLSearchParams()
- * const result = Effect.runSync(SchemaGetter.run(encode, Option.some({ name: "Alice" }), {}))
+ * const result = await Effect.runPromise(encode.run(Option.some({ name: "Alice" }), {}))
  * Option.map(result, (params) => params.toString()) // => Option.some("name=Alice")
  * ```
  *

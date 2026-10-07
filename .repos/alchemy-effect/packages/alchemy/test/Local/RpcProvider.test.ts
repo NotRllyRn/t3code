@@ -35,7 +35,7 @@ const defaultStack: StackShape = {
   actions: {},
 };
 
-describe("Local.RpcProvider.effect", { tags: ["unit", "local"] }, () => {
+describe("Local.RpcProvider.effect", () => {
   it.effect(
     "provides default Stack, Stage, and InstanceId to lifecycle effects",
     () =>

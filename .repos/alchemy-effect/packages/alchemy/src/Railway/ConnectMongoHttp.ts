@@ -70,7 +70,6 @@ const firstUrl = (
  * ```
  *
  * @layer
- * @product MongoDB
  * @provides Railway.ConnectMongo
  */
 export const ConnectMongoHttp = Layer.effect(

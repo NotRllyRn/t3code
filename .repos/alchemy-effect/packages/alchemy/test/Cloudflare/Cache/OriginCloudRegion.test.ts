@@ -151,13 +151,5 @@ test.provider(
       const gone = yield* getMapping(zoneId, "192.0.2.20");
       expect(gone).toBeUndefined();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:cache",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

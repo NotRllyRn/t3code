@@ -15,7 +15,7 @@ import {
 } from "@/Schema";
 import * as S from "effect/Schema";
 
-describe("isStringSchema", { tags: ["unit", "local"] }, () => {
+describe("isStringSchema", () => {
   test("string", () => {
     expect(isStringSchema(S.String)).toBe(true);
   });
@@ -24,7 +24,7 @@ describe("isStringSchema", { tags: ["unit", "local"] }, () => {
   });
 });
 
-describe("isNumberSchema", { tags: ["unit", "local"] }, () => {
+describe("isNumberSchema", () => {
   test("number", () => {
     expect(isNumberSchema(S.Number)).toBe(true);
   });
@@ -33,7 +33,7 @@ describe("isNumberSchema", { tags: ["unit", "local"] }, () => {
   });
 });
 
-describe("isMapSchema", { tags: ["unit", "local"] }, () => {
+describe("isMapSchema", () => {
   test("map", () => {
     expect(isMapSchema(S.ReadonlyMap(S.String, S.String))).toBe(true);
   });
@@ -42,7 +42,7 @@ describe("isMapSchema", { tags: ["unit", "local"] }, () => {
   });
 });
 
-describe("isRecordLikeSchema", { tags: ["unit", "local"] }, () => {
+describe("isRecordLikeSchema", () => {
   for (const [key, value] of Object.entries({
     map: S.ReadonlyMap(S.String, S.String),
     struct: S.Struct({
@@ -60,7 +60,7 @@ describe("isRecordLikeSchema", { tags: ["unit", "local"] }, () => {
   }
 });
 
-describe("isListSchema", { tags: ["unit", "local"] }, () => {
+describe("isListSchema", () => {
   test("list", () => {
     expect(isListSchema(S.Array(S.String))).toBe(true);
   });
@@ -69,7 +69,7 @@ describe("isListSchema", { tags: ["unit", "local"] }, () => {
   });
 });
 
-describe("isSetSchema", { tags: ["unit", "local"] }, () => {
+describe("isSetSchema", () => {
   test("set", () => {
     expect(isSetSchema(S.ReadonlySet(S.String))).toBe(true);
   });
@@ -80,7 +80,7 @@ describe("isSetSchema", { tags: ["unit", "local"] }, () => {
   });
 });
 
-describe("isNullSchema", { tags: ["unit", "local"] }, () => {
+describe("isNullSchema", () => {
   test("null", () => {
     expect(isNullSchema(S.Null)).toBe(true);
   });
@@ -92,7 +92,7 @@ describe("isNullSchema", { tags: ["unit", "local"] }, () => {
   });
 });
 
-describe("isUndefinedSchema", { tags: ["unit", "local"] }, () => {
+describe("isUndefinedSchema", () => {
   test("undefined", () => {
     expect(isUndefinedSchema(S.Undefined)).toBe(true);
   });
@@ -101,7 +101,7 @@ describe("isUndefinedSchema", { tags: ["unit", "local"] }, () => {
   });
 });
 
-describe("isNullishSchema", { tags: ["unit", "local"] }, () => {
+describe("isNullishSchema", () => {
   test("null", () => {
     expect(isNullishSchema(S.Null)).toBe(true);
   });
@@ -113,7 +113,7 @@ describe("isNullishSchema", { tags: ["unit", "local"] }, () => {
   });
 });
 
-describe("isBooleanSchema", { tags: ["unit", "local"] }, () => {
+describe("isBooleanSchema", () => {
   test("boolean", () => {
     expect(isBooleanSchema(S.Boolean)).toBe(true);
   });

@@ -98,10 +98,7 @@ test.provider(
 
       yield* expectGone(accountId);
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:stream", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // Canonical `list()` test (account-level singleton): the account has at most
@@ -134,8 +131,5 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:stream", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

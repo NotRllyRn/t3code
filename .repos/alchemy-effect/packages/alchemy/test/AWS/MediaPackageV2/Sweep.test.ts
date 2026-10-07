@@ -69,8 +69,5 @@ test.provider.skipIf(!process.env.MPV2_SWEEP)(
       const remaining = yield* listAllChannelGroups();
       expect(remaining).toHaveLength(0);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:mediapackagev2", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

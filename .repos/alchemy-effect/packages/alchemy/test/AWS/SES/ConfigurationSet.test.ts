@@ -99,7 +99,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertConfigurationSetDeleted(configSet.configurationSetName);
     }),
-  { tags: ["provider:aws", "provider:aws:ses", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -130,7 +130,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertConfigurationSetDeleted("alchemy-test-ses-config-b");
     }),
-  { tags: ["provider:aws", "provider:aws:ses", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -201,10 +201,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertConfigurationSetDeleted(configSet.configurationSetName);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:ses", "provider:aws:sns", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // Tracking options and VDM options are the two aspects added alongside the
@@ -261,7 +258,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertConfigurationSetDeleted(configSet.configurationSetName);
     }),
-  { tags: ["provider:aws", "provider:aws:ses", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );
 
 // Open/click tracking needs a verified subdomain with a valid certificate,
@@ -310,7 +307,7 @@ test.provider.skipIf(!TRACKING_REDIRECT_DOMAIN)(
       yield* stack.destroy();
       yield* assertConfigurationSetDeleted(configSet.configurationSetName);
     }),
-  { tags: ["provider:aws", "provider:aws:ses", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );
 
 // putConfigurationSetVdmOptions replaces VdmOptions wholesale, so a caller
@@ -356,5 +353,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertConfigurationSetDeleted(configSet.configurationSetName);
     }),
-  { tags: ["provider:aws", "provider:aws:ses", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );

@@ -24,7 +24,6 @@ export interface RetrieveCouponRequest extends Omit<
  * ```
  *
  * @binding
- * @product Product
  */
 export interface RetrieveCoupon extends Binding.Service<
   RetrieveCoupon,

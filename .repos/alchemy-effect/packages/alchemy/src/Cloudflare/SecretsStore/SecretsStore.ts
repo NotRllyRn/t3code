@@ -6,7 +6,6 @@ import * as ProviderLayer from "../../Local/ProviderLayer.ts";
 import * as Provider from "../../Provider.ts";
 import { Resource } from "../../Resource.ts";
 import { CloudflareEnvironment } from "../CloudflareEnvironment.ts";
-import { localAccountId } from "../LocalAccount.ts";
 import { generateLocalId } from "../LocalRuntime.ts";
 import type { Providers } from "../Providers.ts";
 
@@ -174,7 +173,7 @@ export const StoreProviderLocal = () =>
   Provider.succeed(Store, {
     stables: ["accountId"],
     diff: Effect.fn(function* ({ output }) {
-      const accountId = yield* localAccountId;
+      const { accountId } = yield* yield* CloudflareEnvironment;
       if (!output?.storeId) return { action: "update" } as const;
       if (output.accountId !== accountId) {
         return { action: "replace" } as const;
@@ -186,7 +185,7 @@ export const StoreProviderLocal = () =>
       return output ?? undefined;
     }),
     reconcile: Effect.fn(function* ({ output }) {
-      const accountId = yield* localAccountId;
+      const { accountId } = yield* yield* CloudflareEnvironment;
       return {
         storeId: output?.storeId ?? generateLocalId(),
         // Mirror the name Cloudflare uses for an account's default store.

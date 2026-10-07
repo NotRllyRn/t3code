@@ -75,10 +75,7 @@ test.provider(
       const afterDestroy = yield* getLiveConnector(accountId, renamed.tunnelId);
       expect(afterDestroy).toBeUndefined();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:tunnel", "live"],
-    timeout: 90_000,
-  },
+  { timeout: 90_000 },
 );
 
 // Canonical `list()` test (account collection): deploy a WARP Connector
@@ -111,8 +108,5 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:tunnel", "live"],
-    timeout: 90_000,
-  },
+  { timeout: 90_000 },
 );

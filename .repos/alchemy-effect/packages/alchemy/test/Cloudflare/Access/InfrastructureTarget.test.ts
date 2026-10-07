@@ -15,37 +15,34 @@ const { test } = Test.make({
   state: Cloudflare.state(),
 });
 
-test.provider(
-  "list enumerates the deployed infrastructure target",
-  (stack) =>
-    Effect.gen(function* () {
-      const { accountId } = yield* yield* CloudflareEnvironment;
+test.provider("list enumerates the deployed infrastructure target", (stack) =>
+  Effect.gen(function* () {
+    const { accountId } = yield* yield* CloudflareEnvironment;
 
-      yield* stack.destroy();
+    yield* stack.destroy();
 
-      const target = yield* stack.deploy(
-        Effect.gen(function* () {
-          return yield* Cloudflare.Access.InfrastructureTarget("ListTarget", {
-            hostname: "list-test.bastion.internal",
-            ip: { ipv4: { ipAddr: "10.7.0.42" } },
-          });
-        }),
-      );
+    const target = yield* stack.deploy(
+      Effect.gen(function* () {
+        return yield* Cloudflare.Access.InfrastructureTarget("ListTarget", {
+          hostname: "list-test.bastion.internal",
+          ip: { ipv4: { ipAddr: "10.7.0.42" } },
+        });
+      }),
+    );
 
-      const provider = yield* Provider.findProvider(
-        Cloudflare.Access.InfrastructureTarget,
-      );
-      const all = yield* provider.list();
+    const provider = yield* Provider.findProvider(
+      Cloudflare.Access.InfrastructureTarget,
+    );
+    const all = yield* provider.list();
 
-      const found = all.find((t) => t.targetId === target.targetId);
-      expect(found).toBeDefined();
-      expect(found?.accountId).toEqual(accountId);
-      expect(found?.hostname).toEqual(target.hostname);
-      expect(found?.ip.ipv4?.ipAddr).toEqual("10.7.0.42");
+    const found = all.find((t) => t.targetId === target.targetId);
+    expect(found).toBeDefined();
+    expect(found?.accountId).toEqual(accountId);
+    expect(found?.hostname).toEqual(target.hostname);
+    expect(found?.ip.ipv4?.ipAddr).toEqual("10.7.0.42");
 
-      yield* stack.destroy();
-    }),
-  { tags: ["provider:cloudflare", "provider:cloudflare:access", "live"] },
+    yield* stack.destroy();
+  }),
 );
 
 test.provider(
@@ -147,10 +144,7 @@ test.provider(
 
       yield* stack.destroy();
     }),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:access", "live"],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );
 
 const findOwnedError = (

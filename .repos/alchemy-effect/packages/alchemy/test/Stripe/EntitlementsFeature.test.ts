@@ -98,10 +98,7 @@ test.provider(
       const deactivated = yield* GetEntitlementsFeature({ id: created.id });
       expect(deactivated.active).toEqual(false);
     }).pipe(logLevel),
-  {
-    tags: ["provider:stripe", "provider:stripe:entitlementsfeature", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -138,10 +135,7 @@ test.provider(
         after.find((feature) => feature.id === deployed.id),
       ).toBeUndefined();
     }).pipe(logLevel),
-  {
-    tags: ["provider:stripe", "provider:stripe:entitlementsfeature", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -186,8 +180,5 @@ test.provider(
       const gone = yield* waitUntilInactive(replaced.id);
       expect(gone).toEqual("inactive");
     }).pipe(logLevel),
-  {
-    tags: ["provider:stripe", "provider:stripe:entitlementsfeature", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

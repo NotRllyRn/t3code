@@ -123,7 +123,7 @@ export function themeColorToNativeColor(value: string): string {
     : `#${[red, green, blue].map((channel) => channel.toString(16).padStart(2, "0")).join("")}`;
 }
 
-export function nativeColors(colors: ThemeColors): ThemeColors {
+function nativeColors(colors: ThemeColors): ThemeColors {
   return Object.fromEntries(
     Object.entries(colors).map(([role, color]) => [role, themeColorToNativeColor(color)]),
   ) as ThemeColors;

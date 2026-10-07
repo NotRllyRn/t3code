@@ -5,7 +5,7 @@ import * as serverless from "@distilled.cloud/aws/redshift-serverless";
 import { describe, expect } from "alchemy-test";
 import * as Effect from "effect/Effect";
 import * as Schedule from "effect/Schedule";
-import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClient from "effect/unstable/http/HttpClient";
 import ServerlessConnectFunctionLive, {
   ServerlessConnectFunction,
 } from "./fixtures/connect-handler";
@@ -28,7 +28,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:redshiftserverless", "live"] },
 );
 
 let baseUrl: string;
@@ -39,14 +38,6 @@ let baseUrl: string;
 // afterAll.
 describe.skipIf(!process.env.AWS_TEST_REDSHIFT)(
   "RedshiftServerless.Connect",
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:lambda",
-      "provider:aws:redshiftserverless",
-      "live",
-    ],
-  },
   () => {
     beforeAll(
       Effect.gen(function* () {

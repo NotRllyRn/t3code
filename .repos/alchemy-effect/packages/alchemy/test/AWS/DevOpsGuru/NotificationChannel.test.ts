@@ -30,7 +30,6 @@ test.provider(
         error._tag,
       );
     }),
-  { tags: ["provider:aws", "provider:aws:devopsguru", "live"] },
 );
 
 const listChannels = devopsguru.listNotificationChannels.items({}).pipe(
@@ -140,13 +139,5 @@ test.provider(
       ).toBe(false);
       yield* assertTopicDeleted(created.topic.topicArn);
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:devopsguru",
-      "provider:aws:sns",
-      "live",
-    ],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

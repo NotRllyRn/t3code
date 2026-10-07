@@ -32,7 +32,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:mwaaserverless", "live"] },
 );
 
 // A deterministic, checked-in workflow definition (YAML DAG using a
@@ -261,14 +260,5 @@ test.provider(
       yield* assertWorkflowDeleted(replaced.workflow.workflowArn);
       yield* assertLogGroupDeleted(replaced.workflow.workflowArn);
     }).pipe(Effect.ensuring(Effect.orDie(reapTestLogGroups))),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:iam",
-      "provider:aws:mwaaserverless",
-      "provider:aws:s3",
-      "live",
-    ],
-    timeout: 600_000,
-  },
+  { timeout: 600_000 },
 );

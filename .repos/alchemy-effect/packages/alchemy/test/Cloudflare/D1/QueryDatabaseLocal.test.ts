@@ -83,10 +83,7 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:d1", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // Native D1 bind values (number/null/boolean/binary) must round-trip, not just
@@ -180,8 +177,5 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:d1", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

@@ -57,10 +57,7 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  {
-    tags: ["provider:aws", "provider:aws:costexplorer", "live"],
-    timeout: 60_000,
-  },
+  { timeout: 60_000 },
 );
 
 const makeStack = (name: string, matchValue: string, defaultValue: string) =>
@@ -131,8 +128,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertCategoryGone(replaced.costCategoryArn);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:costexplorer", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

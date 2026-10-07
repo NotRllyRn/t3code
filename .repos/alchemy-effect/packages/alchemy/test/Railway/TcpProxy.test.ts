@@ -1,5 +1,4 @@
-import { Query } from "@distilled.cloud/core/query";
-import { Railway as RailwayApi } from "@distilled.cloud/railway";
+import * as railway from "@distilled.cloud/railway";
 import * as Railway from "@/Railway";
 import { suitePartition } from "./suiteProject.ts";
 import * as Test from "@/Test/Alchemy";
@@ -15,45 +14,33 @@ const logLevel = Effect.provideService(
   process.env.DEBUG ? "Debug" : "Info",
 );
 
-const readTcpProxies = Query.fn((environmentId: string, serviceId: string) =>
-  RailwayApi.tcpProxies({ environmentId, serviceId }).pipe(
-    Query.map((proxy) => ({
-      id: proxy.id,
-      domain: proxy.domain,
-      proxyPort: proxy.proxyPort,
-      applicationPort: proxy.applicationPort,
-      deletedAt: proxy.deletedAt,
-      syncStatus: proxy.syncStatus,
-    })),
-  ),
-);
-
-const createService = Query.fn(
-  (input: { projectId: string; environmentId: string; image: string }) => ({
-    id: RailwayApi.serviceCreate({
-      input: {
-        projectId: input.projectId,
-        environmentId: input.environmentId,
-        source: { image: input.image },
-      },
-    }).id,
-  }),
-);
-
 const listLive = (environmentId: string, serviceId: string) =>
-  readTcpProxies(environmentId, serviceId).pipe(
-    Effect.map((items) =>
-      items
-        .filter(
-          (proxy) => proxy.deletedAt == null && proxy.syncStatus !== "DELETED",
-        )
-        .map((proxy) => ({
-          ...proxy,
-          domain: proxy.domain.replace(/\.+$/, ""),
-        })),
-    ),
-    Effect.catchTag("RailwayNotFound", () => Effect.succeed([])),
-  );
+  railway
+    .tcpProxies(
+      { environmentId, serviceId },
+      {
+        id: true,
+        domain: true,
+        proxyPort: true,
+        applicationPort: true,
+        deletedAt: true,
+        syncStatus: true,
+      },
+    )
+    .pipe(
+      Effect.map((items) =>
+        items
+          .filter(
+            (proxy) =>
+              proxy.deletedAt == null && proxy.syncStatus !== "DELETED",
+          )
+          .map((proxy) => ({
+            ...proxy,
+            domain: proxy.domain.replace(/\.+$/, ""),
+          })),
+      ),
+      railway.catchTags(["RailwayNotFound"], () => Effect.succeed([])),
+    );
 
 const waitUntilProxyGone = (
   environmentId: string,
@@ -74,7 +61,16 @@ const waitUntilProxyGone = (
   );
 
 const createTargetService = (projectId: string, environmentId: string) =>
-  createService({ projectId, environmentId, image: "redis:7-alpine" });
+  railway.createService(
+    {
+      input: {
+        projectId,
+        environmentId,
+        source: { image: "redis:7-alpine" },
+      },
+    },
+    { id: true },
+  );
 
 test.provider(
   "create, update, and delete a tcp proxy",
@@ -145,16 +141,7 @@ test.provider(
       );
       expect(proxyGone).toEqual("gone");
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:railway",
-      "provider:railway:project",
-      "provider:railway:projectenvironment",
-      "provider:railway:tcpproxy",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -216,14 +203,5 @@ test.provider(
       );
       expect(proxyGone).toEqual("gone");
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:railway",
-      "provider:railway:project",
-      "provider:railway:projectenvironment",
-      "provider:railway:tcpproxy",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

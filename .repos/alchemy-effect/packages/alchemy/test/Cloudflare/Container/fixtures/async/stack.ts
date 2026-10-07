@@ -30,12 +30,11 @@ export const AsyncContainerWorker = Cloudflare.Worker("AsyncContainerWorker", {
   },
 });
 
-export default (state = Cloudflare.state()) =>
-  Alchemy.Stack(
-    "AsyncContainerStack",
-    { providers: Cloudflare.providers(), state },
-    Effect.gen(function* () {
-      const worker = yield* AsyncContainerWorker;
-      return { url: worker.url.as<string>() };
-    }),
-  );
+export default Alchemy.Stack(
+  "AsyncContainerStack",
+  { providers: Cloudflare.providers(), state: Cloudflare.state() },
+  Effect.gen(function* () {
+    const worker = yield* AsyncContainerWorker;
+    return { url: worker.url.as<string>() };
+  }),
+);

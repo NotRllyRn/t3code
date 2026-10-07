@@ -248,7 +248,6 @@ export interface PullRequest extends Resource<
  * ```
  *
  * @resource
- * @product Pull Request
  */
 export const PullRequest = Resource<PullRequest>("GitHub.PullRequest", {
   defaultRemovalPolicy: "retain",

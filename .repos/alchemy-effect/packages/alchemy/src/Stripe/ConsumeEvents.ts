@@ -88,7 +88,6 @@ export const bindWebhookSecret = (
  * ```
  *
  * @binding
- * @product Webhook
  */
 export function consumeEvents<
   const E extends readonly StripeEventClass[],
@@ -163,7 +162,6 @@ export class EventSource extends Context.Service<
  * and runs the handler once per event.
  *
  * @layer
- * @product Webhook
  * @provides Stripe.EventSource
  */
 export const ConsumeEventsLive = Layer.effect(

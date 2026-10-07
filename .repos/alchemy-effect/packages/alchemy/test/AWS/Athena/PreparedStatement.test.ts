@@ -83,5 +83,5 @@ test.provider(
       const after = yield* getStatement;
       expect(after).toBeUndefined();
     }),
-  { tags: ["provider:aws", "provider:aws:athena", "live"], timeout: 180_000 },
+  { timeout: 180_000 },
 );

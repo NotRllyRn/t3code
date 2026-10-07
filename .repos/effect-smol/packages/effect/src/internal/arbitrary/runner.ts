@@ -1,17 +1,3 @@
-import type {
-  Arbitrary,
-  ArrayOptions,
-  CheckOptions,
-  CheckResult,
-  GlobalOptions,
-  PropertyError,
-  PropertyFailure,
-  Replay,
-  ReturnedFalse,
-  SampleError,
-  SampleOptions,
-  SchemaOptions
-} from "../../Arbitrary.ts"
 import * as Effect from "../../Effect.ts"
 import * as Option from "../../Option.ts"
 import { pipeArguments } from "../../Pipeable.ts"
@@ -19,20 +5,25 @@ import * as Random from "../../Random.ts"
 import type * as Result from "../../Result.ts"
 import * as Scheduler from "../../Scheduler.ts"
 import type * as Schema from "../../Schema.ts"
+import type {
+  Arbitrary,
+  CheckOptions,
+  CheckResult,
+  PropertyError,
+  PropertyFailure,
+  Replay,
+  ReturnedFalse,
+  SampleError,
+  SampleOptions,
+  SchemaOptions
+} from "../../unstable/arbitrary/Arbitrary.ts"
 import { done } from "../core.ts"
 import * as InternalRecord from "../record.ts"
-import * as Arrays from "./array.ts"
 import * as Model from "./model.ts"
 import * as Compiler from "./schema.ts"
 
 /** @internal */
 export const TypeId = "~effect/arbitrary/Arbitrary"
-
-let globalOptions: GlobalOptions = {}
-
-export const configureGlobal = (options: GlobalOptions) => {
-  globalOptions = { check: { ...options.check }, sample: { ...options.sample } }
-}
 
 type FailureTag = PropertyFailure<unknown>["_tag"]
 
@@ -287,43 +278,6 @@ export function filterMap<A, B, X>(
 }
 
 /** @internal */
-export function array<A>(item: Arbitrary<A>, options?: ArrayOptions): Arbitrary<Array<A>> {
-  const minimum = options?.minLength ?? 0
-  const maximum = options?.maxLength ?? 0xffffffff
-  if (
-    !Number.isInteger(minimum) || minimum < 0 || minimum > 0xffffffff ||
-    !Number.isInteger(maximum) || maximum < minimum || maximum > 0xffffffff
-  ) {
-    throw new RangeError("Arbitrary.array: expected 0 <= minLength <= maxLength <= 4294967295 with integer lengths")
-  }
-  const child = item.gen
-  const minCost = minimum === 0 ? 0 : minimum * child.minCost
-  return make(Model.makeGenerator(minCost, (state) => {
-    const upper = Math.min(
-      maximum,
-      Math.max(minimum, state.size),
-      child.minCost > 0 ? Math.floor(state.budget.remaining / child.minCost) : maximum
-    )
-    if (upper < minimum) return Model.discarded
-    const length = Model.randomLength(state, minimum, upper)
-    const children = Array.from({ length }, () => child)
-    const order = length < 2 ? undefined : Model.shuffle(state, children.keys())
-    const itemState = state.size >= length ? state : { ...state, size: length }
-    return Model.mapComputation(
-      Model.generateProduct(children, itemState, order, length === 0 ? 0 : length * child.minCost),
-      (samples) =>
-        samples === undefined ? Model.discarded : Arrays.sample<A>(samples, {
-          fixedCount: 0,
-          optionalCount: 0,
-          repeatCount: length,
-          tailCount: 0,
-          minimum
-        }, state.shrinks)
-    )
-  }))
-}
-
-/** @internal */
 export function all(
   input: Iterable<Arbitrary<any>> | Record<string, Arbitrary<any>>
 ): Arbitrary<any> {
@@ -467,13 +421,11 @@ export function flatMap<A, B>(self: Arbitrary<A>, f: (value: A) => Arbitrary<B>)
 
 /** @internal */
 export const sampleEffect = Effect.fnUntraced(function*<A>(self: Arbitrary<A>, options?: SampleOptions) {
-  const defaults = globalOptions.sample
-  const count = natural(options?.count ?? defaults?.count, 10, "count")
-  const size = natural(options?.size ?? defaults?.size, 10, "size")
-  const maxDiscards = natural(options?.maxDiscards ?? defaults?.maxDiscards, Math.max(100, count * 10), "maxDiscards")
-  const seedOption = options?.seed ?? defaults?.seed
+  const count = natural(options?.count, 10, "count")
+  const size = natural(options?.size, 10, "size")
+  const maxDiscards = natural(options?.maxDiscards, Math.max(100, count * 10), "maxDiscards")
   const maxOpsBeforeYield = yield* Scheduler.MaxOpsBeforeYield
-  const seed = yield* resolveMasterSeed(seedOption)
+  const seed = yield* resolveMasterSeed(options?.seed)
   const seedState = hashSeed(seed)
   const values: Array<A> = []
   let discards = 0
@@ -610,18 +562,12 @@ export const checkEffect = Effect.fnUntraced(function*<A, E, R>(
     }
   }
 
-  const defaults = globalOptions.check
-  const runsTarget = positive(options?.runs ?? defaults?.runs, 100, "runs")
-  const size = natural(options?.size ?? defaults?.size, 10, "size")
-  const maxDiscards = natural(
-    options?.maxDiscards ?? defaults?.maxDiscards,
-    Math.max(100, runsTarget * 10),
-    "maxDiscards"
-  )
-  const maxShrinks = natural(options?.maxShrinks ?? defaults?.maxShrinks, 100, "maxShrinks")
-  const seedOption = options?.seed ?? defaults?.seed
+  const runsTarget = positive(options?.runs, 100, "runs")
+  const size = natural(options?.size, 10, "size")
+  const maxDiscards = natural(options?.maxDiscards, Math.max(100, runsTarget * 10), "maxDiscards")
+  const maxShrinks = natural(options?.maxShrinks, 100, "maxShrinks")
   const maxOpsBeforeYield = yield* Scheduler.MaxOpsBeforeYield
-  const seed = yield* resolveMasterSeed(seedOption)
+  const seed = yield* resolveMasterSeed(options?.seed)
   const seedState = hashSeed(seed)
   let runs = 0
   let discards = 0

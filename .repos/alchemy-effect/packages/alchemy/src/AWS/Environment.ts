@@ -7,11 +7,7 @@ import * as Context from "effect/Context";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import {
-  deferUntilFirstUse,
-  orDieCredentialsUnavailable,
-  resolveProviderConfig,
-} from "../Auth/Resolve.ts";
+import { resolveProviderConfig } from "../Auth/Resolve.ts";
 import {
   AWS_AUTH_PROVIDER_NAME,
   LOCAL_ACCOUNT_ID,
@@ -87,15 +83,14 @@ export const Default = Layer.effect(
     // is the emulator; only `Alchemy.remote()` rows ever need it), so the
     // profile/CI precedence is captured here and evaluated on first use,
     // exactly once.
-    const resolve = yield* resolveProviderConfig<
+    const resolve = resolveProviderConfig<
       AwsAuthConfig,
       AwsResolvedCredentials
-    >(AWS_AUTH_PROVIDER_NAME).pipe(
-      Effect.flatMap(({ resolve }) => resolve),
-      deferUntilFirstUse,
-    );
+    >(AWS_AUTH_PROVIDER_NAME).pipe(Effect.flatMap(({ resolve }) => resolve));
+    const context = yield* Effect.context<Effect.Services<typeof resolve>>();
     return yield* resolve.pipe(
-      orDieCredentialsUnavailable(AWS_AUTH_PROVIDER_NAME),
+      Effect.provideContext(context),
+      Effect.orDie,
       Effect.cached,
     );
   }),

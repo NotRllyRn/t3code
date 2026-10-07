@@ -249,7 +249,7 @@ export class Socket_Https extends $.Struct {
   static readonly _capnp = {
     displayName: "https",
     id: "de123876383cbbdc",
-    size: new $.ObjectSize(16, 5),
+    size: new $.ObjectSize(8, 5),
   };
   _adoptOptions(value: $.Orphan<HttpOptions>): void {
     $.utils.adopt(value, $.utils.getPointer(2, this));
@@ -295,7 +295,7 @@ export class Socket_Tcp extends $.Struct {
   static readonly _capnp = {
     displayName: "tcp",
     id: "b59d8ecf6886b64c",
-    size: new $.ObjectSize(16, 5),
+    size: new $.ObjectSize(8, 5),
   };
   _adoptTlsOptions(value: $.Orphan<TlsOptions>): void {
     $.utils.adopt(value, $.utils.getPointer(2, this));
@@ -319,66 +319,44 @@ export class Socket_Tcp extends $.Struct {
     return "Socket_Tcp_" + super.toString();
   }
 }
-/**
- * Listen for UDP datagrams. Bindings to this service will only support the `connect()`
- * method, same as `tcp`; `fetch()` will throw an exception. Unlike `tcp`, the delivered
- * Socket's `readable`/`writable` are value-mode: each chunk read or written is exactly one
- * datagram (see Socket.protocol).
- *
- * Datagrams from a given peer address/port are grouped into one flow, dispatched to one
- * `connect()` call, until no datagram has been seen from that peer for `idleTimeoutMs`.
- *
- */
-export class Socket_Udp extends $.Struct {
-  static readonly _capnp = {
-    displayName: "udp",
-    id: "95ae058885f84b2a",
-    size: new $.ObjectSize(16, 5),
-    defaultIdleTimeoutMs: $.getUint32Mask(30000),
-    defaultMaxPendingBytes: $.getUint32Mask(262144),
-  };
-  get idleTimeoutMs(): number {
-    return $.utils.getUint32(4, this, Socket_Udp._capnp.defaultIdleTimeoutMs);
-  }
-  set idleTimeoutMs(value: number) {
-    $.utils.setUint32(4, value, this, Socket_Udp._capnp.defaultIdleTimeoutMs);
-  }
-  get maxPendingBytes(): number {
-    return $.utils.getUint32(8, this, Socket_Udp._capnp.defaultMaxPendingBytes);
-  }
-  set maxPendingBytes(value: number) {
-    $.utils.setUint32(8, value, this, Socket_Udp._capnp.defaultMaxPendingBytes);
-  }
-  toString(): string {
-    return "Socket_Udp_" + super.toString();
-  }
-}
 export const Socket_Which = {
-  HTTP: 0,
-  HTTPS: 1,
-  TCP: 2,
   /**
-   * Listen for UDP datagrams. Bindings to this service will only support the `connect()`
-   * method, same as `tcp`; `fetch()` will throw an exception. Unlike `tcp`, the delivered
-   * Socket's `readable`/`writable` are value-mode: each chunk read or written is exactly one
-   * datagram (see Socket.protocol).
-   *
-   * Datagrams from a given peer address/port are grouped into one flow, dispatched to one
-   * `connect()` call, until no datagram has been seen from that peer for `idleTimeoutMs`.
+   * Each socket has a unique name which can be used on the command line to override the socket's
+   * address with `--socket-addr <name>=<addr>` or `--socket-fd <name>=<fd>`.
    *
    */
-  UDP: 3,
+  HTTP: 0,
+  /**
+   * Address/port on which this socket will listen. Optional; if not specified, then you will be
+   * required to specify the socket on the command line with with `--socket-addr <name>=<addr>` or
+   * `--socket-fd <name>=<fd>`.
+   *
+   * Examples:
+   * - "*:80": Listen on port 80 on all local IPv4 and IPv6 interfaces.
+   * - "1.2.3.4": Listen on the specific IPv4 address on the default port for the protocol.
+   * - "1.2.3.4:80": Listen on the specific IPv4 address and port.
+   * - "1234:5678::abcd": Listen on the specific IPv6 address on the default port for the protocol.
+   * - "[1234:5678::abcd]:80": Listen on the specific IPv6 address and port.
+   * - "unix:/path/to/socket": Listen on a Unix socket.
+   * - "unix-abstract:name": On Linux, listen on the given "abstract" Unix socket name.
+   * - "example.com:80": Perform a DNS lookup to determine the address, and then listen on it. If
+   *     this resolves to multiple addresses, listen on all of them.
+   *
+   * (These are the formats supported by KJ's parseAddress().)
+   *
+   */
+  HTTPS: 1,
+  TCP: 2,
 } as const;
 export type Socket_Which = (typeof Socket_Which)[keyof typeof Socket_Which];
 export class Socket extends $.Struct {
   static readonly HTTP = Socket_Which.HTTP;
   static readonly HTTPS = Socket_Which.HTTPS;
   static readonly TCP = Socket_Which.TCP;
-  static readonly UDP = Socket_Which.UDP;
   static readonly _capnp = {
     displayName: "Socket",
     id: "9a0eba45530ee79f",
-    size: new $.ObjectSize(16, 5),
+    size: new $.ObjectSize(8, 5),
   };
   /**
    * Each socket has a unique name which can be used on the command line to override the socket's
@@ -406,9 +384,6 @@ export class Socket extends $.Struct {
    * - "unix-abstract:name": On Linux, listen on the given "abstract" Unix socket name.
    * - "example.com:80": Perform a DNS lookup to determine the address, and then listen on it. If
    *     this resolves to multiple addresses, listen on all of them.
-   *
-   * UDP sockets currently bind only the first address when a hostname resolves to multiple
-   * addresses. Specify a numeric address when selecting the address family matters.
    *
    * (These are the formats supported by KJ's parseAddress().)
    *
@@ -472,30 +447,6 @@ export class Socket extends $.Struct {
   set tcp(_: true) {
     $.utils.setUint16(0, 2, this);
   }
-  /**
-   * Listen for UDP datagrams. Bindings to this service will only support the `connect()`
-   * method, same as `tcp`; `fetch()` will throw an exception. Unlike `tcp`, the delivered
-   * Socket's `readable`/`writable` are value-mode: each chunk read or written is exactly one
-   * datagram (see Socket.protocol).
-   *
-   * Datagrams from a given peer address/port are grouped into one flow, dispatched to one
-   * `connect()` call, until no datagram has been seen from that peer for `idleTimeoutMs`.
-   *
-   */
-  get udp(): Socket_Udp {
-    $.utils.testWhich("udp", $.utils.getUint16(0, this), 3, this);
-    return $.utils.getAs(Socket_Udp, this);
-  }
-  _initUdp(): Socket_Udp {
-    $.utils.setUint16(0, 3, this);
-    return $.utils.getAs(Socket_Udp, this);
-  }
-  get _isUdp(): boolean {
-    return $.utils.getUint16(0, this) === 3;
-  }
-  set udp(_: true) {
-    $.utils.setUint16(0, 3, this);
-  }
   _adoptService(value: $.Orphan<ServiceDesignator>): void {
     $.utils.adopt(value, $.utils.getPointer(4, this));
   }
@@ -525,38 +476,33 @@ export class Socket extends $.Struct {
     return $.utils.getUint16(0, this) as Socket_Which;
   }
 }
-/**
- * Defines a named service. Each server has a list of named services. The names are private,
- * used to refer to the services within this same config file.
- *
- */
 export const Service_Which = {
   /**
-   * (This catches when someone forgets to specify one of the union members. Do not set this.)
+   * Name of the service. Used only to refer to the service from elsewhere in the config file.
+   * Services are not accessible unless you explicitly configure them to be, such as through a
+   * `Socket` or through a binding from another Worker.
    *
    */
   UNSPECIFIED: 0,
   /**
-   * A Worker!
+   * (This catches when someone forgets to specify one of the union members. Do not set this.)
    *
    */
   WORKER: 1,
+  /**
+   * A Worker!
+   *
+   */
+  NETWORK: 2,
   /**
    * A service that implements access to a network. fetch() requests are routed according to
    * the URL hostname.
    *
    */
-  NETWORK: 2,
+  EXTERNAL: 3,
   /**
    * A service that forwards all requests to a specific remote server. Typically used to
    * connect to a back-end server on your internal network.
-   *
-   */
-  EXTERNAL: 3,
-  /**
-   * An HTTP service backed by a directory on disk, supporting a basic HTTP GET/PUT. Generally
-   * not intended to be exposed directly to the internet; typically you want to bind this into
-   * a Worker that adds logic for setting Content-Type and the like.
    *
    */
   DISK: 4,
@@ -723,10 +669,6 @@ export class Service extends $.Struct {
     return $.utils.getUint16(0, this) as Service_Which;
   }
 }
-/**
- * Value to provide in `ctx.props` in the target worker.
- *
- */
 export const ServiceDesignator_Props_Which = {
   /**
    * Empty object. (This is the default.)
@@ -842,55 +784,55 @@ export class ServiceDesignator extends $.Struct {
 }
 export const Worker_Module_Which = {
   /**
+   * Name (or path) used to import the module.
+   *
+   */
+  ES_MODULE: 0,
+  /**
    * An ES module file with imports and exports.
    *
    * As with `serviceWorkerScript`, above, the value is the raw source code.
    *
    */
-  ES_MODULE: 0,
+  COMMON_JS_MODULE: 1,
   /**
    * A common JS module, using require().
    *
    */
-  COMMON_JS_MODULE: 1,
+  TEXT: 2,
   /**
    * A raw text blob. Importing this will produce a string with the value.
    *
    */
-  TEXT: 2,
+  DATA: 3,
   /**
    * A raw data blob. Importing this will produce an ArrayBuffer with the value.
    *
    */
-  DATA: 3,
+  WASM: 4,
   /**
    * A Wasm module. The value is a compiled binary Wasm module file. Importing this will produce
    * a `WebAssembly.Module` object, which you can then instantiate.
    *
    */
-  WASM: 4,
+  JSON: 5,
   /**
    * Importing this will produce the result of parsing the given text as JSON.
    *
    */
-  JSON: 5,
+  OBSOLETE: 6,
   /**
    * This position used to be the nodeJsCompatModule type that has now been
    * obsoleted.
    *
    */
-  OBSOLETE: 6,
+  PYTHON_MODULE: 7,
   /**
    * A Python module. All bundles containing this value type are converted into a JS/WASM Worker
    * Bundle prior to execution.
    *
    */
-  PYTHON_MODULE: 7,
-  /**
-   * This position used to be the pythonRequirement type that has now been deprecated.
-   *
-   */
-  OBSOLETE_PYTHON_REQUIREMENT: 8,
+  PYTHON_REQUIREMENT: 8,
 } as const;
 export type Worker_Module_Which =
   (typeof Worker_Module_Which)[keyof typeof Worker_Module_Which];
@@ -903,8 +845,7 @@ export class Worker_Module extends $.Struct {
   static readonly JSON = Worker_Module_Which.JSON;
   static readonly OBSOLETE = Worker_Module_Which.OBSOLETE;
   static readonly PYTHON_MODULE = Worker_Module_Which.PYTHON_MODULE;
-  static readonly OBSOLETE_PYTHON_REQUIREMENT =
-    Worker_Module_Which.OBSOLETE_PYTHON_REQUIREMENT;
+  static readonly PYTHON_REQUIREMENT = Worker_Module_Which.PYTHON_REQUIREMENT;
   static readonly _capnp = {
     displayName: "Module",
     id: "d9d87a63770a12f3",
@@ -1074,22 +1015,22 @@ export class Worker_Module extends $.Struct {
     $.utils.setText(1, value, this);
   }
   /**
-   * This position used to be the pythonRequirement type that has now been deprecated.
+   * A Python package that is required by this bundle. The package must be supported by
+   * Pyodide (https://pyodide.org/en/stable/usage/packages-in-pyodide.html). All packages listed
+   * will be installed prior to the execution of the worker.
+   *
+   * The value of this field is ignored and should always be an empty string. Only the module
+   * name matters. The field should have been declared `Void`, but it's difficult to change now.
    *
    */
-  get obsoletePythonRequirement(): string {
-    $.utils.testWhich(
-      "obsoletePythonRequirement",
-      $.utils.getUint16(0, this),
-      8,
-      this,
-    );
+  get pythonRequirement(): string {
+    $.utils.testWhich("pythonRequirement", $.utils.getUint16(0, this), 8, this);
     return $.utils.getText(1, this);
   }
-  get _isObsoletePythonRequirement(): boolean {
+  get _isPythonRequirement(): boolean {
     return $.utils.getUint16(0, this) === 8;
   }
-  set obsoletePythonRequirement(value: string) {
+  set pythonRequirement(value: string) {
     $.utils.setUint16(0, 8, this);
     $.utils.setText(1, value, this);
   }
@@ -1126,10 +1067,6 @@ export class Worker_Module extends $.Struct {
     return $.utils.getUint16(0, this) as Worker_Module_Which;
   }
 }
-/**
- * Specifies the type of a parameter binding.
- *
- */
 export const Worker_Binding_Type_Which = {
   /**
    * (This catches when someone forgets to specify one of the union members. Do not set this.)
@@ -1145,7 +1082,7 @@ export const Worker_Binding_Type_Which = {
   DURABLE_OBJECT_NAMESPACE: 7,
   KV_NAMESPACE: 8,
   R2BUCKET: 9,
-  OBSOLETE0: 10,
+  R2ADMIN: 10,
   QUEUE: 11,
   ANALYTICS_ENGINE: 12,
   HYPERDRIVE: 13,
@@ -1170,7 +1107,7 @@ export class Worker_Binding_Type extends $.Struct {
     Worker_Binding_Type_Which.DURABLE_OBJECT_NAMESPACE;
   static readonly KV_NAMESPACE = Worker_Binding_Type_Which.KV_NAMESPACE;
   static readonly R2BUCKET = Worker_Binding_Type_Which.R2BUCKET;
-  static readonly OBSOLETE0 = Worker_Binding_Type_Which.OBSOLETE0;
+  static readonly R2ADMIN = Worker_Binding_Type_Which.R2ADMIN;
   static readonly QUEUE = Worker_Binding_Type_Which.QUEUE;
   static readonly ANALYTICS_ENGINE = Worker_Binding_Type_Which.ANALYTICS_ENGINE;
   static readonly HYPERDRIVE = Worker_Binding_Type_Which.HYPERDRIVE;
@@ -1273,10 +1210,10 @@ export class Worker_Binding_Type extends $.Struct {
   set r2Bucket(_: true) {
     $.utils.setUint16(0, 9, this);
   }
-  get _isObsolete0(): boolean {
+  get _isR2Admin(): boolean {
     return $.utils.getUint16(0, this) === 10;
   }
-  set obsolete0(_: true) {
+  set r2Admin(_: true) {
     $.utils.setUint16(0, 10, this);
   }
   get _isQueue(): boolean {
@@ -1372,10 +1309,6 @@ export const Worker_Binding_CryptoKey_Usage = {
 } as const;
 export type Worker_Binding_CryptoKey_Usage =
   (typeof Worker_Binding_CryptoKey_Usage)[keyof typeof Worker_Binding_CryptoKey_Usage];
-/**
- * Value for the `algorithm` parameter.
- *
- */
 export const Worker_Binding_CryptoKey_Algorithm_Which = {
   /**
    * Just a name, like `AES-GCM`.
@@ -1442,10 +1375,6 @@ export class Worker_Binding_CryptoKey_Algorithm extends $.Struct {
     ) as Worker_Binding_CryptoKey_Algorithm_Which;
   }
 }
-/**
- * Parameters to crypto.subtle.importKey().
- *
- */
 export const Worker_Binding_CryptoKey_Which = {
   RAW: 0,
   HEX: 1,
@@ -1955,32 +1884,33 @@ export class Worker_Binding_WorkerLoader extends $.Struct {
   }
 }
 export const Worker_Binding_Which = {
+  UNSPECIFIED: 0,
   /**
    * (This catches when someone forgets to specify one of the union members. Do not set this.)
    *
    */
-  UNSPECIFIED: 0,
+  PARAMETER: 1,
   /**
    * Indicates that the Worker requires a binding of the given type, but it won't be specified
    * here. Another Worker can inherit this Worker and fill in this binding.
    *
    */
-  PARAMETER: 1,
+  TEXT: 2,
   /**
    * A string.
    *
    */
-  TEXT: 2,
+  DATA: 3,
   /**
    * An ArrayBuffer.
    *
    */
-  DATA: 3,
+  JSON: 4,
   /**
    * A value parsed from JSON.
    *
    */
-  JSON: 4,
+  WASM_MODULE: 5,
   /**
    * A WebAssembly module. The binding will be an instance of `WebAssembly.Module`. Only
    * supported when using Service Workers syntax.
@@ -1988,7 +1918,7 @@ export const Worker_Binding_Which = {
    * DEPRECATED: Please switch to ES modules syntax instead, and embed Wasm modules as modules.
    *
    */
-  WASM_MODULE: 5,
+  CRYPTO_KEY: 6,
   /**
    * A CryptoKey instance, for use with the WebCrypto API.
    *
@@ -1997,18 +1927,17 @@ export const Worker_Binding_Which = {
    * operations.
    *
    */
-  CRYPTO_KEY: 6,
+  SERVICE: 7,
+  /**
+   * A binding representing access to an in-memory cache.
+   *
+   */
+  DURABLE_OBJECT_CLASS: 19,
   /**
    * Binding to a named service (possibly, a worker).
    *
    */
-  SERVICE: 7,
-  /**
-   * A Durable Object class binding, without an actual storage namespace. This can be used to
-   * implement a facet.
-   *
-   */
-  DURABLE_OBJECT_CLASS: 19,
+  DURABLE_OBJECT_NAMESPACE: 8,
   /**
    * Binding to the durable object namespace implemented by the given class.
    *
@@ -2018,33 +1947,33 @@ export const Worker_Binding_Which = {
    *     durableObjectNamespace = "MyClass"
    *
    */
-  DURABLE_OBJECT_NAMESPACE: 8,
+  KV_NAMESPACE: 9,
   /**
    * A KV namespace, implemented by the named service. The Worker sees a KvNamespace-typed
    * binding. Requests to the namespace will be converted into HTTP requests targeting the
    * given service name.
    *
    */
-  KV_NAMESPACE: 9,
+  R2BUCKET: 10,
+  R2ADMIN: 11,
   /**
-   * R2 bucket binding. Similar to KV namespaces, this turns operations into HTTP requests aimed
-   * at the named service.
+   * R2 bucket and admin API bindings. Similar to KV namespaces, these turn operations into
+   * HTTP requests aimed at the named service.
    *
    */
-  R2BUCKET: 10,
-  OBSOLETE0: 11,
+  WRAPPED: 12,
   /**
    * Wraps a collection of inner bindings in a common api functionality.
    *
    */
-  WRAPPED: 12,
+  QUEUE: 13,
   /**
    * A Queue binding, implemented by the named service. Requests to the
    * namespace will be converted into HTTP requests targeting the given
    * service name.
    *
    */
-  QUEUE: 13,
+  FROM_ENVIRONMENT: 14,
   /**
    * Takes the value of an environment variable from the system. The value specified here is
    * the name of a system environment variable. The value of the binding is obtained by invoking
@@ -2052,30 +1981,31 @@ export const Worker_Binding_Which = {
    * `null`.
    *
    */
-  FROM_ENVIRONMENT: 14,
+  ANALYTICS_ENGINE: 15,
   /**
    * A binding for Analytics Engine. Allows workers to store information through Analytics Engine Events.
    * workerd will forward AnalyticsEngineEvents to designated service in the body of HTTP requests
    * This binding is subject to change and requires the `--experimental` flag
    *
    */
-  ANALYTICS_ENGINE: 15,
+  HYPERDRIVE: 16,
   /**
    * A binding for Hyperdrive. Allows workers to use Hyperdrive caching & pooling for Postgres
    * databases.
    *
    */
-  HYPERDRIVE: 16,
+  UNSAFE_EVAL: 17,
   /**
    * A simple binding that enables access to the UnsafeEval API.
    *
    */
-  UNSAFE_EVAL: 17,
+  MEMORY_CACHE: 18,
   /**
-   * A binding representing access to an in-memory cache.
+   * A Durable Object class binding, without an actual storage namespace. This can be used to
+   * implement a facet.
    *
    */
-  MEMORY_CACHE: 18,
+  WORKER_LOADER: 20,
   /**
    * A binding representing the ability to dynamically load Workers from code presented at
    * runtime.
@@ -2083,18 +2013,6 @@ export const Worker_Binding_Which = {
    * A Worker loader is not just a function that loads a Worker, but also serves as a
    * cache of Workers, automatically unloading Workers that are not in use. To that end, each
    * Worker must have a name, and if a Worker with that name already exists, it'll be reused.
-   *
-   */
-  WORKER_LOADER: 20,
-  /**
-   * A binding that provides a connect() method to dynamically connect to any workerd
-   * instance's debug port. This allows dynamic access to worker entrypoints via the
-   * WorkerdDebugPort RPC interface.
-   *
-   * Usage: const client = await env.DEBUG_PORT.connect("localhost:1234");
-   *        const fetcher = await client.getEntrypoint("service", "entrypoint");
-   *
-   * This is a workerd-only API intended for local development and testing.
    *
    */
   WORKERD_DEBUG_PORT: 21,
@@ -2116,7 +2034,7 @@ export class Worker_Binding extends $.Struct {
     Worker_Binding_Which.DURABLE_OBJECT_NAMESPACE;
   static readonly KV_NAMESPACE = Worker_Binding_Which.KV_NAMESPACE;
   static readonly R2BUCKET = Worker_Binding_Which.R2BUCKET;
-  static readonly OBSOLETE0 = Worker_Binding_Which.OBSOLETE0;
+  static readonly R2ADMIN = Worker_Binding_Which.R2ADMIN;
   static readonly WRAPPED = Worker_Binding_Which.WRAPPED;
   static readonly QUEUE = Worker_Binding_Which.QUEUE;
   static readonly FROM_ENVIRONMENT = Worker_Binding_Which.FROM_ENVIRONMENT;
@@ -2445,11 +2363,6 @@ export class Worker_Binding extends $.Struct {
   _disownR2Bucket(): $.Orphan<ServiceDesignator> {
     return $.utils.disown(this.r2Bucket);
   }
-  /**
-   * R2 bucket binding. Similar to KV namespaces, this turns operations into HTTP requests aimed
-   * at the named service.
-   *
-   */
   get r2Bucket(): ServiceDesignator {
     $.utils.testWhich("r2Bucket", $.utils.getUint16(0, this), 10, this);
     return $.utils.getStruct(1, ServiceDesignator, this);
@@ -2468,28 +2381,33 @@ export class Worker_Binding extends $.Struct {
     $.utils.setUint16(0, 10, this);
     $.utils.copyFrom(value, $.utils.getPointer(1, this));
   }
-  _adoptObsolete0(value: $.Orphan<ServiceDesignator>): void {
+  _adoptR2Admin(value: $.Orphan<ServiceDesignator>): void {
     $.utils.setUint16(0, 11, this);
     $.utils.adopt(value, $.utils.getPointer(1, this));
   }
-  _disownObsolete0(): $.Orphan<ServiceDesignator> {
-    return $.utils.disown(this.obsolete0);
+  _disownR2Admin(): $.Orphan<ServiceDesignator> {
+    return $.utils.disown(this.r2Admin);
   }
-  get obsolete0(): ServiceDesignator {
-    $.utils.testWhich("obsolete0", $.utils.getUint16(0, this), 11, this);
+  /**
+   * R2 bucket and admin API bindings. Similar to KV namespaces, these turn operations into
+   * HTTP requests aimed at the named service.
+   *
+   */
+  get r2Admin(): ServiceDesignator {
+    $.utils.testWhich("r2Admin", $.utils.getUint16(0, this), 11, this);
     return $.utils.getStruct(1, ServiceDesignator, this);
   }
-  _hasObsolete0(): boolean {
+  _hasR2Admin(): boolean {
     return !$.utils.isNull($.utils.getPointer(1, this));
   }
-  _initObsolete0(): ServiceDesignator {
+  _initR2Admin(): ServiceDesignator {
     $.utils.setUint16(0, 11, this);
     return $.utils.initStructAt(1, ServiceDesignator, this);
   }
-  get _isObsolete0(): boolean {
+  get _isR2Admin(): boolean {
     return $.utils.getUint16(0, this) === 11;
   }
-  set obsolete0(value: ServiceDesignator) {
+  set r2Admin(value: ServiceDesignator) {
     $.utils.setUint16(0, 11, this);
     $.utils.copyFrom(value, $.utils.getPointer(1, this));
   }
@@ -2681,184 +2599,15 @@ export class Worker_Binding extends $.Struct {
     return $.utils.getUint16(0, this) as Worker_Binding_Which;
   }
 }
-export class Worker_DurableObjectNamespace_ContainerOptions_NamedImage
-  extends $.Struct
-{
-  static readonly _capnp = {
-    displayName: "NamedImage",
-    id: "ab54a21a8a2ec0c0",
-    size: new $.ObjectSize(0, 2),
-  };
-  get name(): string {
-    return $.utils.getText(0, this);
-  }
-  set name(value: string) {
-    $.utils.setText(0, value, this);
-  }
-  get image(): string {
-    return $.utils.getText(1, this);
-  }
-  set image(value: string) {
-    $.utils.setText(1, value, this);
-  }
-  toString(): string {
-    return (
-      "Worker_DurableObjectNamespace_ContainerOptions_NamedImage_" +
-      super.toString()
-    );
-  }
-}
-export class Worker_DurableObjectNamespace_ContainerOptions_ContainerPrivileges_Device
-  extends $.Struct
-{
-  static readonly _capnp = {
-    displayName: "Device",
-    id: "83f9125afacda809",
-    size: new $.ObjectSize(0, 3),
-  };
-  get pathOnHost(): string {
-    return $.utils.getText(0, this);
-  }
-  set pathOnHost(value: string) {
-    $.utils.setText(0, value, this);
-  }
-  get pathInContainer(): string {
-    return $.utils.getText(1, this);
-  }
-  set pathInContainer(value: string) {
-    $.utils.setText(1, value, this);
-  }
-  get cgroupPermissions(): string {
-    return $.utils.getText(2, this);
-  }
-  set cgroupPermissions(value: string) {
-    $.utils.setText(2, value, this);
-  }
-  toString(): string {
-    return (
-      "Worker_DurableObjectNamespace_ContainerOptions_ContainerPrivileges_Device_" +
-      super.toString()
-    );
-  }
-}
-export class Worker_DurableObjectNamespace_ContainerOptions_ContainerPrivileges
-  extends $.Struct
-{
-  static readonly Device =
-    Worker_DurableObjectNamespace_ContainerOptions_ContainerPrivileges_Device;
-  static readonly _capnp = {
-    displayName: "ContainerPrivileges",
-    id: "ca910fa0c4c988bf",
-    size: new $.ObjectSize(0, 3),
-  };
-  static _Devices: $.ListCtor<Worker_DurableObjectNamespace_ContainerOptions_ContainerPrivileges_Device>;
-  _adoptCapabilities(value: $.Orphan<$.List<string>>): void {
-    $.utils.adopt(value, $.utils.getPointer(0, this));
-  }
-  _disownCapabilities(): $.Orphan<$.List<string>> {
-    return $.utils.disown(this.capabilities);
-  }
-  /**
-   * Docker HostConfig.CapAdd values.
-   *
-   */
-  get capabilities(): $.List<string> {
-    return $.utils.getList(0, $.TextList, this);
-  }
-  _hasCapabilities(): boolean {
-    return !$.utils.isNull($.utils.getPointer(0, this));
-  }
-  _initCapabilities(length: number): $.List<string> {
-    return $.utils.initList(0, $.TextList, length, this);
-  }
-  set capabilities(value: $.List<string>) {
-    $.utils.copyFrom(value, $.utils.getPointer(0, this));
-  }
-  _adoptDevices(
-    value: $.Orphan<
-      $.List<Worker_DurableObjectNamespace_ContainerOptions_ContainerPrivileges_Device>
-    >,
-  ): void {
-    $.utils.adopt(value, $.utils.getPointer(1, this));
-  }
-  _disownDevices(): $.Orphan<
-    $.List<Worker_DurableObjectNamespace_ContainerOptions_ContainerPrivileges_Device>
-  > {
-    return $.utils.disown(this.devices);
-  }
-  /**
-   * Docker HostConfig.Devices values.
-   *
-   */
-  get devices(): $.List<Worker_DurableObjectNamespace_ContainerOptions_ContainerPrivileges_Device> {
-    return $.utils.getList(
-      1,
-      Worker_DurableObjectNamespace_ContainerOptions_ContainerPrivileges._Devices,
-      this,
-    );
-  }
-  _hasDevices(): boolean {
-    return !$.utils.isNull($.utils.getPointer(1, this));
-  }
-  _initDevices(
-    length: number,
-  ): $.List<Worker_DurableObjectNamespace_ContainerOptions_ContainerPrivileges_Device> {
-    return $.utils.initList(
-      1,
-      Worker_DurableObjectNamespace_ContainerOptions_ContainerPrivileges._Devices,
-      length,
-      this,
-    );
-  }
-  set devices(
-    value: $.List<Worker_DurableObjectNamespace_ContainerOptions_ContainerPrivileges_Device>,
-  ) {
-    $.utils.copyFrom(value, $.utils.getPointer(1, this));
-  }
-  _adoptSecurityOpt(value: $.Orphan<$.List<string>>): void {
-    $.utils.adopt(value, $.utils.getPointer(2, this));
-  }
-  _disownSecurityOpt(): $.Orphan<$.List<string>> {
-    return $.utils.disown(this.securityOpt);
-  }
-  /**
-   * Docker HostConfig.SecurityOpt values.
-   *
-   */
-  get securityOpt(): $.List<string> {
-    return $.utils.getList(2, $.TextList, this);
-  }
-  _hasSecurityOpt(): boolean {
-    return !$.utils.isNull($.utils.getPointer(2, this));
-  }
-  _initSecurityOpt(length: number): $.List<string> {
-    return $.utils.initList(2, $.TextList, length, this);
-  }
-  set securityOpt(value: $.List<string>) {
-    $.utils.copyFrom(value, $.utils.getPointer(2, this));
-  }
-  toString(): string {
-    return (
-      "Worker_DurableObjectNamespace_ContainerOptions_ContainerPrivileges_" +
-      super.toString()
-    );
-  }
-}
 export class Worker_DurableObjectNamespace_ContainerOptions extends $.Struct {
-  static readonly NamedImage =
-    Worker_DurableObjectNamespace_ContainerOptions_NamedImage;
-  static readonly ContainerPrivileges =
-    Worker_DurableObjectNamespace_ContainerOptions_ContainerPrivileges;
   static readonly _capnp = {
     displayName: "ContainerOptions",
     id: "a609621a4d236cd7",
-    size: new $.ObjectSize(0, 3),
+    size: new $.ObjectSize(0, 1),
   };
-  static _Images: $.ListCtor<Worker_DurableObjectNamespace_ContainerOptions_NamedImage>;
   /**
-   * Optional default image used when start() does not specify an image or full container
-   * snapshot. An empty value means that no default image is configured.
-   * When imageName omits a tag, Docker uses the "latest" tag.
+   * Image name to be used to create the container using supported provider.
+   * By default, we pull the "latest" tag of this image.
    *
    */
   get imageName(): string {
@@ -2867,93 +2616,19 @@ export class Worker_DurableObjectNamespace_ContainerOptions extends $.Struct {
   set imageName(value: string) {
     $.utils.setText(0, value, this);
   }
-  _adoptPrivileges(
-    value: $.Orphan<Worker_DurableObjectNamespace_ContainerOptions_ContainerPrivileges>,
-  ): void {
-    $.utils.adopt(value, $.utils.getPointer(1, this));
-  }
-  _disownPrivileges(): $.Orphan<Worker_DurableObjectNamespace_ContainerOptions_ContainerPrivileges> {
-    return $.utils.disown(this.privileges);
-  }
-  /**
-   * Extra Docker HostConfig privileges applied when creating the container.
-   * These fields are passed through to Docker as-is and are empty by default.
-   * They are not validated or allow-listed. Depending on the values and Docker daemon mode,
-   * they can expose arbitrary host devices, disable security profiles, or grant capabilities
-   * such as CAP_SYS_ADMIN that may provide host-level access. Only use trusted configuration.
-   *
-   */
-  get privileges(): Worker_DurableObjectNamespace_ContainerOptions_ContainerPrivileges {
-    return $.utils.getStruct(
-      1,
-      Worker_DurableObjectNamespace_ContainerOptions_ContainerPrivileges,
-      this,
-    );
-  }
-  _hasPrivileges(): boolean {
-    return !$.utils.isNull($.utils.getPointer(1, this));
-  }
-  _initPrivileges(): Worker_DurableObjectNamespace_ContainerOptions_ContainerPrivileges {
-    return $.utils.initStructAt(
-      1,
-      Worker_DurableObjectNamespace_ContainerOptions_ContainerPrivileges,
-      this,
-    );
-  }
-  set privileges(
-    value: Worker_DurableObjectNamespace_ContainerOptions_ContainerPrivileges,
-  ) {
-    $.utils.copyFrom(value, $.utils.getPointer(1, this));
-  }
-  _adoptImages(
-    value: $.Orphan<
-      $.List<Worker_DurableObjectNamespace_ContainerOptions_NamedImage>
-    >,
-  ): void {
-    $.utils.adopt(value, $.utils.getPointer(2, this));
-  }
-  _disownImages(): $.Orphan<
-    $.List<Worker_DurableObjectNamespace_ContainerOptions_NamedImage>
-  > {
-    return $.utils.disown(this.images);
-  }
-  /**
-   * Named image references exposed to the Durable Object through ctx.container.images.
-   * These are optional; Worker code can instead supply an image reference from another source.
-   * When imageName is empty, the local container backend requires start() to specify an image or
-   * full container snapshot.
-   *
-   */
-  get images(): $.List<Worker_DurableObjectNamespace_ContainerOptions_NamedImage> {
-    return $.utils.getList(
-      2,
-      Worker_DurableObjectNamespace_ContainerOptions._Images,
-      this,
-    );
-  }
-  _hasImages(): boolean {
-    return !$.utils.isNull($.utils.getPointer(2, this));
-  }
-  _initImages(
-    length: number,
-  ): $.List<Worker_DurableObjectNamespace_ContainerOptions_NamedImage> {
-    return $.utils.initList(
-      2,
-      Worker_DurableObjectNamespace_ContainerOptions._Images,
-      length,
-      this,
-    );
-  }
-  set images(
-    value: $.List<Worker_DurableObjectNamespace_ContainerOptions_NamedImage>,
-  ) {
-    $.utils.copyFrom(value, $.utils.getPointer(2, this));
-  }
   toString(): string {
     return "Worker_DurableObjectNamespace_ContainerOptions_" + super.toString();
   }
 }
 export const Worker_DurableObjectNamespace_Which = {
+  /**
+   * Exported class name that implements the Durable Object.
+   *
+   * Changing the class name will not break compatibility with existing storage, so long as
+   * `uniqueKey` stays the same.
+   *
+   */
+  UNIQUE_KEY: 0,
   /**
    * A unique, stable ID associated with this namespace. This could be a  GUID, or any other
    * string which does not appear anywhere else in the world.
@@ -2966,24 +2641,6 @@ export const Worker_DurableObjectNamespace_Which = {
    * deal if the key leaks.
    *
    * DO NOT LOSE this key, otherwise it may be difficult or impossible to recover stored data.
-   *
-   */
-  UNIQUE_KEY: 0,
-  /**
-   * Instances of this class are ephemeral -- they have no durable storage at all. The
-   * `state.storage` API will not be present. Additionally, this namespace will allow arbitrary
-   * strings as IDs. There are no `idFromName()` nor `newUniqueId()` methods; `get()` takes any
-   * string as a parameter.
-   *
-   * Ephemeral objects are NOT globally unique, only "locally" unique, for some definition of
-   * "local". For example, on Cloudflare's network, these objects are unique per-colo.
-   *
-   * WARNING: Cloudflare Workers currently limits this feature to Cloudflare-internal users
-   *   only, because using them correctly requires deep understanding of Cloudflare network
-   *   topology. We're working on something better for public consuption. Until then for
-   *   "ephemeral" use cases we recommend using regular durable objects and just not storing
-   *   anything. An object that hasn't stored anything will not consume any storage space on
-   *   disk.
    *
    */
   EPHEMERAL_LOCAL: 1,
@@ -3084,10 +2741,9 @@ export class Worker_DurableObjectNamespace extends $.Struct {
   }
   /**
    * If present, Durable Objects in this namespace have attached containers.
-   * workerd will talk to the configured container engine to start containers for each Durable
-   * Object from a configured default, a runtime-selected image, or a full container snapshot. The
-   * Durable Object can access the container via the ctx.container API.
-   * TODO(CloudChamber): add link to docs.
+   * workerd will talk to the configured container engine to start containers for each
+   * Durable Object based on the given image. The Durable Object can access the container via the
+   * ctx.container API. TODO(CloudChamber): add link to docs.
    *
    */
   get container(): Worker_DurableObjectNamespace_ContainerOptions {
@@ -3150,10 +2806,6 @@ export class Worker_DockerConfiguration extends $.Struct {
     return "Worker_DockerConfiguration_" + super.toString();
   }
 }
-/**
- * Specifies where this worker's Durable Objects are stored.
- *
- */
 export const Worker_DurableObjectStorage_Which = {
   /**
    * Default. The worker has no Durable Objects. `durableObjectNamespaces` must be empty, or
@@ -3200,7 +2852,7 @@ export class Worker_DurableObjectStorage extends $.Struct {
   static readonly _capnp = {
     displayName: "durableObjectStorage",
     id: "cc72b3faa57827d4",
-    size: new $.ObjectSize(8, 15),
+    size: new $.ObjectSize(8, 13),
   };
   get _isNone(): boolean {
     return $.utils.getUint16(2, this) === 0;
@@ -3265,7 +2917,7 @@ export class Worker_ContainerEngine extends $.Struct {
   static readonly _capnp = {
     displayName: "containerEngine",
     id: "82de68f58dc2eb24",
-    size: new $.ObjectSize(8, 15),
+    size: new $.ObjectSize(8, 13),
   };
   get _isNone(): boolean {
     return $.utils.getUint16(4, this) === 0;
@@ -3362,7 +3014,7 @@ export class Worker extends $.Struct {
   static readonly _capnp = {
     displayName: "Worker",
     id: "acfa77e88fd97d1c",
-    size: new $.ObjectSize(8, 15),
+    size: new $.ObjectSize(8, 13),
     defaultGlobalOutbound: $.readRawPointer(
       new Uint8Array([
         16, 7, 80, 1, 3, 0, 0, 17, 9, 74, 0, 1, 255, 105, 110, 116, 101, 114,
@@ -3680,54 +3332,6 @@ export class Worker extends $.Struct {
   _initContainerEngine(): Worker_ContainerEngine {
     return $.utils.getAs(Worker_ContainerEngine, this);
   }
-  /**
-   * Name of the HTTP header carrying per-request Cloudflare Access metadata for local dev.
-   * When set, the worker reads this header from every incoming request to populate `ctx.access`.
-   * The header value is a JSON object matching the production Access struct:
-   *   { "app_aud": "<audience>", "jwt_claims": { ... } }
-   * `app_aud` (string, required) populates `ctx.access.aud`.
-   * `jwt_claims` (object, optional) is passed as `ctx.props.jwtClaims` to the access binding
-   * worker (if configured via `accessBindingService`) when `ctx.access.getIdentity()` is called.
-   * Requests that carry the header get `ctx.access` populated; requests without it get
-   * `ctx.access === undefined`.
-   *
-   */
-  get accessBlobHeader(): string {
-    return $.utils.getText(13, this);
-  }
-  set accessBlobHeader(value: string) {
-    $.utils.setText(13, value, this);
-  }
-  _adoptAccessBindingService(value: $.Orphan<ServiceDesignator>): void {
-    $.utils.adopt(value, $.utils.getPointer(14, this));
-  }
-  _disownAccessBindingService(): $.Orphan<ServiceDesignator> {
-    return $.utils.disown(this.accessBindingService);
-  }
-  /**
-   * Names a service that acts as the Cloudflare Access identity binding worker for local dev.
-   * When `ctx.access.getIdentity()` is called, workerd dispatches a `getIdentity` JS-RPC method
-   * on this service with per-request `props` set to `{ aud }` or `{ aud, jwtClaims }` (extracted
-   * from the `accessBlobHeader` HTTP header; `jwtClaims` is included only when the optional
-   * `jwt_claims` field is present in the header). This mimics the production path where an
-   * Access binding worker resolves the identity from JWT claims.
-   *
-   * If not set, `ctx.access.getIdentity()` resolves to `undefined` (even when `accessBlobHeader`
-   * is configured and `ctx.access.aud` is available).
-   *
-   */
-  get accessBindingService(): ServiceDesignator {
-    return $.utils.getStruct(14, ServiceDesignator, this);
-  }
-  _hasAccessBindingService(): boolean {
-    return !$.utils.isNull($.utils.getPointer(14, this));
-  }
-  _initAccessBindingService(): ServiceDesignator {
-    return $.utils.initStructAt(14, ServiceDesignator, this);
-  }
-  set accessBindingService(value: ServiceDesignator) {
-    $.utils.copyFrom(value, $.utils.getPointer(14, this));
-  }
   toString(): string {
     return "Worker_" + super.toString();
   }
@@ -3835,38 +3439,31 @@ export class ExternalServer_Tcp extends $.Struct {
     return "ExternalServer_Tcp_" + super.toString();
   }
 }
-/**
- * Describes the ability to talk to a specific server, typically a back-end server available
- * on the internal network.
- *
- * When a Worker contains a service binding that points to an ExternalServer, *all* fetch()
- * calls on that binding will be delivered to that server, regardless of whether the hostname
- * or protocol specified in the URL actually match the hostname or protocol used by the actual
- * server. Typically, a Worker implementing a reverse proxy would use this to forward a request
- * to a back-end application server. Such a back-end typically does not have a real public
- * hostname, since it is only reachable through the proxy, but the requests forwarded to it will
- * keep the hostname that was on the original request.
- *
- * Note that this also implies that regardless of whether the original URL was http: or https:,
- * the request will be delivered to the target server using the protocol specified below. A
- * header like `X-Forwarded-Proto` can be used to pass along the original protocol; see
- * `HttpOptions`.
- *
- */
 export const ExternalServer_Which = {
   /**
-   * Talk to the server over unencrypted HTTP.
+   * Address/port of the server. Optional; if not specified, then you will be required to specify
+   * the address on the command line with with `--external-addr <name>=<addr>`.
+   *
+   * Examples:
+   * - "1.2.3.4": Connect to the given IPv4 address on the protocol's default port.
+   * - "1.2.3.4:80": Connect to the given IPv4 address and port.
+   * - "1234:5678::abcd": Connect to the given IPv6 address on the protocol's default port.
+   * - "[1234:5678::abcd]:80": Connect to the given IPv6 address and port.
+   * - "unix:/path/to/socket": Connect to the given Unix Domain socket by path.
+   * - "unix-abstract:name": On Linux, connect to the given "abstract" Unix socket name.
+   * - "example.com:80": Perform a DNS lookup to determine the address, and then connect to it.
+   *
+   * (These are the formats supported by KJ's parseAddress().)
    *
    */
   HTTP: 0,
   /**
-   * Talk to the server over encrypted HTTPS.
+   * Talk to the server over unencrypted HTTP.
    *
    */
   HTTPS: 1,
   /**
-   * Connect to the server over raw TCP. Bindings to this service will only support the
-   * `connect()` method; `fetch()` will throw an exception.
+   * Talk to the server over encrypted HTTPS.
    *
    */
   TCP: 2,
@@ -4547,11 +4144,7 @@ export class Extension_Module extends $.Struct {
     defaultInternal: $.getBitMask(false, 0),
   };
   /**
-   * Full js module name. Must be a fully-qualified URL with a non-file: scheme,
-   * e.g. "my-extension:module". Workers using the new_module_registry
-   * compatibility flag reject extensions whose module names are not valid URLs;
-   * the original module registry tolerates any path-like name, but new
-   * extensions should always use the URL form.
+   * Full js module name.
    *
    */
   get name(): string {
@@ -4711,13 +4304,6 @@ Config._Services = $.CompositeList(Service);
 Config._Sockets = $.CompositeList(Socket);
 Config._Extensions = $.CompositeList(Extension);
 Worker_Binding_WrappedBinding._InnerBindings = $.CompositeList(Worker_Binding);
-Worker_DurableObjectNamespace_ContainerOptions_ContainerPrivileges._Devices =
-  $.CompositeList(
-    Worker_DurableObjectNamespace_ContainerOptions_ContainerPrivileges_Device,
-  );
-Worker_DurableObjectNamespace_ContainerOptions._Images = $.CompositeList(
-  Worker_DurableObjectNamespace_ContainerOptions_NamedImage,
-);
 Worker._Modules = $.CompositeList(Worker_Module);
 Worker._Bindings = $.CompositeList(Worker_Binding);
 Worker._DurableObjectNamespaces = $.CompositeList(

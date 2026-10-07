@@ -8,7 +8,7 @@ import {
 import * as Cause from "effect/Cause";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
-import { AsyncResult, Atom } from "effect/reactivity";
+import { AsyncResult, Atom } from "effect/unstable/reactivity";
 import { useCallback } from "react";
 
 import { appAtomRegistry } from "~/rpc/atomRegistry";
@@ -37,7 +37,6 @@ interface ProjectQueryState<A> {
 }
 
 interface ProjectFileQueryState extends ProjectQueryState<ProjectReadFileResult> {
-  readonly readError: ProjectReadFileError | null;
   /** The path exists but is not a regular file, typically a directory. */
   readonly isNotFile: boolean;
 }
@@ -87,18 +86,6 @@ export function getOptimisticProjectFileQueryData(
   relativePath: string,
 ): ProjectReadFileResult | null {
   return appAtomRegistry.get(optimisticFileAtom(environmentId, cwd, relativePath))?.data ?? null;
-}
-
-/** The contents the Files panel shows, read outside React so it is current within a frame. */
-export function getProjectFileContents(
-  environmentId: EnvironmentId,
-  cwd: string,
-  relativePath: string,
-): string | undefined {
-  const optimistic = getOptimisticProjectFileQueryData(environmentId, cwd, relativePath);
-  if (optimistic) return optimistic.contents;
-  const result = appAtomRegistry.get(getProjectFileQueryAtom(environmentId, cwd, relativePath));
-  return Option.getOrUndefined(AsyncResult.value(result))?.contents;
 }
 
 export function confirmProjectFileQueryData(
@@ -230,13 +217,11 @@ export function useProjectFileQuery(
   );
   const optimisticFile = relativePath === null ? null : optimisticResult;
   const cause = failureCause(result);
-  const readError = isProjectReadFileError(cause) ? cause : null;
 
   return {
     data: optimisticFile?.data ?? data,
     error: errorMessage(cause),
-    readError,
-    isNotFile: readError?.failure === "path_not_file",
+    isNotFile: isProjectReadFileError(cause) && cause.failure === "path_not_file",
     isPending: result.waiting,
     refresh,
   };

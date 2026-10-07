@@ -76,13 +76,6 @@ export interface FoldkitProps<
   assets?: AssetsConfig;
 }
 
-// These options are inspected while constructing the Worker. Resolve them in
-// the outer props Effect; pass-through properties can remain deferred Inputs.
-type FoldkitInput<Bindings extends WorkerBindingProps> = InputProps<
-  FoldkitProps<Bindings>,
-  "assets"
->;
-
 /**
  * A Cloudflare Worker deployed from a [Foldkit](https://foldkit.dev) app.
  *
@@ -187,8 +180,8 @@ export const Foldkit: {
     <const Bindings extends WorkerBindingProps = {}, Req = never>(
       id: string,
       propsEff?:
-        | FoldkitInput<Bindings>
-        | Effect.Effect<FoldkitInput<Bindings>, never, Req>,
+        | InputProps<FoldkitProps<Bindings>>
+        | Effect.Effect<InputProps<FoldkitProps<Bindings>>, never, Req>,
     ): Effect.Effect<Self, never, Req | Providers> & {
       new (): Worker<{
         [
@@ -200,8 +193,8 @@ export const Foldkit: {
   <const Bindings extends WorkerBindingProps = {}, Req = never>(
     id: string,
     propsEff?:
-      | FoldkitInput<Bindings>
-      | Effect.Effect<FoldkitInput<Bindings>, never, Req>,
+      | InputProps<FoldkitProps<Bindings>>
+      | Effect.Effect<InputProps<FoldkitProps<Bindings>>, never, Req>,
   ): Effect.Effect<
     Worker<{
       [
@@ -211,19 +204,9 @@ export const Foldkit: {
     never,
     Req | Providers
   >;
-} = (<const Bindings extends WorkerBindingProps = {}, Req = never>(
-  id?: string,
-  propsEff?:
-    | FoldkitInput<Bindings>
-    | Effect.Effect<FoldkitInput<Bindings>, never, Req>,
-) =>
+} = ((id?: any, propsEff?: any) =>
   id === undefined
-    ? <const Bindings extends WorkerBindingProps = {}, Req = never>(
-        id: string,
-        propsEff?:
-          | FoldkitInput<Bindings>
-          | Effect.Effect<FoldkitInput<Bindings>, never, Req>,
-      ) => effectClass(Foldkit(id, propsEff))
+    ? (id: string, propsEff: any) => effectClass(Foldkit(id, propsEff))
     : Worker(
         id,
         Effect.map(

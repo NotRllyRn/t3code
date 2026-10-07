@@ -22,7 +22,6 @@ test.provider(
       );
       expect(error._tag).toBe("ACLNotFoundFault");
     }),
-  { tags: ["provider:aws", "provider:aws:memorydb", "live"] },
 );
 
 const assertGone = (name: string) =>
@@ -82,5 +81,5 @@ test.provider.skipIf(!process.env.AWS_TEST_SLOW)(
       yield* stack.destroy();
       yield* assertGone(acl.aclName);
     }),
-  { tags: ["provider:aws", "provider:aws:memorydb", "live"], timeout: 300_000 },
+  { timeout: 300_000 },
 );

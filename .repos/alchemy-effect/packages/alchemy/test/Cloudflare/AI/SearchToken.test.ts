@@ -121,15 +121,7 @@ test.provider(
       // Destroy again — delete must be idempotent (already gone).
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:ai",
-      "provider:cloudflare:apitoken",
-      "live",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );
 
 test.provider(
@@ -169,15 +161,7 @@ test.provider(
 
       yield* expectGone(accountId, healed.token.id);
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:ai",
-      "provider:cloudflare:apitoken",
-      "live",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );
 
 test.provider(
@@ -204,15 +188,7 @@ test.provider(
 
       yield* expectGone(accountId, deployed.token.id);
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:ai",
-      "provider:cloudflare:apitoken",
-      "live",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );
 
 test.provider(
@@ -264,14 +240,5 @@ test.provider(
   // legitimately ride the provider's `InvalidTokenCredentials` propagation
   // window (~2 min under full-suite parallel load) before the deploy even
   // returns — 240s leaves no room for the destroy + gone-poll that follow.
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:ai",
-      "provider:cloudflare:apitoken",
-      "provider:cloudflare:r2",
-      "live",
-    ],
-    timeout: 360_000,
-  },
+  { timeout: 360_000 },
 );

@@ -1,7 +1,7 @@
-import * as placementGroups from "@distilled.cloud/hetzner/placement_groups";
 import * as Hetzner from "@/Hetzner";
 import * as Provider from "@/Provider";
 import * as Test from "@/Test/Alchemy";
+import { Services } from "@distilled.cloud/hetzner";
 import { expect } from "alchemy-test";
 import * as Effect from "effect/Effect";
 import { MinimumLogLevel } from "effect/References";
@@ -39,7 +39,7 @@ test.provider.skipIf(!hasHetznerCreds)(
       expect(created.servers).toEqual([]);
       expect(created.labels).toMatchObject({ env: "test" });
 
-      const fetched = yield* placementGroups.getPlacementGroup({
+      const fetched = yield* Services.placementGroups.getPlacementGroup({
         id: created.id,
       });
       expect(fetched.placement_group.id).toEqual(created.id);
@@ -64,7 +64,7 @@ test.provider.skipIf(!hasHetznerCreds)(
       expect(updated.name).toEqual(`${created.name.slice(0, 55)}-renamed`);
       expect(updated.labels).toMatchObject({ env: "prod", role: "web" });
 
-      const refetched = yield* placementGroups.getPlacementGroup({
+      const refetched = yield* Services.placementGroups.getPlacementGroup({
         id: updated.id,
       });
       expect(refetched.placement_group.name).toEqual(updated.name);
@@ -77,15 +77,7 @@ test.provider.skipIf(!hasHetznerCreds)(
       const gone = yield* waitUntilGone(created.id);
       expect(gone).toEqual("gone");
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:hetzner",
-      "provider:hetzner:placementgroup",
-      "provider:hetzner:service",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider.skipIf(!hasHetznerCreds)(
@@ -113,8 +105,5 @@ test.provider.skipIf(!hasHetznerCreds)(
       const gone = yield* waitUntilGone(deployed.id);
       expect(gone).toEqual("gone");
     }).pipe(logLevel),
-  {
-    tags: ["provider:hetzner", "provider:hetzner:placementgroup", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

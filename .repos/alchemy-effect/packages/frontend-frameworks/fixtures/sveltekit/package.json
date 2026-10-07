@@ -7,9 +7,9 @@
     "build": "bun run ../../../cloudflare-test-tools/src/e2e/Cli.ts build",
     "preview": "bun run ../../../cloudflare-test-tools/src/e2e/Cli.ts preview",
     "test": "node scripts/e2e.mjs",
-    "test:update-snapshots": "playwright test --tsconfig ../tsconfig.playwright.json --update-snapshots",
+    "test:update-snapshots": "playwright test --update-snapshots",
     "pretest": "playwright install chromium",
-    "test:e2e": "playwright test --tsconfig ../tsconfig.playwright.json"
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "cookie": "catalog:",
@@ -26,7 +26,6 @@
     "@types/node": "catalog:node24",
     "effect": "catalog:",
     "svelte": "catalog:",
-    "typescript": "catalog:typescript-classic",
     "vite": "catalog:"
   }
 }

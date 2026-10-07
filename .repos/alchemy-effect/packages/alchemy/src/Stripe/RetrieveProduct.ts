@@ -28,7 +28,6 @@ export interface RetrieveProductRequest extends Omit<GetProductRequest, "id"> {}
  * ```
  *
  * @binding
- * @product Product
  */
 export interface RetrieveProduct extends Binding.Service<
   RetrieveProduct,

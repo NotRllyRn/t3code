@@ -1,4 +1,3 @@
-import type { GitHubSettings } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
@@ -8,7 +7,6 @@ const GitHubAuthStatusAccountSchema = Schema.Struct({
   active: Schema.Boolean,
   host: Schema.String,
   login: Schema.String,
-  tokenSource: Schema.optional(Schema.String),
 });
 
 const GitHubAuthStatusSchema = Schema.Struct({
@@ -25,16 +23,12 @@ export interface GitHubAuthStatusAccount {
   readonly authenticated: boolean;
   readonly active: boolean;
   readonly error: string | null;
-  /** The variable (GH_TOKEN and kin) the login came from; it overrides every stored login. */
-  readonly environmentVariable: string | null;
 }
 
 export interface GitHubAuthStatus {
   readonly parsed: boolean;
   readonly accounts: ReadonlyArray<GitHubAuthStatusAccount>;
 }
-
-const ENVIRONMENT_TOKEN_SOURCE = /^(?:GH|GITHUB)_(?:ENTERPRISE_)?TOKEN$/u;
 
 function nonEmptyString(value: string): string | null {
   const trimmed = value.trim();
@@ -60,9 +54,6 @@ export function parseGitHubAuthStatus(text: string): GitHubAuthStatus {
                 authenticated: account.state === "success",
                 active: account.active,
                 error: account.error?.trim() || null,
-                environmentVariable: ENVIRONMENT_TOKEN_SOURCE.test(account.tokenSource ?? "")
-                  ? (account.tokenSource ?? null)
-                  : null,
               },
             ];
           }),
@@ -77,27 +68,5 @@ export function findAuthenticatedGitHubAccount(
   return (
     accounts.find((account) => account.authenticated && account.active) ??
     accounts.find((account) => account.authenticated)
-  );
-}
-
-/**
- * The login GitHub requests for a host will use, honoring Settings: an environment token
- * first (gh's own precedence), then the pinned account, then gh's active login.
- * Returns undefined when the host is turned off or has no usable login.
- */
-export function effectiveGitHubAccount(
-  host: string,
-  accounts: ReadonlyArray<GitHubAuthStatusAccount>,
-  settings: GitHubSettings,
-): GitHubAuthStatusAccount | undefined {
-  const choice = settings.hosts[host];
-  if (choice?.enabled === false) return undefined;
-  const usable = accounts.filter((account) => account.host === host && account.authenticated);
-  return (
-    usable.find((account) => account.environmentVariable !== null) ??
-    (choice?.account === undefined
-      ? undefined
-      : usable.find((account) => account.account === choice.account)) ??
-    findAuthenticatedGitHubAccount(usable)
   );
 }

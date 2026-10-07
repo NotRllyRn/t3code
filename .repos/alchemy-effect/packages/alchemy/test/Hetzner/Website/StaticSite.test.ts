@@ -1,11 +1,11 @@
 import * as Hetzner from "@/Hetzner";
 import * as Test from "@/Test/Alchemy";
-import * as servers from "@distilled.cloud/hetzner/servers";
+import { Services } from "@distilled.cloud/hetzner";
 import { expect } from "alchemy-test";
 import * as Effect from "effect/Effect";
 import { MinimumLogLevel } from "effect/References";
 import * as Schedule from "effect/Schedule";
-import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClient from "effect/unstable/http/HttpClient";
 import * as pathe from "pathe";
 import { cloneFixture } from "../../Cloudflare/Utils/Fixture.ts";
 import { expectUrlContains } from "../../Cloudflare/Utils/Http.ts";
@@ -26,7 +26,7 @@ const fixtureDir = pathe.resolve(
 const tempRoot = pathe.resolve(import.meta.dirname, "../../../.tmp");
 
 const waitUntilGone = (id: number) =>
-  servers.getServer({ id }).pipe(
+  Services.servers.getServer({ id }).pipe(
     Effect.as("found" as const),
     Effect.catchTag("NotFound", () => Effect.succeed("gone" as const)),
     Effect.repeat({
@@ -95,13 +95,5 @@ test.provider.skipIf(!hasHetznerCreds)(
         Effect.logWarning(`skipping: Hetzner quota (${error._tag})`),
       ),
     ),
-  {
-    tags: [
-      "provider:hetzner",
-      "provider:hetzner:service",
-      "provider:hetzner:website",
-      "live",
-    ],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

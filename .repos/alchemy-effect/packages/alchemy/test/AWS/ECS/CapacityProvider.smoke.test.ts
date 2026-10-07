@@ -79,5 +79,5 @@ test.provider.skipIf(!process.env.TEST_ASG_ARN)(
       });
       expect(afterDestroy.capacityProviders ?? []).toHaveLength(0);
     }).pipe(logLevel),
-  { tags: ["provider:aws", "provider:aws:ecs", "live"], timeout: 600_000 },
+  { timeout: 600_000 },
 );

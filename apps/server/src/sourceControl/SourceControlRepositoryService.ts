@@ -7,7 +7,6 @@ import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
 
 import {
-  SourceControlProviderError,
   SourceControlRepositoryError,
   type SourceControlCloneRepositoryInput,
   type SourceControlCloneRepositoryResult,
@@ -20,18 +19,15 @@ import {
   type SourceControlRepositoryLookupInput,
 } from "@t3tools/contracts";
 
-import * as ServerConfig from "../config.ts";
+import { ServerConfig } from "../config.ts";
 import { expandHomePathWith } from "../pathExpansion.ts";
 import {
   parseGitCloneProgressLine,
   type GitCloneProgressLine,
 } from "../project/gitCloneProgress.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
-import * as BitbucketApi from "./BitbucketApi.ts";
 import * as SourceControlProviderRegistry from "./SourceControlProviderRegistry.ts";
 const isSourceControlRepositoryError = Schema.is(SourceControlRepositoryError);
-const isSourceControlProviderError = Schema.is(SourceControlProviderError);
-const isBitbucketRepositoryLocatorError = Schema.is(BitbucketApi.BitbucketRepositoryLocatorError);
 
 export class SourceControlRepositoryService extends Context.Service<
   SourceControlRepositoryService,
@@ -96,12 +92,7 @@ function mapRepositoryError(operation: string, provider: SourceControlProviderKi
       : new SourceControlRepositoryError({
           operation,
           provider,
-          detail:
-            isSourceControlProviderError(cause) &&
-            cause.provider === "bitbucket" &&
-            isBitbucketRepositoryLocatorError(cause.cause)
-              ? BitbucketApi.BitbucketRepositoryLocatorError.detail
-              : "The source control operation could not be completed.",
+          detail: "The source control operation could not be completed.",
           cause,
         }),
   );
@@ -164,7 +155,7 @@ function selectRemoteUrl(
 
 /** @public Service construction is part of the canonical Effect module API. */
 export const make = Effect.gen(function* () {
-  const config = yield* ServerConfig.ServerConfig;
+  const config = yield* ServerConfig;
   const fileSystem = yield* FileSystem.FileSystem;
   const git = yield* GitVcsDriver.GitVcsDriver;
   const path = yield* Path.Path;
@@ -312,13 +303,7 @@ export const make = Effect.gen(function* () {
       .execute({
         operation: "SourceControlRepositoryService.cloneRepository",
         cwd: path.dirname(prepared.destinationPath),
-        args: [
-          "clone",
-          "--progress",
-          "--",
-          prepared.cloneUrl,
-          path.basename(prepared.destinationPath),
-        ],
+        args: ["clone", "--progress", prepared.cloneUrl, path.basename(prepared.destinationPath)],
         timeoutMs: options?.timeoutMs === undefined ? CLONE_TIMEOUT_MS : options.timeoutMs,
         // Progress redraws add up on a slow multi-GB clone. The buffered copy
         // is never read (the tail is kept by hand above), so keep it small

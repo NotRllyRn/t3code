@@ -4,7 +4,7 @@ import { expect } from "alchemy-test";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as Schedule from "effect/Schedule";
-import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClient from "effect/unstable/http/HttpClient";
 import Stack from "./fixtures/stack.ts";
 
 const { test, beforeAll, afterAll, deploy, destroy } = Test.make({
@@ -53,10 +53,7 @@ test(
     expect(body.mode).toBe("async");
     expect(body.title).toBe("Example Domain");
   }),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:worker", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test(
@@ -71,10 +68,7 @@ test(
     expect(body.title).toBe("Example Domain");
     expect(body.contentLength).toBeGreaterThan(0);
   }),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:worker", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test(
@@ -87,10 +81,7 @@ test(
 
     expect(body.markdownLength).toBeGreaterThan(0);
   }),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:worker", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test(
@@ -103,10 +94,7 @@ test(
 
     expect(body.linkCount).toBeGreaterThan(0);
   }),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:worker", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test(
@@ -114,15 +102,12 @@ test(
   Effect.gen(function* () {
     const { effectWorkerUrl } = yield* stack;
     const body = (yield* readJson(`${effectWorkerUrl}/scrape`)) as {
-      text: string | null;
+      heading: string | null;
     };
 
-    expect(body.text).toBe("Learn more");
+    expect(body.heading).toBe("Example Domain");
   }),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:worker", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test(
@@ -137,10 +122,7 @@ test(
     expect(body.title).toBe("Example Domain");
     expect(body.screenshotLength).toBeGreaterThan(0);
   }),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:worker", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test(
@@ -153,10 +135,7 @@ test(
 
     expect(body.bytes).toBeGreaterThan(0);
   }),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:worker", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test(
@@ -169,10 +148,7 @@ test(
 
     expect(body.bytes).toBeGreaterThan(0);
   }),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:worker", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test(
@@ -185,10 +161,7 @@ test(
 
     expect(body.success).toBe(true);
   }),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:worker", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test(
@@ -201,10 +174,7 @@ test(
 
     expect(body.title).toBe("Example Domain");
   }),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:worker", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test(
@@ -217,8 +187,5 @@ test(
 
     expect(body.title).toBe("Example Domain");
   }),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:worker", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

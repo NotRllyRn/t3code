@@ -93,10 +93,13 @@ export interface TestApi {
   beforeEach: BeforeEachFn;
   afterAll: AfterAllFn;
   afterEach: AfterEachFn;
-  deploy: Core.Deploy;
+  deploy: <A>(
+    stack: TestEffect<CompiledStack<A>, Stage | AlchemyContext>,
+    options?: { stage?: string },
+  ) => ReturnType<typeof Core.deploy<A>>;
   destroy: (
     stack: TestEffect<CompiledStack, Stage | AlchemyContext>,
-    options?: { stage?: string; include?: never; exclude?: never },
+    options?: { stage?: string },
   ) => ReturnType<typeof Core.destroy>;
 }
 
@@ -245,7 +248,8 @@ export const make = <ROut = any>(options: MakeOptions<ROut>): TestApi => {
     beforeEach,
     afterAll,
     afterEach,
-    deploy: Core.makeDeploy(options, sharedScope),
+    deploy: (stack, callOpts) =>
+      Core.deploy(options, stack, { ...callOpts, scope: sharedScope }),
     destroy: (stack, callOpts) =>
       Core.destroy(options, stack, { ...callOpts, scope: sharedScope }).pipe(
         Effect.ensuring(closeScope),

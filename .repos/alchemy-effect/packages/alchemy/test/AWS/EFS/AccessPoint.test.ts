@@ -121,5 +121,5 @@ test.provider(
       Effect.tap(() => stack.destroy()),
       Effect.onError(() => stack.destroy().pipe(Effect.ignore)),
     ),
-  { tags: ["provider:aws", "provider:aws:efs", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );

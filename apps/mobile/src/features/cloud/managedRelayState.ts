@@ -11,14 +11,14 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 import type { EnvironmentId } from "@t3tools/contracts";
 import type { RelayClientEnvironmentRecord } from "@t3tools/contracts/relay";
-import { AsyncResult, Atom } from "effect/reactivity";
+import { AsyncResult, Atom } from "effect/unstable/reactivity";
 import { useCallback, useEffect } from "react";
 
-import * as Runtime from "../../lib/runtime";
+import { runtimeContextLayer } from "../../lib/runtime";
 import { appAtomRegistry } from "../../state/atom-registry";
 import { cloudDebugLog } from "./cloudDebugLog";
 
-const managedRelayAtomRuntime = Atom.runtime(Runtime.layer);
+const managedRelayAtomRuntime = Atom.runtime(runtimeContextLayer);
 
 export const managedRelayQueryManager = createManagedRelayQueryManager(managedRelayAtomRuntime, {
   onQueryEvent: (event) =>

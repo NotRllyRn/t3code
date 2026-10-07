@@ -28,8 +28,7 @@ export interface ExecRequest {
  *
  * ### Exec a command
  * Bind the client in init. Provide {@link ExecHttp}. The Sprite name
- * is fixed by `Exec(box)`. Alchemy transports that name and the
- * deployment's org token to the caller automatically.
+ * is fixed by `Exec(box)`.
  *
  * **Example:** List files
  * ```typescript
@@ -38,7 +37,6 @@ export interface ExecRequest {
  * ```
  *
  * @binding
- * @product Sprite
  */
 export interface Exec extends Binding.Service<
   Exec,

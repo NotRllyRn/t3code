@@ -302,19 +302,9 @@ export const Nuxt: {
     never,
     Req | Providers
   >;
-} = (<const Bindings extends WorkerBindingProps = {}, Req = never>(
-  id?: string,
-  propsEff?:
-    | InputProps<NuxtProps<Bindings>>
-    | Effect.Effect<InputProps<NuxtProps<Bindings>>, never, Req>,
-) =>
+} = ((id?: any, propsEff?: any) =>
   id === undefined
-    ? <const Bindings extends WorkerBindingProps = {}, Req = never>(
-        id: string,
-        propsEff?:
-          | InputProps<NuxtProps<Bindings>>
-          | Effect.Effect<InputProps<NuxtProps<Bindings>>, never, Req>,
-      ) => effectClass(Nuxt(id, propsEff))
+    ? (id: string, propsEff: any) => effectClass(Nuxt(id, propsEff))
     : Worker(
         id,
         Effect.map(

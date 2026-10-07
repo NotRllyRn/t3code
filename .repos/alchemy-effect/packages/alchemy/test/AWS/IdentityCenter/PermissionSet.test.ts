@@ -83,8 +83,5 @@ test.provider.skipIf(SKIP_IDENTITY_CENTER)(
 
       yield* stack.destroy();
     }),
-  {
-    tags: ["provider:aws", "provider:aws:identitycenter", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

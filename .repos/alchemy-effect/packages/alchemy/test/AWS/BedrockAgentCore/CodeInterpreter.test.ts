@@ -21,7 +21,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:bedrockagentcore", "live"] },
 );
 
 const assertInterpreterGone = (codeInterpreterId: string) =>
@@ -96,8 +95,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertInterpreterGone(replaced.codeInterpreterId);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:bedrockagentcore", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

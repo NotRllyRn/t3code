@@ -23,7 +23,7 @@ const alchemyBin = path.join(
   "node_modules",
   "alchemy",
   "bin",
-  "alchemy.js",
+  "alchemy.ts",
 );
 const STAGE = "dev-cli-test";
 

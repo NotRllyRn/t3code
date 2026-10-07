@@ -24,7 +24,6 @@ test.provider(
       );
       expect(error._tag).toBe("ClusterNotFoundFault");
     }),
-  { tags: ["provider:aws", "provider:aws:memorydb", "live"] },
 );
 
 // Resolve two default-for-AZ subnets and the default security group.
@@ -145,8 +144,5 @@ test.provider.skipIf(!process.env.AWS_TEST_SLOW)(
       yield* assertClusterDeleting(cluster.clusterName);
     }),
   // create (~10-15 min) + delete initiation, one test.
-  {
-    tags: ["provider:aws", "provider:aws:ec2", "provider:aws:memorydb", "live"],
-    timeout: 1_500_000,
-  },
+  { timeout: 1_500_000 },
 );

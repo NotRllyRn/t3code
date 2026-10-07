@@ -19,7 +19,7 @@ import type { CRUD, Plan } from "@/Plan.ts";
 import type { ProviderMode } from "@/ProviderMode.ts";
 import { describe, expect, test } from "alchemy-test";
 
-describe("formatModeNote", { tags: ["unit", "local"] }, () => {
+describe("formatModeNote", () => {
   test("mode-agnostic rows (no resolved mode) show nothing", () => {
     expect(
       formatModeNote({ mode: undefined, defaultMode: "live" }),
@@ -143,7 +143,7 @@ const makePlan = (options: {
 const lineFor = (lines: string[], id: string) =>
   lines.find((line) => line.includes(`[${id}]`));
 
-describe("formatPlanLines rename tags", { tags: ["unit", "local"] }, () => {
+describe("formatPlanLines rename tags", () => {
   test("a migrated resource shows its former FQN", () => {
     const lines = formatPlanLines(
       makePlan({
@@ -160,7 +160,7 @@ describe("formatPlanLines rename tags", { tags: ["unit", "local"] }, () => {
   });
 });
 
-describe("compact plan output", { tags: ["unit", "local"] }, () => {
+describe("compact plan output", () => {
   test("surfaces adoption and intentional orphaning as distinct actions", () => {
     const lines = formatPlanLines(
       makePlan({
@@ -255,7 +255,7 @@ describe("compact plan output", { tags: ["unit", "local"] }, () => {
   });
 });
 
-describe("formatPlanLines mode tags", { tags: ["unit", "local"] }, () => {
+describe("formatPlanLines mode tags", () => {
   test("deploy (default live): local deletion rows get a dim local tag", () => {
     const lines = formatPlanLines(
       makePlan({

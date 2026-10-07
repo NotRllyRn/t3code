@@ -94,13 +94,5 @@ test.provider(
       yield* assertRuleGone(replaced.rule.resolverRuleId);
       yield* assertEndpointDeleting(replaced.endpoint.resolverEndpointId);
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:ec2",
-      "provider:aws:route53resolver",
-      "live",
-    ],
-    timeout: 220_000,
-  },
+  { timeout: 220_000 },
 );

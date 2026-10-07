@@ -180,10 +180,7 @@ test.provider(
       Effect.tap(() => stack.destroy()),
       Effect.onError(() => stack.destroy().pipe(Effect.ignore)),
     ),
-  {
-    tags: ["provider:aws", "provider:aws:lambda", "provider:aws:sqs", "live"],
-    timeout: 360_000,
-  },
+  { timeout: 360_000 },
 );
 
 const getConfigOrUndefined = Effect.fn(function* (

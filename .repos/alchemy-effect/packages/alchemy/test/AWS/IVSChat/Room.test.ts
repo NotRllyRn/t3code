@@ -24,7 +24,7 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:ivschat", "live"], timeout: 60_000 },
+  { timeout: 60_000 },
 );
 
 const assertRoomGone = (arn: string) =>
@@ -99,5 +99,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertRoomGone(created.roomArn);
     }),
-  { tags: ["provider:aws", "provider:aws:ivschat", "live"], timeout: 240_000 },
+  { timeout: 240_000 },
 );

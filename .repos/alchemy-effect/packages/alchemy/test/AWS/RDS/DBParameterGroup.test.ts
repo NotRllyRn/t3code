@@ -111,83 +111,77 @@ const assertGroupGone = Effect.fn(function* (name: string) {
 // DBParameterGroup)` so `list()`'s element type is the exact
 // `DBParameterGroup["Attributes"]` shape, call it, and assert the deployed
 // group appears in the exhaustively-paginated result.
-test.provider(
-  "list enumerates the deployed DB parameter group",
-  (stack) =>
-    Effect.gen(function* () {
-      yield* stack.destroy();
+test.provider("list enumerates the deployed DB parameter group", (stack) =>
+  Effect.gen(function* () {
+    yield* stack.destroy();
 
-      const group = yield* stack.deploy(
-        Effect.gen(function* () {
-          return yield* DBParameterGroup("ListDBParameterGroup", {
-            dbParameterGroupName: "alchemy-test-dbpg-list",
-            family: "aurora-postgresql16",
-            description: "Alchemy list() test parameter group",
-          });
-        }),
-      );
+    const group = yield* stack.deploy(
+      Effect.gen(function* () {
+        return yield* DBParameterGroup("ListDBParameterGroup", {
+          dbParameterGroupName: "alchemy-test-dbpg-list",
+          family: "aurora-postgresql16",
+          description: "Alchemy list() test parameter group",
+        });
+      }),
+    );
 
-      const provider = yield* Provider.findProvider(DBParameterGroup);
-      const all = yield* provider.list();
+    const provider = yield* Provider.findProvider(DBParameterGroup);
+    const all = yield* provider.list();
 
-      expect(Array.isArray(all)).toBe(true);
-      expect(
-        all.some((g) => g.dbParameterGroupName === group.dbParameterGroupName),
-      ).toBe(true);
+    expect(Array.isArray(all)).toBe(true);
+    expect(
+      all.some((g) => g.dbParameterGroupName === group.dbParameterGroupName),
+    ).toBe(true);
 
-      for (const g of all) {
-        expect(typeof g.dbParameterGroupName).toBe("string");
-        expect(typeof g.family).toBe("string");
-      }
+    for (const g of all) {
+      expect(typeof g.dbParameterGroupName).toBe("string");
+      expect(typeof g.family).toBe("string");
+    }
 
-      yield* stack.destroy();
-    }),
-  { tags: ["provider:aws", "provider:aws:rds", "live"] },
+    yield* stack.destroy();
+  }),
 );
 
 // Parameters reconcile in place: a redeploy writes changed values and resets
 // keys the props dropped, both diffed against live `Source=user` state rather
 // than the prior props.
-test.provider(
-  "parameters are written, updated and reset",
-  (stack) =>
-    Effect.gen(function* () {
-      yield* stack.destroy();
+test.provider("parameters are written, updated and reset", (stack) =>
+  Effect.gen(function* () {
+    yield* stack.destroy();
 
-      const name = "alchemy-test-dbpg-params";
-      const deploy = (parameters: Record<string, string>) =>
-        stack.deploy(
-          Effect.gen(function* () {
-            return yield* DBParameterGroup("ParamsDBParameterGroup", {
-              dbParameterGroupName: name,
-              family: "mysql8.4",
-              description: "Alchemy parameters test parameter group",
-              parameters,
-            });
-          }),
-        );
+    const name = "alchemy-test-dbpg-params";
+    const deploy = (parameters: Record<string, string>) =>
+      stack.deploy(
+        Effect.gen(function* () {
+          return yield* DBParameterGroup("ParamsDBParameterGroup", {
+            dbParameterGroupName: name,
+            family: "mysql8.4",
+            description: "Alchemy parameters test parameter group",
+            parameters,
+          });
+        }),
+      );
 
-      const created = yield* deploy({
-        time_zone: "Australia/Sydney",
-        max_connections: "150",
-      });
-      expect(created.parameters.time_zone).toBe("Australia/Sydney");
+    const created = yield* deploy({
+      time_zone: "Australia/Sydney",
+      max_connections: "150",
+    });
+    expect(created.parameters.time_zone).toBe("Australia/Sydney");
 
-      const afterCreate = yield* userParameters(name);
-      expect(afterCreate.time_zone).toBe("Australia/Sydney");
-      expect(afterCreate.max_connections).toBe("150");
+    const afterCreate = yield* userParameters(name);
+    expect(afterCreate.time_zone).toBe("Australia/Sydney");
+    expect(afterCreate.max_connections).toBe("150");
 
-      // time_zone changes; max_connections is dropped and must go back to the
-      // engine default, which removes it from Source=user entirely.
-      yield* deploy({ time_zone: "UTC" });
+    // time_zone changes; max_connections is dropped and must go back to the
+    // engine default, which removes it from Source=user entirely.
+    yield* deploy({ time_zone: "UTC" });
 
-      const afterUpdate = yield* userParameters(name);
-      expect(afterUpdate.time_zone).toBe("UTC");
-      expect(afterUpdate.max_connections).toBeUndefined();
+    const afterUpdate = yield* userParameters(name);
+    expect(afterUpdate.time_zone).toBe("UTC");
+    expect(afterUpdate.max_connections).toBeUndefined();
 
-      yield* stack.destroy();
-    }),
-  { tags: ["provider:aws", "provider:aws:rds", "live"] },
+    yield* stack.destroy();
+  }),
 );
 
 test.provider(
@@ -226,7 +220,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertGroupGone(name);
     }),
-  { tags: ["provider:aws", "provider:aws:rds", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -311,7 +305,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertGroupGone(name);
     }),
-  { tags: ["provider:aws", "provider:aws:rds", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -410,7 +404,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertGroupGone(name);
     }),
-  { tags: ["provider:aws", "provider:aws:rds", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -449,7 +443,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertGroupGone(name);
     }),
-  { tags: ["provider:aws", "provider:aws:rds", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -592,7 +586,7 @@ test.provider(
       yield* assertGroupGone(name);
       yield* assertGroupGone(created.dependent.dbParameterGroupName);
     }),
-  { tags: ["provider:aws", "provider:aws:rds", "live"], timeout: 240_000 },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -694,7 +688,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertGroupGone(name);
     }),
-  { tags: ["provider:aws", "provider:aws:rds", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -757,5 +751,5 @@ test.provider(
       yield* assertGroupGone(name);
       yield* assertGroupGone(created.dependent.dbParameterGroupName);
     }),
-  { tags: ["provider:aws", "provider:aws:rds", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );

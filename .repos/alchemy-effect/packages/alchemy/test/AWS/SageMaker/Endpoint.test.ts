@@ -21,7 +21,6 @@ test.provider(
       );
       expect(error._tag).toBe("EndpointNotFound");
     }),
-  { tags: ["provider:aws", "provider:aws:sagemaker", "live"] },
 );
 
 const findEndpoint = (name: string) =>
@@ -97,13 +96,5 @@ test.provider.skipIf(
       yield* stack.destroy();
       expect(yield* findEndpoint(endpoint.endpointName)).toBeUndefined();
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:iam",
-      "provider:aws:sagemaker",
-      "live",
-    ],
-    timeout: 1_500_000,
-  },
+  { timeout: 1_500_000 },
 );

@@ -8,7 +8,6 @@ import { makeHttpStripeIdBinding } from "./StripeHttp.ts";
  * Function or Worker Effect.
  *
  * @layer
- * @product Billing
  * @provides Stripe.RetrieveCreditGrant
  */
 export const RetrieveCreditGrantHttp = Layer.effect(

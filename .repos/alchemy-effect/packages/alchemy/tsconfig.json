@@ -32,11 +32,6 @@
     ]
   },
   "references": [
-    { "path": "../../submodules/distilled/packages/doppler/tsconfig.json" },
-    { "path": "../../submodules/distilled/packages/infisical/tsconfig.json" },
-    {
-      "path": "../floci/tsconfig.json"
-    },
     {
       "path": "../alchemy-test/tsconfig.json"
     },
@@ -68,19 +63,10 @@
       "path": "../../submodules/distilled/packages/railway/tsconfig.json"
     },
     {
-      "path": "../../submodules/distilled/packages/gcp/tsconfig.json"
-    },
-    {
       "path": "../../submodules/distilled/packages/stripe/tsconfig.json"
     },
     {
       "path": "../../submodules/distilled/packages/prisma/tsconfig.json"
-    },
-    {
-      "path": "../../submodules/distilled/packages/acme/tsconfig.json"
-    },
-    {
-      "path": "../../submodules/distilled/packages/zerossl/tsconfig.json"
     },
     {
       "path": "../cloudflare-runtime/tsconfig.json"

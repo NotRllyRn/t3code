@@ -83,7 +83,6 @@ export interface Network extends Resource<
  * ```
  *
  * @resource
- * @product Network
  */
 export const Network = Resource<Network>("Docker.Network");
 

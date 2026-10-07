@@ -67,14 +67,7 @@ test.provider(
       expect(Array.isArray(result.success.data)).toBe(true);
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:stripe",
-      "provider:stripe:issuingpersonalizationdesign",
-      "live",
-    ],
-    timeout: 60_000,
-  },
+  { timeout: 60_000 },
 );
 
 test.provider.skipIf(!ISSUING_ENABLED)(
@@ -165,14 +158,7 @@ test.provider.skipIf(!ISSUING_ENABLED)(
       expect(residue).toBeDefined();
       expect(residue?.id).toEqual(created.id);
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:stripe",
-      "provider:stripe:issuingpersonalizationdesign",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider.skipIf(!ISSUING_ENABLED)(
@@ -211,12 +197,5 @@ test.provider.skipIf(!ISSUING_ENABLED)(
       const after = yield* provider.list();
       expect(after.find((design) => design.id === deployed.id)).toBeDefined();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:stripe",
-      "provider:stripe:issuingpersonalizationdesign",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

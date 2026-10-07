@@ -8,7 +8,6 @@ import { HeadObject } from "./HeadObject.ts";
  * `headObject` against the Tigris endpoint with the bucket's credentials.
  *
  * @layer
- * @product Bucket
  * @provides Fly.HeadObject
  */
 export const HeadObjectHttp = Layer.effect(

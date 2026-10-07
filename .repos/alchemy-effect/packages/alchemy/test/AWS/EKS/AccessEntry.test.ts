@@ -17,24 +17,21 @@ const { test } = Test.make({ providers: AWS.providers() });
 // still verifies the cluster-fan-out + pagination + mapping against the live
 // API and asserts every returned row is well-formed (the array is empty when
 // the account has no clusters).
-test.provider(
-  "list returns the account/region access entries",
-  () =>
-    Effect.gen(function* () {
-      const provider = yield* Provider.findProvider(AccessEntry);
-      const all = yield* provider.list();
+test.provider("list returns the account/region access entries", () =>
+  Effect.gen(function* () {
+    const provider = yield* Provider.findProvider(AccessEntry);
+    const all = yield* provider.list();
 
-      expect(Array.isArray(all)).toBe(true);
-      for (const entry of all) {
-        expect(typeof entry.accessEntryArn).toBe("string");
-        expect(typeof entry.clusterName).toBe("string");
-        expect(typeof entry.principalArn).toBe("string");
-        expect(Array.isArray(entry.kubernetesGroups)).toBe(true);
-        expect(Array.isArray(entry.accessPolicies)).toBe(true);
-        expect(entry.tags).toBeDefined();
-      }
-    }),
-  { tags: ["provider:aws", "provider:aws:eks", "live"] },
+    expect(Array.isArray(all)).toBe(true);
+    for (const entry of all) {
+      expect(typeof entry.accessEntryArn).toBe("string");
+      expect(typeof entry.clusterName).toBe("string");
+      expect(typeof entry.principalArn).toBe("string");
+      expect(Array.isArray(entry.kubernetesGroups)).toBe(true);
+      expect(Array.isArray(entry.accessPolicies)).toBe(true);
+      expect(entry.tags).toBeDefined();
+    }
+  }),
 );
 
 // Full deploy-then-list assertion. SKIPPED by default because an EKS cluster
@@ -104,8 +101,5 @@ test.provider.skipIf(!clusterName)(
         yield* stack.destroy();
       }).pipe(Effect.scoped);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:eks", "provider:aws:iam", "live"],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

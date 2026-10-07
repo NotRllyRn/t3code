@@ -49,10 +49,7 @@ test.provider(
       }
       yield* stack.destroy();
     }),
-  {
-    tags: ["provider:aws", "provider:aws:verifiedpermissions", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider.skipIf(!process.env.AWS_TEST_POLICY_STORE_ALIAS)(
@@ -93,8 +90,5 @@ test.provider.skipIf(!process.env.AWS_TEST_POLICY_STORE_ALIAS)(
       const gone = yield* findAlias(alias.aliasName);
       expect(gone).toBeUndefined();
     }),
-  {
-    tags: ["provider:aws", "provider:aws:verifiedpermissions", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

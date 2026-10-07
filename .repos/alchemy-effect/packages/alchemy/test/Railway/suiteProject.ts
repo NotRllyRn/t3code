@@ -5,8 +5,7 @@
  * Named so `matchesAlchemyPhysicalName` still lists it (service `list()`
  * walks owned projects) and `pnpm nuke` can reclaim it.
  */
-import { Query } from "@distilled.cloud/core/query";
-import { GraphQLLive, Railway } from "@distilled.cloud/railway";
+import * as railway from "@distilled.cloud/railway";
 import { RailwayAuth } from "@/Railway/AuthProvider.ts";
 import { fromAuthProvider } from "@/Railway/Credentials.ts";
 import { resolveWorkspace } from "@/Railway/Environment.ts";
@@ -43,48 +42,30 @@ const toProject = (
   url: `https://railway.com/project/${project.id}`,
 });
 
-const workspaceProjects = (workspaceId: string) =>
-  Query.items(
-    Railway.projects({ workspaceId, first: 50, includeDeleted: false }).pipe(
-      Query.map((project) => ({
-        id: project.id,
-        name: project.name,
-        workspaceId: project.workspaceId,
-        primaryEnvironmentId: project.primaryEnvironmentId,
-        baseEnvironmentId: project.baseEnvironmentId,
-        deletedAt: project.deletedAt,
-      })),
-    ),
-  );
-
-const readProject = Query.fn((id: string) => {
-  const project = Railway.project({ id });
-  return {
-    id: project.id,
-    name: project.name,
-    workspaceId: project.workspaceId,
-    primaryEnvironmentId: project.primaryEnvironmentId,
-    baseEnvironmentId: project.baseEnvironmentId,
-  };
-});
-
-const projectEnvironments = (projectId: string) =>
-  Query.items(
-    Railway.environments({ projectId, first: 5 }).pipe(
-      Query.map((env) => ({ id: env.id, deletedAt: env.deletedAt })),
-    ),
-  );
-
 const findByName = (workspaceId: string) =>
-  workspaceProjects(workspaceId).pipe(
-    Stream.filter(
-      (project) =>
-        project.deletedAt == null && project.name === SUITE_PROJECT_NAME,
-    ),
-    Stream.take(1),
-    Stream.runHead,
-    Effect.map((option) => (option._tag === "Some" ? option.value : undefined)),
-  );
+  railway.projects
+    .items(
+      { workspaceId, first: 50, includeDeleted: false },
+      {
+        id: true,
+        name: true,
+        workspaceId: true,
+        primaryEnvironmentId: true,
+        baseEnvironmentId: true,
+        deletedAt: true,
+      },
+    )
+    .pipe(
+      Stream.filter(
+        (project) =>
+          project.deletedAt == null && project.name === SUITE_PROJECT_NAME,
+      ),
+      Stream.take(1),
+      Stream.runHead,
+      Effect.map((option) =>
+        option._tag === "Some" ? option.value : undefined,
+      ),
+    );
 
 const acquire = Effect.gen(function* () {
   const workspace = yield* resolveWorkspace();
@@ -93,17 +74,31 @@ const acquire = Effect.gen(function* () {
     Effect.gen(function* () {
       let attrs = toProject(project, workspace.id);
       if (attrs.environmentId.length === 0) {
-        const fresh = yield* readProject(attrs.projectId);
+        const fresh = yield* railway.project(
+          { id: attrs.projectId },
+          {
+            id: true,
+            name: true,
+            workspaceId: true,
+            primaryEnvironmentId: true,
+            baseEnvironmentId: true,
+          },
+        );
         attrs = toProject(fresh, workspace.id);
       }
       if (attrs.environmentId.length > 0) {
         return attrs;
       }
-      const env = yield* projectEnvironments(attrs.projectId).pipe(
-        Stream.filter((item) => item.deletedAt == null),
-        Stream.take(1),
-        Stream.runHead,
-      );
+      const env = yield* railway.environments
+        .items(
+          { projectId: attrs.projectId, first: 5 },
+          { id: true, deletedAt: true },
+        )
+        .pipe(
+          Stream.filter((item) => item.deletedAt == null),
+          Stream.take(1),
+          Stream.runHead,
+        );
       return env._tag === "Some"
         ? { ...attrs, environmentId: env.value.id }
         : attrs;
@@ -127,14 +122,7 @@ const acquire = Effect.gen(function* () {
       ),
     ),
   );
-}).pipe(
-  Effect.provide(
-    Layer.mergeAll(
-      GraphQLLive,
-      fromAuthProvider().pipe(Layer.provide(RailwayAuth)),
-    ),
-  ),
-);
+}).pipe(Effect.provide(fromAuthProvider().pipe(Layer.provide(RailwayAuth))));
 
 /**
  * Process-cached create-or-get. Yield it inside a test or pass the

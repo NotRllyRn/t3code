@@ -58,8 +58,5 @@ test.provider(
 
       yield* assertRuleGone("alchemy-test-rule-list");
     }),
-  {
-    tags: ["provider:aws", "provider:aws:eventbridge", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

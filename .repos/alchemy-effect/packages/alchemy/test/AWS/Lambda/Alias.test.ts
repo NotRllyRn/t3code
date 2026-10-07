@@ -234,7 +234,7 @@ test.provider(
       Effect.tap(() => stack.destroy()),
       Effect.onError(() => stack.destroy().pipe(Effect.ignore)),
     ),
-  { tags: ["provider:aws", "provider:aws:lambda", "live"], timeout: 360_000 },
+  { timeout: 360_000 },
 );
 
 const getAliasOrUndefined = Effect.fn(function* (

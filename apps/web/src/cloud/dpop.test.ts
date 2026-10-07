@@ -4,8 +4,7 @@ import * as Effect from "effect/Effect";
 import { decodeJwt } from "jose";
 import { vi } from "vite-plus/test";
 
-import { createBrowserDpopProof, generateBrowserDpopKey } from "./dpop";
-import * as Dpop from "./dpop";
+import { browserCryptoLayer, createBrowserDpopProof, generateBrowserDpopKey } from "./dpop";
 
 describe("browser DPoP proofs", () => {
   it.effect("signs relay resource proofs with an access-token hash", () =>
@@ -17,7 +16,7 @@ describe("browser DPoP proofs", () => {
         url: "https://relay.example.test/v1/environments/env-1/connect?ignored=true",
         accessToken: "relay-access-token",
         proofKey,
-      }).pipe(Effect.provide(Dpop.layer));
+      }).pipe(Effect.provide(browserCryptoLayer));
       const issuedAt = decodeJwt(proof.proof).iat;
       expect(issuedAt).toBeTypeOf("number");
 

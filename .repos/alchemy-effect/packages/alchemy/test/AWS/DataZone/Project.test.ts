@@ -92,5 +92,5 @@ test.provider(
         true,
       );
     }),
-  { tags: ["provider:aws", "provider:aws:datazone", "live"], timeout: 480_000 },
+  { timeout: 480_000 },
 );

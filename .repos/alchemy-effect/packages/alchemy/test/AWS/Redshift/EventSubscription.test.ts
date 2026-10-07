@@ -21,7 +21,6 @@ test.provider(
       );
       expect(error._tag).toBe("SubscriptionNotFoundFault");
     }),
-  { tags: ["provider:aws", "provider:aws:redshift", "live"] },
 );
 
 const readSubscription = (name: string) =>
@@ -110,8 +109,5 @@ test.provider(
       );
       expect(error._tag).toBe("SubscriptionNotFoundFault");
     }),
-  {
-    tags: ["provider:aws", "provider:aws:redshift", "provider:aws:sns", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

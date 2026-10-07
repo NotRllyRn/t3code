@@ -28,10 +28,7 @@ export const exitValid = () => {
   const run = Schema.decodeUnknownExit(schema)
   return {
     run: () => run(input),
-    validate: (result) => {
-      assert.equal(result._tag, "Success")
-      assert.deepEqual(result.value, input)
-    }
+    validate: (result) => assert.equal(result._tag, "Success")
   }
 }
 
@@ -47,10 +44,7 @@ export const optionValid = () => {
   const run = Schema.decodeUnknownOption(schema)
   return {
     run: () => run(input),
-    validate: (result) => {
-      assert.equal(Option.isSome(result), true)
-      if (Option.isSome(result)) assert.deepEqual(result.value, input)
-    }
+    validate: (result) => assert.equal(Option.isSome(result), true)
   }
 }
 
@@ -66,10 +60,7 @@ export const resultValid = () => {
   const run = Schema.decodeUnknownResult(schema)
   return {
     run: () => run(input),
-    validate: (result) => {
-      assert.equal(Result.isSuccess(result), true)
-      if (Result.isSuccess(result)) assert.deepEqual(result.success, input)
-    }
+    validate: (result) => assert.equal(Result.isSuccess(result), true)
   }
 }
 

@@ -1,6 +1,5 @@
 import * as Effect from "effect/Effect";
 import * as Equal from "effect/Equal";
-import type { PlatformError } from "effect/PlatformError";
 import * as Redacted from "effect/Redacted";
 import * as Schedule from "effect/Schedule";
 import type * as rolldown from "rolldown";
@@ -504,7 +503,6 @@ export interface ServiceRuntimeContext extends HostRuntimeContext {
  * ```
  *
  * @resource
- * @product Swarm
  */
 export const Service: Platform<
   Service,
@@ -1077,7 +1075,7 @@ const waitForServiceContainersReleased = (
   docker: Docker["Service"],
   serviceId: string,
   context?: string,
-): Effect.Effect<void, PlatformError> => {
+): Effect.Effect<void, any, any> => {
   const maxAttempts = 10;
   const noContainers = Symbol.for("Docker.Service.NoContainers");
 
@@ -1126,7 +1124,7 @@ const listServiceContainerIds = (
   docker: Docker["Service"],
   serviceId: string,
   context?: string,
-): Effect.Effect<string[], PlatformError> =>
+): Effect.Effect<string[], any, any> =>
   docker
     .run([
       ...(context ? ["--context", context] : []),

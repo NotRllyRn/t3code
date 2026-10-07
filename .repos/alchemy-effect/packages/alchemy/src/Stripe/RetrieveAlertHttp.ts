@@ -7,7 +7,6 @@ import { makeHttpStripeIdBinding } from "./StripeHttp.ts";
  * HTTP implementation of {@link RetrieveAlert}.
  *
  * @layer
- * @product Billing
  * @provides Stripe.RetrieveAlert
  */
 export const RetrieveAlertHttp = Layer.effect(

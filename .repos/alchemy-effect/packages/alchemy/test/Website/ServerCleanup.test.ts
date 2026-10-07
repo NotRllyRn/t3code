@@ -69,6 +69,6 @@ for (const location of [
         );
         expect(yield* fs.exists(dist)).toBe(location !== "dist");
       }),
-    { tags: ["unit", "local"], timeout: 10_000 },
+    { timeout: 10_000 },
   );
 }

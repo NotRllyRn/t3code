@@ -1,7 +1,11 @@
 import {
-  ClientCapabilities,
+  ClientPresentation,
+  CloudSession,
+  EnvironmentOwnedDataCleanup,
   PlatformConnectionSource,
-  Persistence,
+  PrimaryEnvironmentAuth,
+  RelayDeviceIdentity,
+  SshEnvironmentGateway,
 } from "@t3tools/client-runtime/platform";
 import {
   BearerConnectionCredential,
@@ -9,7 +13,6 @@ import {
   BearerConnectionRegistration,
   BearerConnectionTarget,
   ConnectionBlockedError,
-  type ConnectionAttemptError,
   ConnectionTransientError,
   Connectivity,
   mapRemoteEnvironmentError,
@@ -27,7 +30,6 @@ import {
   type DesktopBridge,
   type DesktopEnvironmentBootstrap,
   type DesktopSshEnvironmentTarget,
-  type EnvironmentId,
   PRIMARY_LOCAL_ENVIRONMENT_ID,
 } from "@t3tools/contracts";
 import * as Clock from "effect/Clock";
@@ -38,11 +40,11 @@ import * as Option from "effect/Option";
 import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
 import * as Stream from "effect/Stream";
-import { FetchHttpClient } from "effect/http";
+import { FetchHttpClient } from "effect/unstable/http";
 
 import { APP_VERSION } from "../branding";
 import { readDesktopPrimaryBearerToken } from "../environments/primary/desktopAuth";
-import * as PrimaryEnvironmentHttpLayer from "../environments/primary/httpLayer";
+import { primaryEnvironmentHttpLayer } from "../environments/primary/httpLayer";
 import {
   readPrimaryEnvironmentTarget,
   type PrimaryEnvironmentTarget,
@@ -57,7 +59,7 @@ import {
   readDesktopSecondaryBootstrapsResult,
   type DesktopSecondaryBootstrapsRead,
 } from "./desktopLocal";
-import * as ConnectionStorage from "./storage";
+import { connectionStorageLayer } from "./storage";
 import { clientPresentationMetadata } from "./clientMetadata";
 
 let nextObservedRpcRequestId = 0;
@@ -69,7 +71,7 @@ function currentNetworkStatus(): "unknown" | "offline" | "online" {
   return navigator.onLine ? "online" : "offline";
 }
 
-const layerConnectivity = Connectivity.layer({
+const connectivityLayer = Connectivity.layer({
   status: Effect.sync(currentNetworkStatus),
   changes: Stream.callback((queue) =>
     Effect.acquireRelease(
@@ -89,68 +91,28 @@ const layerConnectivity = Connectivity.layer({
   ),
 });
 
-interface NetworkInformationLike extends EventTarget {
-  readonly type?: string;
-}
-
-/**
- * Wakes connections when the browser reports a different network type, such
- * as a laptop moving from Wi-Fi to a phone hotspot. `change` also fires for
- * bandwidth and latency estimates on the same network, so only a type change
- * counts. Browsers without `navigator.connection.type` rely on the periodic
- * route check instead.
- */
-const networkPathChanges = Stream.callback<"network-changed">((queue) =>
-  Effect.acquireRelease(
-    Effect.sync(() => {
-      const connection =
-        typeof navigator === "undefined"
-          ? undefined
-          : (navigator as Navigator & { readonly connection?: NetworkInformationLike }).connection;
-      if (connection?.type === undefined) return undefined;
-      let previous = connection.type;
-      const listener = () => {
-        const type = connection.type;
-        if (type === undefined || type === previous) return;
-        previous = type;
-        Queue.offerUnsafe(queue, "network-changed");
-      };
-      connection.addEventListener("change", listener);
-      return { connection, listener };
-    }),
-    (subscription) =>
-      Effect.sync(() =>
-        subscription?.connection.removeEventListener("change", subscription.listener),
-      ),
-  ).pipe(Effect.asVoid),
-);
-
-const layerWakeups = Wakeups.layer({
-  changes: Stream.mergeAll(
-    [
-      Stream.callback<"application-active">((queue) =>
-        Effect.acquireRelease(
+const wakeupsLayer = Wakeups.layer({
+  changes: Stream.merge(
+    Stream.callback<"application-active">((queue) =>
+      Effect.acquireRelease(
+        Effect.sync(() => {
+          const listener = () => {
+            if (document.visibilityState === "visible") {
+              Queue.offerUnsafe(queue, "application-active");
+            }
+          };
+          document.addEventListener("visibilitychange", listener);
+          return listener;
+        }),
+        (listener) =>
           Effect.sync(() => {
-            const listener = () => {
-              if (document.visibilityState === "visible") {
-                Queue.offerUnsafe(queue, "application-active");
-              }
-            };
-            document.addEventListener("visibilitychange", listener);
-            return listener;
+            document.removeEventListener("visibilitychange", listener);
           }),
-          (listener) =>
-            Effect.sync(() => {
-              document.removeEventListener("visibilitychange", listener);
-            }),
-        ).pipe(Effect.asVoid),
-      ),
-      managedRelayAccountChanges(appAtomRegistry).pipe(
-        Stream.map(() => "credentials-changed" as const),
-      ),
-      networkPathChanges,
-    ],
-    { concurrency: "unbounded" },
+      ).pipe(Effect.asVoid),
+    ),
+    managedRelayAccountChanges(appAtomRegistry).pipe(
+      Stream.map(() => "credentials-changed" as const),
+    ),
   ),
 });
 
@@ -183,11 +145,7 @@ function sshPreparationError(cause: unknown) {
 
 export const provisionDesktopSshEnvironment = Effect.fn(
   "web.connectionPlatform.ssh.provisionDesktop",
-)(function* (
-  bridge: DesktopBridge,
-  target: DesktopSshEnvironmentTarget,
-  expectedEnvironmentId?: EnvironmentId,
-) {
+)(function* (bridge: DesktopBridge, target: DesktopSshEnvironmentTarget) {
   const bootstrap = yield* Effect.tryPromise({
     try: () =>
       bridge.ensureSshEnvironment(target, {
@@ -206,12 +164,6 @@ export const provisionDesktopSshEnvironment = Effect.fn(
     try: () => bridge.fetchSshEnvironmentDescriptor(bootstrap.httpBaseUrl),
     catch: sshPreparationError,
   });
-  if (expectedEnvironmentId !== undefined && descriptor.environmentId !== expectedEnvironmentId) {
-    return yield* new ConnectionBlockedError({
-      reason: "configuration",
-      detail: `That host reaches ${descriptor.label}, a different machine. Add it as its own environment instead.`,
-    });
-  }
   const access = yield* Effect.tryPromise({
     try: () => bridge.bootstrapSshBearerSession(bootstrap.httpBaseUrl, pairingToken),
     catch: sshPreparationError,
@@ -224,13 +176,13 @@ export const provisionDesktopSshEnvironment = Effect.fn(
   };
 });
 
-const layerCapabilities = Layer.effectContext(
+const capabilitiesLayer = Layer.effectContext(
   Effect.sync(() => {
-    const presentation = ClientCapabilities.ClientPresentation.of({
+    const presentation = ClientPresentation.of({
       metadata: clientMetadata(),
       scopes: AuthStandardClientScopes,
     });
-    const cloudSession = ClientCapabilities.CloudSession.of({
+    const cloudSession = CloudSession.of({
       identity: Effect.sync(() =>
         Option.fromNullishOr(appAtomRegistry.get(managedRelaySessionAtom)),
       ),
@@ -260,10 +212,10 @@ const layerCapabilities = Layer.effectContext(
         return token;
       }),
     });
-    const identity = ClientCapabilities.RelayDeviceIdentity.of({
+    const identity = RelayDeviceIdentity.of({
       deviceId: Effect.succeedNone,
     });
-    const primaryAuth = ClientCapabilities.PrimaryEnvironmentAuth.of({
+    const primaryAuth = PrimaryEnvironmentAuth.of({
       bearerToken: Effect.tryPromise({
         try: readDesktopPrimaryBearerToken,
         catch: (cause) =>
@@ -273,19 +225,17 @@ const layerCapabilities = Layer.effectContext(
           }),
       }).pipe(Effect.map(Option.fromNullishOr)),
     });
-    const ssh = ClientCapabilities.SshEnvironmentGateway.of({
-      provision: Effect.fn("web.connectionPlatform.ssh.provision")(
-        function* (target, expectedEnvironmentId) {
-          const bridge = window.desktopBridge;
-          if (bridge === undefined) {
-            return yield* new ConnectionBlockedError({
-              reason: "unsupported",
-              detail: "SSH environments are only available in the desktop app.",
-            });
-          }
-          return yield* provisionDesktopSshEnvironment(bridge, target, expectedEnvironmentId);
-        },
-      ),
+    const ssh = SshEnvironmentGateway.of({
+      provision: Effect.fn("web.connectionPlatform.ssh.provision")(function* (target) {
+        const bridge = window.desktopBridge;
+        if (bridge === undefined) {
+          return yield* new ConnectionBlockedError({
+            reason: "unsupported",
+            detail: "SSH environments are only available in the desktop app.",
+          });
+        }
+        return yield* provisionDesktopSshEnvironment(bridge, target);
+      }),
       prepare: Effect.fn("web.connectionPlatform.ssh.prepare")(function* (input) {
         const bridge = window.desktopBridge;
         if (bridge === undefined) {
@@ -333,11 +283,11 @@ const layerCapabilities = Layer.effectContext(
       }),
     });
 
-    return Context.make(ClientCapabilities.CloudSession, cloudSession).pipe(
-      Context.add(ClientCapabilities.PrimaryEnvironmentAuth, primaryAuth),
-      Context.add(ClientCapabilities.RelayDeviceIdentity, identity),
-      Context.add(ClientCapabilities.ClientPresentation, presentation),
-      Context.add(ClientCapabilities.SshEnvironmentGateway, ssh),
+    return Context.make(CloudSession, cloudSession).pipe(
+      Context.add(PrimaryEnvironmentAuth, primaryAuth),
+      Context.add(RelayDeviceIdentity, identity),
+      Context.add(ClientPresentation, presentation),
+      Context.add(SshEnvironmentGateway, ssh),
     );
   }),
 );
@@ -347,10 +297,7 @@ const loadPrimaryConnectionRegistration = Effect.fn(
 )(function* (resolved: PrimaryEnvironmentTarget) {
   const descriptor = yield* fetchRemoteEnvironmentDescriptor({
     httpBaseUrl: resolved.target.httpBaseUrl,
-  }).pipe(
-    Effect.provide(PrimaryEnvironmentHttpLayer.layer),
-    Effect.mapError(mapRemoteEnvironmentError),
-  );
+  }).pipe(Effect.provide(primaryEnvironmentHttpLayer), Effect.mapError(mapRemoteEnvironmentError));
   return new PrimaryConnectionRegistration({
     target: new PrimaryConnectionTarget({
       environmentId: descriptor.environmentId,
@@ -421,7 +368,7 @@ const loadSecondaryConnectionRegistration = Effect.fn(
 
 // Poll cadence for the desktop bootstrap topology. There is no change event on
 // the bridge, so the renderer polls; successful registrations are cached by a
-// signature of their endpoint until bearer credentials approach expiry.
+// signature of their endpoint + token until bearer credentials approach expiry.
 const PLATFORM_POLL_INTERVAL = "3 seconds";
 const SECONDARY_BEARER_REFRESH_SKEW_MS = 5_000;
 
@@ -448,8 +395,6 @@ interface CachedPlatformRegistration {
   readonly registration: PlatformConnectionRegistration;
   readonly expiresAtEpochMs?: number;
   readonly refreshAtEpochMs?: number;
-  /** The bootstrap token a desktop-local bearer was exchanged for. */
-  readonly bootstrapToken?: string;
 }
 
 export type PrimaryEnvironmentTargetRead =
@@ -502,52 +447,6 @@ export function canRetainCachedPlatformRegistrationAfterRefreshFailure(
   );
 }
 
-const REJECTED_BOOTSTRAP_RETRY_INITIAL_MS = 60_000;
-const REJECTED_BOOTSTRAP_RETRY_MAX_MS = 30 * 60_000;
-
-/** A bootstrap token a backend rejected, and when the poll may try it again. */
-export interface RejectedSecondaryBootstrap {
-  readonly signature: string;
-  readonly retryAtEpochMs: number;
-  readonly delayMs: number;
-}
-
-/**
- * A backend that rejected a bootstrap token will usually keep rejecting it, so
- * the poll backs off on that exact signature instead of re-presenting a dead
- * credential every few seconds. It still retries on a capped backoff: a
- * backend that restarts on the same port seeds a fresh grant for the same
- * token, and nothing in the topology says it restarted. A new token or
- * endpoint retries at once.
- */
-export function isRejectedSecondaryBootstrap(
-  rejected: RejectedSecondaryBootstrap | undefined,
-  signature: string,
-  nowEpochMs: number,
-): rejected is RejectedSecondaryBootstrap {
-  return (
-    rejected !== undefined &&
-    rejected.signature === signature &&
-    nowEpochMs < rejected.retryAtEpochMs
-  );
-}
-
-export function nextRejectedSecondaryBootstrap(
-  previous: RejectedSecondaryBootstrap | undefined,
-  signature: string,
-  nowEpochMs: number,
-): RejectedSecondaryBootstrap {
-  const delayMs =
-    previous?.signature === signature
-      ? Math.min(previous.delayMs * 2, REJECTED_BOOTSTRAP_RETRY_MAX_MS)
-      : REJECTED_BOOTSTRAP_RETRY_INITIAL_MS;
-  return { signature, retryAtEpochMs: nowEpochMs + delayMs, delayMs };
-}
-
-export function isRejectedBootstrapCredentialError(error: ConnectionAttemptError): boolean {
-  return error._tag === "ConnectionBlockedError" && error.reason === "authentication";
-}
-
 export function secondaryRegistrationsToRetainAfterTopologyRead(
   previous: ReadonlyMap<string, CachedPlatformRegistration>,
   topologyRead: DesktopSecondaryBootstrapsRead,
@@ -563,16 +462,15 @@ export function secondaryRegistrationsToRetainAfterTopologyRead(
   );
 }
 
-const layerPlatformConnectionSource = Layer.effect(
-  PlatformConnectionSource.PlatformConnectionSource,
+const platformConnectionSourceLayer = Layer.effect(
+  PlatformConnectionSource,
   Effect.gen(function* () {
     if (isHostedStaticApp() || isLocalEnvironmentDisabled()) {
-      return PlatformConnectionSource.PlatformConnectionSource.of({
+      return PlatformConnectionSource.of({
         registrations: Stream.empty,
       });
     }
     const cacheRef = yield* Ref.make(new Map<string, CachedPlatformRegistration>());
-    const rejectedRef = yield* Ref.make(new Map<string, RejectedSecondaryBootstrap>());
 
     // Resolve the full set of platform-managed environments the host currently
     // reports: the primary (same-origin cookie auth) plus any desktop-local
@@ -638,43 +536,15 @@ const layerPlatformConnectionSource = Layer.effect(
           cause: topologyRead.cause,
         });
       } else {
-        const rejected = yield* Ref.get(rejectedRef);
-        const nextRejected = new Map<string, RejectedSecondaryBootstrap>();
         for (const bootstrap of topologyRead.bootstraps) {
-          // The cached bearer belongs to the endpoint, not to the bootstrap
-          // token it was exchanged for: a new token must not drop a live
-          // session (its removal also clears the environment's drafts). The
-          // token only decides whether a rejected exchange is retried.
-          const endpointSignature = `${bootstrap.httpBaseUrl}|${bootstrap.wsBaseUrl}`;
-          const signature = `${endpointSignature}|${bootstrap.bootstrapToken ?? ""}`;
+          const signature = `${bootstrap.httpBaseUrl}|${bootstrap.wsBaseUrl}|${bootstrap.bootstrapToken ?? ""}`;
           const cached = previous.get(bootstrap.id);
-          // A new token from the desktop means something changed (rotation, a
-          // restarted backend): exchange it rather than reusing a bearer that
-          // may be dead. The old bearer stays registered if that exchange fails.
           if (
             cached !== undefined &&
-            cached.bootstrapToken === bootstrap.bootstrapToken &&
-            canReuseCachedPlatformRegistration(cached, endpointSignature, nowEpochMs)
+            canReuseCachedPlatformRegistration(cached, signature, nowEpochMs)
           ) {
             next.set(bootstrap.id, cached);
             registrations.push(cached.registration);
-            continue;
-          }
-          const previouslyRejected = rejected.get(bootstrap.id);
-          if (isRejectedSecondaryBootstrap(previouslyRejected, signature, nowEpochMs)) {
-            nextRejected.set(bootstrap.id, previouslyRejected);
-            // The bearer minted before the token died is still good until it expires.
-            if (
-              cached !== undefined &&
-              canRetainCachedPlatformRegistrationAfterRefreshFailure(
-                cached,
-                endpointSignature,
-                nowEpochMs,
-              )
-            ) {
-              next.set(bootstrap.id, cached);
-              registrations.push(cached.registration);
-            }
             continue;
           }
           const built = yield* loadSecondaryConnectionRegistration(bootstrap).pipe(
@@ -684,56 +554,27 @@ const layerPlatformConnectionSource = Layer.effect(
                 error,
               }),
             ),
-            Effect.tapError((error) =>
-              isRejectedBootstrapCredentialError(error)
-                ? // Back off from when the rejection arrived; the exchanges in
-                  // this poll can take longer than the first backoff step.
-                  Clock.currentTimeMillis.pipe(
-                    Effect.map((rejectedAtEpochMs) =>
-                      nextRejected.set(
-                        bootstrap.id,
-                        nextRejectedSecondaryBootstrap(
-                          previouslyRejected,
-                          signature,
-                          rejectedAtEpochMs,
-                        ),
-                      ),
-                    ),
-                  )
-                : Effect.void,
-            ),
             Effect.option,
           );
           if (Option.isSome(built)) {
-            const cacheEntry = {
-              signature: endpointSignature,
-              ...(bootstrap.bootstrapToken === undefined
-                ? {}
-                : { bootstrapToken: bootstrap.bootstrapToken }),
-              ...built.value,
-            };
+            const cacheEntry = { signature, ...built.value };
             next.set(bootstrap.id, cacheEntry);
             registrations.push(built.value.registration);
           } else if (
             cached !== undefined &&
-            canRetainCachedPlatformRegistrationAfterRefreshFailure(
-              cached,
-              endpointSignature,
-              nowEpochMs,
-            )
+            canRetainCachedPlatformRegistrationAfterRefreshFailure(cached, signature, nowEpochMs)
           ) {
             next.set(bootstrap.id, cached);
             registrations.push(cached.registration);
           }
         }
-        yield* Ref.set(rejectedRef, nextRejected);
       }
 
       yield* Ref.set(cacheRef, next);
       return registrations as ReadonlyArray<PlatformConnectionRegistration>;
     }).pipe(Effect.provide(FetchHttpClient.layer));
 
-    return PlatformConnectionSource.PlatformConnectionSource.of({
+    return PlatformConnectionSource.of({
       registrations: Stream.tick(PLATFORM_POLL_INTERVAL).pipe(
         Stream.mapEffect(() => buildPlatformRegistrations),
       ),
@@ -741,9 +582,9 @@ const layerPlatformConnectionSource = Layer.effect(
   }),
 );
 
-const layerEnvironmentOwnedDataCleanup = Layer.succeed(
-  Persistence.EnvironmentOwnedDataCleanup,
-  Persistence.EnvironmentOwnedDataCleanup.of({
+const environmentOwnedDataCleanupLayer = Layer.succeed(
+  EnvironmentOwnedDataCleanup,
+  EnvironmentOwnedDataCleanup.of({
     clear: (environmentId) =>
       Effect.sync(() => {
         clearComposerDraftsEnvironment(environmentId);
@@ -751,7 +592,7 @@ const layerEnvironmentOwnedDataCleanup = Layer.succeed(
   }),
 );
 
-const layerRpcRequestObserver = Layer.succeed(
+const rpcRequestObserverLayer = Layer.succeed(
   EnvironmentRpcRequestObserver,
   EnvironmentRpcRequestObserver.of({
     observe: ({ environmentId, method }) =>
@@ -767,24 +608,24 @@ const layerRpcRequestObserver = Layer.succeed(
 );
 
 type ConnectionPlatformLayerSource =
-  | typeof ConnectionStorage.layer
-  | typeof layerConnectivity
-  | typeof layerWakeups
-  | typeof layerCapabilities
-  | typeof layerPlatformConnectionSource
-  | typeof layerEnvironmentOwnedDataCleanup
-  | typeof layerRpcRequestObserver;
+  | typeof connectionStorageLayer
+  | typeof connectivityLayer
+  | typeof wakeupsLayer
+  | typeof capabilitiesLayer
+  | typeof platformConnectionSourceLayer
+  | typeof environmentOwnedDataCleanupLayer
+  | typeof rpcRequestObserverLayer;
 
-export const layer: Layer.Layer<
+export const connectionPlatformLayer: Layer.Layer<
   Layer.Success<ConnectionPlatformLayerSource>,
   Layer.Error<ConnectionPlatformLayerSource>,
   Layer.Services<ConnectionPlatformLayerSource>
 > = Layer.mergeAll(
-  ConnectionStorage.layer,
-  layerConnectivity,
-  layerWakeups,
-  layerCapabilities,
-  layerPlatformConnectionSource,
-  layerEnvironmentOwnedDataCleanup,
-  layerRpcRequestObserver,
+  connectionStorageLayer,
+  connectivityLayer,
+  wakeupsLayer,
+  capabilitiesLayer,
+  platformConnectionSourceLayer,
+  environmentOwnedDataCleanupLayer,
+  rpcRequestObserverLayer,
 );

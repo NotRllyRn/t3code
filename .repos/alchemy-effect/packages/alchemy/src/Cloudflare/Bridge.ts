@@ -10,5 +10,4 @@ export * from "./Workers/RpcAsync.ts";
 // ── runtime bridge factories ──
 export { makeDurableObjectBridge } from "./Workers/DurableObjectBridge.ts";
 export { makeWorkerBridge } from "./Workers/WorkerBridge.ts";
-export { withSqlMigrations } from "./Workers/SqlMigrationsRuntime.ts";
 export { makeWorkflowBridge } from "./Workflows/WorkflowBridge.ts";

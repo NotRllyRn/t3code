@@ -180,15 +180,7 @@ test.provider(
         );
       expect(gone).toBe("gone");
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:access",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );
 
 /** Find a live application by its exact display name, or undefined. */
@@ -248,15 +240,7 @@ test.provider(
       );
       expect(appAfter).toBeUndefined();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:access",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );
 
 test.provider(
@@ -328,13 +312,5 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:access",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );

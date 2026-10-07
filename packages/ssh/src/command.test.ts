@@ -8,13 +8,12 @@ import * as Result from "effect/Result";
 import * as Sink from "effect/Sink";
 import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
-import { ChildProcessSpawner } from "effect/process";
+import { ChildProcessSpawner } from "effect/unstable/process";
 
 import {
   baseSshArgs,
   getLastNonEmptyOutputLine,
   parseSshResolveOutput,
-  remoteStateKey,
   runSshCommand,
 } from "./command.ts";
 import { SshCommandError } from "./errors.ts";
@@ -99,30 +98,6 @@ describe("ssh command", () => {
     }),
   );
 
-  // Remote servers store state under this key, so it must not change across releases.
-  it.effect("derives a stable remote state key", () =>
-    Effect.gen(function* () {
-      assert.equal(
-        yield* remoteStateKey({
-          alias: "devbox",
-          hostname: "devbox.example.com",
-          username: "julius",
-          port: 2222,
-        }),
-        "711bc738002d72fd",
-      );
-      assert.equal(
-        yield* remoteStateKey({
-          alias: "fixture",
-          hostname: "fixture",
-          username: null,
-          port: null,
-        }),
-        "326264c4f08c8a0c",
-      );
-    }).pipe(Effect.provide(NodeServices.layer)),
-  );
-
   it.effect("reads the last non-empty ssh output line", () =>
     Effect.sync(() => {
       assert.equal(
@@ -138,8 +113,8 @@ describe("ssh command", () => {
     const spawner = ChildProcessSpawner.make(() =>
       Effect.succeed(makeFailedProcess({ stdout: "Pairing token creation failed\n" })),
     );
-    const layerSpawner = Layer.succeed(ChildProcessSpawner.ChildProcessSpawner, spawner);
-    const layerProcess = Layer.mergeAll(NodeServices.layer, layerSpawner);
+    const spawnerLayer = Layer.succeed(ChildProcessSpawner.ChildProcessSpawner, spawner);
+    const processLayer = Layer.mergeAll(NodeServices.layer, spawnerLayer);
 
     return Effect.gen(function* () {
       const result = yield* Effect.result(
@@ -161,15 +136,15 @@ describe("ssh command", () => {
         assert.equal(result.failure.stdout, "Pairing token creation failed\n");
         assert.equal(result.failure.stderr, "");
       }
-    }).pipe(Effect.provide(layerProcess));
+    }).pipe(Effect.provide(processLayer));
   });
 
   it.effect("redacts credentials from stdout in non-zero command failures", () => {
     const spawner = ChildProcessSpawner.make(() =>
       Effect.succeed(makeFailedProcess({ stdout: '{"credential":"pairing-secret"}\n' })),
     );
-    const layerSpawner = Layer.succeed(ChildProcessSpawner.ChildProcessSpawner, spawner);
-    const layerProcess = Layer.mergeAll(NodeServices.layer, layerSpawner);
+    const spawnerLayer = Layer.succeed(ChildProcessSpawner.ChildProcessSpawner, spawner);
+    const processLayer = Layer.mergeAll(NodeServices.layer, spawnerLayer);
 
     return Effect.gen(function* () {
       const result = yield* Effect.result(
@@ -190,13 +165,13 @@ describe("ssh command", () => {
         assert.equal(result.failure.message, '{"credential":"[redacted]"}');
         assert.equal(result.failure.stdout, '{"credential":"[redacted]"}\n');
       }
-    }).pipe(Effect.provide(layerProcess));
+    }).pipe(Effect.provide(processLayer));
   });
 
   it.effect("fails commands that never finish", () => {
     const spawner = ChildProcessSpawner.make(() => Effect.succeed(makeNeverFinishingProcess()));
-    const layerSpawner = Layer.succeed(ChildProcessSpawner.ChildProcessSpawner, spawner);
-    const layerProcess = Layer.mergeAll(NodeServices.layer, layerSpawner, TestClock.layer());
+    const spawnerLayer = Layer.succeed(ChildProcessSpawner.ChildProcessSpawner, spawner);
+    const processLayer = Layer.mergeAll(NodeServices.layer, spawnerLayer, TestClock.layer());
 
     return Effect.gen(function* () {
       const fiber = yield* Effect.forkChild(
@@ -221,6 +196,6 @@ describe("ssh command", () => {
       if (Result.isFailure(result)) {
         assert.include(result.failure.message, "SSH command timed out after 1ms.");
       }
-    }).pipe(Effect.provide(layerProcess));
+    }).pipe(Effect.provide(processLayer));
   });
 });

@@ -26,7 +26,7 @@ const alchemyBin = path.join(
   "node_modules",
   "alchemy",
   "bin",
-  "alchemy.js",
+  "alchemy.ts",
 );
 // Isolated stage so this suite never fights a developer's own `alchemy dev`
 // session (default stage) over state rows.

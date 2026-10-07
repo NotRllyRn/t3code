@@ -1,6 +1,6 @@
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
-import { ChildProcess, ChildProcessSpawner } from "effect/process";
+import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -15,7 +15,7 @@ const program = Effect.gen(function* () {
       shell: false,
     }),
   );
-  const layerCodex = CodexClient.layerChildProcess(handle, {
+  const codexLayer = CodexClient.layerChildProcess(handle, {
     logIncoming: true,
     logOutgoing: true,
   });
@@ -61,7 +61,7 @@ const program = Effect.gen(function* () {
       cwds: [process.cwd()],
     });
     yield* Console.log("skills/list", skills);
-  }).pipe(Effect.provide(layerCodex));
+  }).pipe(Effect.provide(codexLayer));
 });
 
 program.pipe(Effect.scoped, Effect.provide(NodeServices.layer), NodeRuntime.runMain);

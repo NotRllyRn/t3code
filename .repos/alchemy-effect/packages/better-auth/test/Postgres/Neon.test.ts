@@ -55,8 +55,5 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(Effect.provide(RuntimeContext.phantom)),
-  {
-    tags: ["provider:neon", "provider:neon:project", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

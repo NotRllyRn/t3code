@@ -21,7 +21,6 @@ test.provider(
       );
       expect(error._tag).toBe("NotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:mq", "live"] },
 );
 
 test.provider(
@@ -35,7 +34,6 @@ test.provider(
       );
       expect(error._tag).toBe("NotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:mq", "live"] },
 );
 
 const assertConfigurationGone = (configurationId: string) =>
@@ -140,5 +138,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertConfigurationGone(created.configurationId);
     }),
-  { tags: ["provider:aws", "provider:aws:mq", "live"], timeout: 180_000 },
+  { timeout: 180_000 },
 );

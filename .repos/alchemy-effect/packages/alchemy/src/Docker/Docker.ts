@@ -1,7 +1,7 @@
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
-import { Base64 } from "effect/encoding";
+import * as Encoding from "effect/Encoding";
 import * as FileSystem from "effect/FileSystem";
 import { flow } from "effect/Function";
 import * as Layer from "effect/Layer";
@@ -17,8 +17,8 @@ import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as Sink from "effect/Sink";
 import * as Stream from "effect/Stream";
-import * as ChildProcess from "effect/process/ChildProcess";
-import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
+import * as ChildProcess from "effect/unstable/process/ChildProcess";
+import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
 import type { ScopedPlanStatusSession } from "../Report.ts";
 import { createPhysicalName } from "../PhysicalName.ts";
 import {
@@ -39,7 +39,7 @@ export interface RegistryCredentials {
 const RegistryAuth = Schema.String.pipe(
   Schema.check(
     Schema.makeFilter((value) => {
-      const decoded = Base64.decode(value);
+      const decoded = Encoding.decodeBase64(value);
       return Result.isSuccess(decoded) && decoded.success.indexOf(58) > 0;
     }),
   ),
@@ -126,8 +126,7 @@ export class Docker extends Context.Service<
       readonly build: (
         options: {
           context: string;
-          /** Image tags to build and publish together. */
-          tag: string | [string, ...string[]];
+          tag: string;
           file?: string;
           platform?: string;
           target?: string;
@@ -618,7 +617,9 @@ export const DockerLive = Layer.effect(
             const password = Redacted.isRedacted(credentials.password)
               ? Redacted.value(credentials.password)
               : credentials.password;
-            const auth = Base64.encode(`${credentials.username}:${password}`);
+            const auth = Encoding.encodeBase64(
+              `${credentials.username}:${password}`,
+            );
             // Preserve Docker's file/helper fallback, contexts, and builders.
             return {
               DOCKER_AUTH_CONFIG: JSON.stringify({
@@ -835,21 +836,11 @@ export const DockerLive = Layer.effect(
             undefined,
             tap,
           );
-          const [tag, ...tags] =
-            typeof options.tag === "string"
-              ? ([options.tag] as const)
-              : options.tag;
           return yield* push(
-            tag,
+            options.tag,
             registry,
             options.platform,
             engineContext,
-          ).pipe(
-            Effect.tap(() =>
-              Effect.forEach(tags, (tag) =>
-                push(tag, registry, options.platform, engineContext),
-              ),
-            ),
           );
         }),
         pull: (ref, platform, context) =>

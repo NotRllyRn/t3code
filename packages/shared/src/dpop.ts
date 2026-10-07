@@ -1,6 +1,6 @@
 import { p256 } from "@noble/curves/nist";
 import { sha256 } from "@noble/hashes/sha2";
-import * as Base64Url from "effect/encoding/Base64Url";
+import * as Encoding from "effect/Encoding";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
@@ -69,15 +69,15 @@ export type DpopVerificationResult =
     };
 
 function base64UrlToBytes(value: string): Uint8Array {
-  return Result.getOrThrow(Base64Url.decode(value));
+  return Result.getOrThrow(Encoding.decodeBase64Url(value));
 }
 
 function decodeBase64UrlDpopJwtHeader(value: string) {
-  return decodeDpopJwtHeaderJson(Result.getOrThrow(Base64Url.decodeString(value)));
+  return decodeDpopJwtHeaderJson(Result.getOrThrow(Encoding.decodeBase64UrlString(value)));
 }
 
 function decodeBase64UrlDpopJwtPayload(value: string) {
-  return decodeDpopJwtPayloadJson(Result.getOrThrow(Base64Url.decodeString(value)));
+  return decodeDpopJwtPayloadJson(Result.getOrThrow(Encoding.decodeBase64UrlString(value)));
 }
 
 function dpopThumbprintInput(jwk: DpopPublicJwkType): string {
@@ -90,11 +90,11 @@ function dpopThumbprintInput(jwk: DpopPublicJwkType): string {
 }
 
 export function computeDpopJwkThumbprint(jwk: DpopPublicJwkType): string {
-  return Base64Url.encode(sha256(new TextEncoder().encode(dpopThumbprintInput(jwk))));
+  return Encoding.encodeBase64Url(sha256(new TextEncoder().encode(dpopThumbprintInput(jwk))));
 }
 
 export function computeDpopAccessTokenHash(accessToken: string): string {
-  return Base64Url.encode(sha256(new TextEncoder().encode(accessToken)));
+  return Encoding.encodeBase64Url(sha256(new TextEncoder().encode(accessToken)));
 }
 
 function publicKeyBytesFromJwk(jwk: DpopPublicJwkType): Uint8Array {

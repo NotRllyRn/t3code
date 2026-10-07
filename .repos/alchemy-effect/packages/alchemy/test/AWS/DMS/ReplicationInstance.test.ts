@@ -26,7 +26,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundFault");
     }),
-  { tags: ["provider:aws", "provider:aws:dms", "live"] },
 );
 
 const findInstance = (identifier: string) =>
@@ -119,8 +118,5 @@ test.provider.skipIf(!process.env.AWS_TEST_SLOW)(
       // calls. `orDie` — a finalizer must not swallow its own failure.
       Effect.ensuring(reapDmsOrphans.pipe(Effect.orDie)),
     ),
-  {
-    tags: ["provider:aws", "provider:aws:dms", "provider:aws:ec2", "live"],
-    timeout: 1_500_000,
-  },
+  { timeout: 1_500_000 },
 );

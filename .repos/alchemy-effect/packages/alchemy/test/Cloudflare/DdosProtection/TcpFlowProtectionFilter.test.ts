@@ -84,10 +84,7 @@ test.provider.skipIf(!magicTransit)(
         .pipe(Effect.flip);
       expect(error._tag).toEqual("TcpFlowProtectionFilterNotFound");
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:ddosprotection", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // Read-only: list() enumerates account-scoped filters. On accounts without
@@ -95,24 +92,19 @@ test.provider.skipIf(!magicTransit)(
 // enumeration API rejects with the typed `AdvancedTcpProtectionNotEntitled`
 // error; list() swallows it and returns a well-typed empty array, so this
 // runs unconditionally and never crashes the engine.
-test.provider(
-  "list returns the account's TCP flow protection filters",
-  () =>
-    Effect.gen(function* () {
-      const provider = yield* Provider.findProvider(
-        Cloudflare.DdosProtection.TcpFlowProtectionFilter,
-      );
-      const all = yield* provider.list();
-      expect(Array.isArray(all)).toBe(true);
-      for (const filter of all) {
-        expect(typeof filter.filterId).toBe("string");
-        expect(typeof filter.accountId).toBe("string");
-        expect(typeof filter.expression).toBe("string");
-      }
-    }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:ddosprotection", "live"],
-  },
+test.provider("list returns the account's TCP flow protection filters", () =>
+  Effect.gen(function* () {
+    const provider = yield* Provider.findProvider(
+      Cloudflare.DdosProtection.TcpFlowProtectionFilter,
+    );
+    const all = yield* provider.list();
+    expect(Array.isArray(all)).toBe(true);
+    for (const filter of all) {
+      expect(typeof filter.filterId).toBe("string");
+      expect(typeof filter.accountId).toBe("string");
+      expect(typeof filter.expression).toBe("string");
+    }
+  }).pipe(logLevel),
 );
 
 test.provider.skipIf(!magicTransit)(
@@ -141,8 +133,5 @@ test.provider.skipIf(!magicTransit)(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:ddosprotection", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

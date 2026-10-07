@@ -142,13 +142,5 @@ test.provider.skipIf(!process.env.AWS_TEST_APPREGISTRY)(
       yield* stack.destroy();
       yield* assertApplicationGone(created.applicationId);
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:appregistry",
-      "provider:aws:cloudformation",
-      "live",
-    ],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );

@@ -10,7 +10,7 @@ import * as Test from "@/Test/Alchemy";
 import { expect } from "alchemy-test";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as HttpServerResponse from "effect/http/HttpServerResponse";
+import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 
 // Regression for the container-platform serve OOM (fixed in c35217c2b):
 // `createContainerRuntimeContext` wrapped the host `serve`, but the wrapper
@@ -62,10 +62,7 @@ test(
     const { program } = yield* ctx.exports;
     expect(program).toBeDefined();
   }),
-  {
-    tags: ["unit", "provider:aws", "provider:aws:ecs", "local"],
-    timeout: 10_000,
-  },
+  { timeout: 10_000 },
 );
 
 // ── plan/apply-level: the inline class form with Effect-valued props ────────
@@ -135,10 +132,7 @@ test.provider(
       expect(props?.image).toBe("nginx:1.27");
       expect(props?.port).toBe(80);
     }),
-  {
-    tags: ["unit", "provider:aws", "provider:aws:ecs", "local"],
-    timeout: 60_000,
-  },
+  { timeout: 60_000 },
 );
 
 // ── plan-only: multiple yields of the inline class stay stable ──────────────
@@ -178,8 +172,5 @@ test(
       ),
     ).toEqual(["InlineService"]);
   }),
-  {
-    tags: ["unit", "provider:aws", "provider:aws:ecs", "local"],
-    timeout: 60_000,
-  },
+  { timeout: 60_000 },
 );

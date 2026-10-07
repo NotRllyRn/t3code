@@ -1,10 +1,4 @@
-import { Query } from "@distilled.cloud/core/query";
-import {
-  Railway,
-  type EdgeConfig,
-  type PurgeOnDeploy,
-  type UpdateServiceEdgeConfigInput,
-} from "@distilled.cloud/railway";
+import * as railway from "@distilled.cloud/railway";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as Schedule from "effect/Schedule";
@@ -12,6 +6,8 @@ import { isResolved } from "../../Diff.ts";
 import * as Provider from "../../Provider.ts";
 import { Resource } from "../../Resource.ts";
 import type { Providers } from "../Providers.ts";
+
+type PurgeOnDeploy = railway.Scalars["PurgeOnDeploy"];
 
 type Ref<T> = T | Effect.Effect<T, never, Providers>;
 
@@ -101,57 +97,16 @@ const cachingInput = (props: CdnProps) => ({
   defaultTtlSeconds: props.defaultTtlSeconds ?? 7200,
 });
 
-const edgeConfigFields = <E>(config: Query<EdgeConfig, E>) => ({
-  id: config.id,
-  enabled: config.enabled,
-  caching: config.caching.pipe(
-    Query.map((caching) => ({
-      mode: caching.mode,
-      htmlCaching: caching.htmlCaching,
-      purgeOnDeploy: caching.purgeOnDeploy,
-      defaultTtlSeconds: caching.defaultTtlSeconds,
-    })),
-  ),
-});
-
-const readEdgeConfig = Query.fn((serviceId: string, environmentId: string) =>
-  Railway.serviceInstance({ serviceId, environmentId }).edgeConfig.pipe(
-    Query.map(edgeConfigFields),
-  ),
-);
-
-const readEdgeConfigAndDomains = Query.fn(
-  (serviceId: string, environmentId: string) => {
-    const instance = Railway.serviceInstance({ serviceId, environmentId });
-    return {
-      edgeConfig: instance.edgeConfig.pipe(Query.map(edgeConfigFields)),
-      domains: {
-        serviceDomains: instance.domains.serviceDomains.pipe(
-          Query.map((domain) => ({ syncStatus: domain.syncStatus })),
-        ),
-        customDomains: instance.domains.customDomains.pipe(
-          Query.map((domain) => ({ syncStatus: domain.syncStatus })),
-        ),
-      },
-    };
+const edgeConfigSelection = {
+  id: true,
+  enabled: true,
+  caching: {
+    mode: true,
+    htmlCaching: true,
+    purgeOnDeploy: true,
+    defaultTtlSeconds: true,
   },
-);
-
-const enableServiceCdn = Query.fn((serviceId: string, environmentId: string) =>
-  edgeConfigFields(
-    Railway.enableServiceCdn({ input: { environmentId, serviceId } }),
-  ),
-);
-
-const updateServiceEdgeConfig = Query.fn(
-  (input: UpdateServiceEdgeConfigInput) => ({
-    id: Railway.updateServiceEdgeConfig({ input }).id,
-  }),
-);
-
-const disableServiceCdn = Query.fn((serviceId: string, environmentId: string) =>
-  Railway.disableServiceCdn({ input: { environmentId, serviceId } }),
-);
+} as const satisfies railway.Selection<"EdgeConfig">;
 
 export class CdnPublicDomainPending extends Data.TaggedError(
   "Railway.Website.CdnPublicDomainPending",
@@ -162,30 +117,50 @@ export class CdnConfigurationPending extends Data.TaggedError(
 )<{ serviceId: string; environmentId: string }> {}
 
 const getConfig = (serviceId: string, environmentId: string) =>
-  readEdgeConfig(serviceId, environmentId).pipe(
-    Effect.map((edgeConfig) => edgeConfig ?? undefined),
-    Effect.catchTag("RailwayNotFound", () => Effect.succeed(undefined)),
-  );
+  railway
+    .serviceInstance(
+      { serviceId, environmentId },
+      { edgeConfig: edgeConfigSelection },
+    )
+    .pipe(
+      Effect.map((instance) => instance.edgeConfig ?? undefined),
+      railway.catchTags("RailwayNotFound", () => Effect.succeed(undefined)),
+    );
 
 const getReadyConfig = (serviceId: string, environmentId: string) =>
-  readEdgeConfigAndDomains(serviceId, environmentId).pipe(
-    Effect.flatMap((instance) =>
-      [
-        ...instance.domains.serviceDomains,
-        ...instance.domains.customDomains,
-      ].some(
-        (domain) =>
-          domain.syncStatus === "ACTIVE" || domain.syncStatus === "UNSPECIFIED",
-      )
-        ? Effect.succeed(instance.edgeConfig ?? undefined)
-        : Effect.fail(new CdnPublicDomainPending({ serviceId, environmentId })),
-    ),
-    Effect.retry({
-      while: (error) => error._tag === "Railway.Website.CdnPublicDomainPending",
-      times: 8,
-      schedule: Schedule.spaced("2 seconds"),
-    }),
-  );
+  railway
+    .serviceInstance(
+      { serviceId, environmentId },
+      {
+        edgeConfig: edgeConfigSelection,
+        domains: {
+          serviceDomains: { syncStatus: true },
+          customDomains: { syncStatus: true },
+        },
+      },
+    )
+    .pipe(
+      Effect.flatMap((instance) =>
+        [
+          ...instance.domains.serviceDomains,
+          ...instance.domains.customDomains,
+        ].some(
+          (domain) =>
+            domain.syncStatus === "ACTIVE" ||
+            domain.syncStatus === "UNSPECIFIED",
+        )
+          ? Effect.succeed(instance.edgeConfig ?? undefined)
+          : Effect.fail(
+              new CdnPublicDomainPending({ serviceId, environmentId }),
+            ),
+      ),
+      Effect.retry({
+        while: (error) =>
+          error._tag === "Railway.Website.CdnPublicDomainPending",
+        times: 8,
+        schedule: Schedule.spaced("2 seconds"),
+      }),
+    );
 
 export const CdnProvider = () =>
   Provider.succeed(Cdn, {
@@ -245,7 +220,10 @@ export const CdnProvider = () =>
         current.caching == null ||
         current.caching.mode.toLowerCase() === "off"
       ) {
-        current = yield* enableServiceCdn(serviceId, environmentId);
+        current = yield* railway.enableServiceCdn(
+          { input: { environmentId, serviceId } },
+          edgeConfigSelection,
+        );
       }
       const caching = current?.caching;
       const changed =
@@ -253,7 +231,10 @@ export const CdnProvider = () =>
         caching?.purgeOnDeploy !== config.caching.purgeOnDeploy ||
         caching?.defaultTtlSeconds !== config.caching.defaultTtlSeconds;
       if (changed) {
-        yield* updateServiceEdgeConfig({ serviceId, environmentId, config });
+        yield* railway.updateServiceEdgeConfig(
+          { input: { serviceId, environmentId, config } },
+          { id: true },
+        );
       }
       const enabled = yield* getConfig(serviceId, environmentId).pipe(
         Effect.flatMap((observed) =>
@@ -288,6 +269,11 @@ export const CdnProvider = () =>
       if (output === undefined) return;
       const current = yield* getConfig(output.serviceId, output.environmentId);
       if (current === undefined || !current.enabled) return;
-      yield* disableServiceCdn(output.serviceId, output.environmentId);
+      yield* railway.disableServiceCdn({
+        input: {
+          environmentId: output.environmentId,
+          serviceId: output.serviceId,
+        },
+      });
     }),
   });

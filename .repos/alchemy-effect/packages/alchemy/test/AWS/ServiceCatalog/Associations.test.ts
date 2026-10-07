@@ -193,14 +193,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertPortfolioGone(deployed.portfolioId);
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:iam",
-      "provider:aws:s3",
-      "provider:aws:servicecatalog",
-      "live",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

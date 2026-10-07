@@ -19,6 +19,7 @@ export default Alchemy.Stack(
           "package.json",
           "next.config.mjs",
           "postcss.config.mjs",
+          "open-next.config.ts",
           "tsconfig.json",
         ],
       },

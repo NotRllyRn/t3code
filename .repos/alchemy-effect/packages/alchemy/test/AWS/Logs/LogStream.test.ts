@@ -108,5 +108,5 @@ test.provider(
         replaced.logStreamName,
       );
     }).pipe(Effect.onError(() => stack.destroy().pipe(Effect.ignore))),
-  { tags: ["provider:aws", "provider:aws:logs", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );

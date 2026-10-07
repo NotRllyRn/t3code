@@ -53,7 +53,7 @@ const drain = (input: Uint8Array, size: number): ParseResult[] => {
   return frames;
 };
 
-describe("encodeCommand", { tags: ["unit", "local"] }, () => {
+describe("encodeCommand", () => {
   test("PING is an array of bulk strings", () => {
     expect(encodeCommand("PING")).toEqual(bytes("*1\r\n$4\r\nPING\r\n"));
   });
@@ -83,7 +83,7 @@ describe("encodeCommand", { tags: ["unit", "local"] }, () => {
   });
 });
 
-describe("RESP2 decode", { tags: ["unit", "local"] }, () => {
+describe("RESP2 decode", () => {
   test("simple string", () => {
     expect(asReply("+OK\r\n")).toBe("OK");
     expect(asReply("+\r\n")).toBe("");
@@ -161,7 +161,7 @@ describe("RESP2 decode", { tags: ["unit", "local"] }, () => {
   });
 });
 
-describe("RESP3 decode", { tags: ["unit", "local"] }, () => {
+describe("RESP3 decode", () => {
   test("null boolean double big number", () => {
     expect(asReply("_\r\n")).toBeNull();
     expect(asReply("#t\r\n")).toBe(true);
@@ -222,7 +222,7 @@ describe("RESP3 decode", { tags: ["unit", "local"] }, () => {
   });
 });
 
-describe("incremental parser", { tags: ["unit", "local"] }, () => {
+describe("incremental parser", () => {
   test("replies split one byte at a time", () => {
     const payload = encodeArray([
       encodeBulk("foo"),
@@ -260,7 +260,7 @@ describe("incremental parser", { tags: ["unit", "local"] }, () => {
   });
 });
 
-describe("protocol errors", { tags: ["unit", "local"] }, () => {
+describe("protocol errors", () => {
   test("unknown type byte", () => {
     const result = decode("xOK\r\n");
     expect(result._tag).toBe("Protocol");

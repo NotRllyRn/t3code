@@ -168,16 +168,7 @@ test.provider(
         }),
       );
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:stripe",
-      "provider:stripe:entitlementsfeature",
-      "provider:stripe:product",
-      "provider:stripe:productfeature",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -233,16 +224,7 @@ test.provider(
         }),
       );
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:stripe",
-      "provider:stripe:entitlementsfeature",
-      "provider:stripe:product",
-      "provider:stripe:productfeature",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -317,14 +299,5 @@ test.provider(
         }),
       );
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:stripe",
-      "provider:stripe:entitlementsfeature",
-      "provider:stripe:product",
-      "provider:stripe:productfeature",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

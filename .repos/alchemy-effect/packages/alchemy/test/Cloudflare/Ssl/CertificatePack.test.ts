@@ -100,14 +100,6 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:ssl",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-  },
 );
 
 test.provider(
@@ -134,10 +126,7 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:ssl", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider.skipIf(!acmZoneName)(
@@ -173,15 +162,7 @@ test.provider.skipIf(!acmZoneName)(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:ssl",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider.skipIf(!acmZoneName)(
@@ -246,13 +227,5 @@ test.provider.skipIf(!acmZoneName)(
       );
       expect(gone === undefined || gone.status === "deleted").toBe(true);
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:ssl",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

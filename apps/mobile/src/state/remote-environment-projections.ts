@@ -5,7 +5,7 @@ import type {
 import { connectionCatalogDisplayUrl } from "@t3tools/client-runtime/connection";
 import type { EnvironmentId, ServerConfig } from "@t3tools/contracts";
 import * as Option from "effect/Option";
-import { Atom } from "effect/reactivity";
+import { Atom } from "effect/unstable/reactivity";
 
 import type { SavedRemoteConnection } from "../lib/connection";
 import type { EnvironmentRuntimeState } from "./remote-runtime-types";
@@ -52,10 +52,7 @@ export function createRemoteEnvironmentProjectionAtoms(input: {
             : displayUrl.replace(/^http:/, "ws:")
           : new URL(socketUrl).origin;
       const authorization = prepared?.httpAuthorization ?? null;
-      // Credentials follow the route in use, which may not be the preferred one.
-      const relayManaged = prepared
-        ? prepared.target._tag === "RelayConnectionTarget"
-        : presentation.entry.target._tag === "RelayConnectionTarget";
+      const relayManaged = presentation.entry.target._tag === "RelayConnectionTarget";
 
       previousEntry = presentation.entry;
       previousPrepared = prepared;

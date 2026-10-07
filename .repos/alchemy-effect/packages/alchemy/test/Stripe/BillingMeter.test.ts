@@ -110,10 +110,7 @@ test.provider(
       const deactivated = yield* GetBillingMeter({ id: created.id });
       expect(deactivated.status).toEqual("inactive");
     }).pipe(logLevel),
-  {
-    tags: ["provider:stripe", "provider:stripe:billingmeter", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -162,10 +159,7 @@ test.provider(
       const gone = yield* waitUntilInactive(replaced.id);
       expect(gone).toEqual("inactive");
     }).pipe(logLevel),
-  {
-    tags: ["provider:stripe", "provider:stripe:billingmeter", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -200,8 +194,5 @@ test.provider(
       const after = yield* provider.list();
       expect(after.find((meter) => meter.id === deployed.id)).toBeUndefined();
     }).pipe(logLevel),
-  {
-    tags: ["provider:stripe", "provider:stripe:billingmeter", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

@@ -23,7 +23,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:apprunner", "live"] },
 );
 
 // No ACTIVE revision of the named configuration remains (deleted configs
@@ -125,8 +124,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertConfigGone("alchemy-test-asc-b");
     }),
-  {
-    tags: ["provider:aws", "provider:aws:apprunner", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

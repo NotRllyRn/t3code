@@ -22,7 +22,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:bedrockagentcore", "live"] },
 );
 
 const assertRuntimeGone = (agentRuntimeId: string) =>
@@ -104,13 +103,5 @@ test.provider.skipIf(
       yield* stack.destroy();
       yield* assertRuntimeGone(runtime.agentRuntimeId);
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:bedrockagentcore",
-      "provider:aws:iam",
-      "live",
-    ],
-    timeout: 600_000,
-  },
+  { timeout: 600_000 },
 );

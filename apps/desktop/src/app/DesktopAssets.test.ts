@@ -11,7 +11,7 @@ import * as DesktopAssets from "./DesktopAssets.ts";
 import * as DesktopConfig from "./DesktopConfig.ts";
 import * as DesktopEnvironment from "./DesktopEnvironment.ts";
 
-const layerEnvironment = DesktopEnvironment.layer({
+const environmentLayer = DesktopEnvironment.layer({
   dirname: "/repo/apps/desktop/dist-electron",
   homeDirectory: "/Users/alice",
   platform: "darwin",
@@ -30,7 +30,7 @@ const layerEnvironment = DesktopEnvironment.layer({
 describe("DesktopAssets", () => {
   it.effect("uses canonical source-tree icons for unpackaged development", () =>
     Effect.gen(function* () {
-      const layerDevelopmentEnvironment = DesktopEnvironment.layer({
+      const developmentEnvironmentLayer = DesktopEnvironment.layer({
         dirname: "/repo/apps/desktop/dist-electron",
         homeDirectory: "/Users/alice",
         platform: "linux",
@@ -49,13 +49,13 @@ describe("DesktopAssets", () => {
           ),
         ),
       );
-      const layerFileSystem = FileSystem.layerNoop({
+      const fileSystemLayer = FileSystem.layerNoop({
         exists: (path) => Effect.succeed(String(path).includes("/assets/dev/")),
       });
       const assets = yield* DesktopAssets.DesktopAssets.pipe(
         Effect.provide(
           DesktopAssets.layer.pipe(
-            Layer.provide(Layer.merge(layerFileSystem, layerDevelopmentEnvironment)),
+            Layer.provide(Layer.merge(fileSystemLayer, developmentEnvironmentLayer)),
           ),
         ),
       );
@@ -79,13 +79,13 @@ describe("DesktopAssets", () => {
         pathOrDescriptor: candidatePath,
         description: "private filesystem diagnostic",
       });
-      const layerFileSystem = FileSystem.layerNoop({
+      const fileSystemLayer = FileSystem.layerNoop({
         exists: (path) => (path === candidatePath ? Effect.fail(cause) : Effect.succeed(false)),
       });
-      const layerAssets = DesktopAssets.layer.pipe(
-        Layer.provide(Layer.merge(layerFileSystem, layerEnvironment)),
+      const assetsLayer = DesktopAssets.layer.pipe(
+        Layer.provide(Layer.merge(fileSystemLayer, environmentLayer)),
       );
-      const assets = yield* DesktopAssets.DesktopAssets.pipe(Effect.provide(layerAssets));
+      const assets = yield* DesktopAssets.DesktopAssets.pipe(Effect.provide(assetsLayer));
 
       const error = yield* assets.resolveResourcePath(fileName).pipe(Effect.flip);
 

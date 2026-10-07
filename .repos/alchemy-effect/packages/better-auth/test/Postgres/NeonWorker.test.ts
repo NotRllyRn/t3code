@@ -68,14 +68,5 @@ test(
     });
     expect(me.email).toBe(email);
   }),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:worker",
-      "provider:neon",
-      "provider:neon:project",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

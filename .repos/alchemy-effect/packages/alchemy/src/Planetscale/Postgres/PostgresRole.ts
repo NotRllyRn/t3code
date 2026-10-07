@@ -86,15 +86,6 @@ export interface PostgresRoleProps {
   inheritedRoles: InheritedRole[] | PostgresRole;
 
   /**
-   * Give the role the REPLICATION attribute, for a logical-replication
-   * consumer (Electric, Debezium, a CDC pipeline). PlanetScale only grants
-   * it alongside `inheritedRoles: ["postgres"]`. Create-only: changing it
-   * replaces the role.
-   * @default false
-   */
-  withReplication?: boolean;
-
-  /**
    * Successor role to reassign ownership to before dropping. Used during
    * delete.
    * @default "postgres"
@@ -140,8 +131,6 @@ export interface PostgresRoleAttributes {
   connectionUrlPooled: Redacted.Redacted<string>;
   /** Inherited roles. */
   inheritedRoles: InheritedRole[];
-  /** Whether the role carries the REPLICATION attribute. */
-  withReplication: boolean;
   /** The successor role used during delete. */
   successor: string;
   /** Resolved organization slug. */
@@ -221,11 +210,6 @@ export const PostgresRoleProvider = () =>
       const newRoles = [...resolveInheritedRoles(news.inheritedRoles)].sort();
       const oldRoles = [...(output?.inheritedRoles ?? [])].sort();
       if (!deepEqual(newRoles, oldRoles)) {
-        return { action: "replace" } as const;
-      }
-      if (
-        (news.withReplication ?? false) !== (output?.withReplication ?? false)
-      ) {
         return { action: "replace" } as const;
       }
       const oldName = output?.name ?? (yield* resolveName(id, olds?.name));
@@ -326,7 +310,6 @@ export const PostgresRoleProvider = () =>
           database: databaseName,
           ttl: news.ttl,
           inherited_roles: inheritedRoles as SDKInheritedRole[],
-          with_replication: news.withReplication,
         });
         if (!created.password) {
           return yield* Effect.die(
@@ -519,7 +502,6 @@ const buildAttributes = (
     id: string;
     name: string;
     expires_at: string | null;
-    with_replication: boolean;
     access_host_url: string;
     private_access_host_url: string;
     private_connection_service_name: string;
@@ -552,7 +534,6 @@ const buildAttributes = (
     privateHost: role.private_access_host_url,
     privateConnectionServiceName: role.private_connection_service_name,
     inheritedRoles: context.inheritedRoles,
-    withReplication: role.with_replication,
     successor: context.successor,
     organization: context.organization,
     database: context.database,

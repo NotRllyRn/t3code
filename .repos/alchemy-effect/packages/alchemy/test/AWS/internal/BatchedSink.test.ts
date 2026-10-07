@@ -41,7 +41,7 @@ const byIndex = <In>(
 
 const instant = Schedule.recurs(3);
 
-describe("makeBatchedSink", { tags: ["unit", "provider:aws", "local"] }, () => {
+describe("makeBatchedSink", () => {
   it.effect("splits a chunk into maxRecords batches preserving order", () =>
     Effect.gen(function* () {
       const sent = yield* Ref.make<(readonly number[])[]>([]);
@@ -143,7 +143,6 @@ describe("makeBatchedSink", { tags: ["unit", "provider:aws", "local"] }, () => {
         // initial attempt + 2 bounded retries
         expect(yield* Ref.get(calls)).toBe(3);
       }),
-    { tags: ["provider:aws:batch"] },
   );
 
   it.effect("drops rejected entries without retrying and surfaces them", () =>

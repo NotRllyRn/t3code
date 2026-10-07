@@ -461,18 +461,6 @@ export const taskImagePlatform = (runtimePlatform?: ecs.RuntimePlatform) =>
   // platform 'linux/amd64'`.
   runtimePlatform?.cpuArchitecture === "ARM64" ? "linux/arm64" : "linux/amd64";
 
-/** Keep image resolution, drift detection and dev watching on the same inputs. */
-export const taskImageInput = (props: TaskProps) => {
-  const source = props as ImageSourceLike;
-  return {
-    source,
-    platform: taskImagePlatform(props.runtimePlatform),
-    port: props.port,
-    isExternal: props.isExternal,
-    bootstrap: makeBunBootstrap(source.handler ?? "default"),
-  };
-};
-
 /**
  * Create the IAM role assumed by ECS tasks if it doesn't already exist.
  * Idempotent: an `EntityAlreadyExistsException` adopts the existing role
@@ -1122,7 +1110,14 @@ export const TaskProvider = () =>
           // and surface drift as an update; without this a bootstrap or
           // code-only change would silently no-op until `--force`.
           if (output) {
-            const hash = yield* imageSource.hash(taskImageInput(news));
+            const source = news as ImageSourceLike;
+            const hash = yield* imageSource.hash({
+              source,
+              platform: taskImagePlatform(news.runtimePlatform),
+              port: news.port,
+              isExternal: news.isExternal,
+              bootstrap: makeBunBootstrap(source.handler ?? "default"),
+            });
             if (hash !== undefined && hash !== output.code.hash) {
               return { action: "update" } as const;
             }
@@ -1241,15 +1236,20 @@ export const TaskProvider = () =>
           // task definition revision. Task definitions are versioned in
           // AWS, so registering a new revision is the unit of "update" —
           // the superseded revision is reaped after registration below.
+          const source = news as ImageSourceLike;
           const resolved = yield* imageSource.resolve({
-            ...taskImageInput(news),
             id,
+            source,
             repositoryName,
             repositoryUri:
               output?.repositoryUri && output.repositoryName === repositoryName
                 ? output.repositoryUri
                 : undefined,
             tags,
+            platform: taskImagePlatform(news.runtimePlatform),
+            port: news.port,
+            isExternal: news.isExternal,
+            bootstrap: makeBunBootstrap(source.handler ?? "default"),
             session,
           });
 

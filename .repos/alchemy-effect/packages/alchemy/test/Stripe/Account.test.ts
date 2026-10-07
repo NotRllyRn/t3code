@@ -64,10 +64,7 @@ test.provider(
       yield* deleteAccount(probe.success.id);
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:stripe", "provider:stripe:account", "live"],
-    timeout: 60_000,
-  },
+  { timeout: 60_000 },
 );
 
 test.provider.skipIf(!CONNECT_ENABLED)(
@@ -184,10 +181,7 @@ test.provider.skipIf(!CONNECT_ENABLED)(
       const gone = yield* waitUntilGone(created.id);
       expect(gone).toEqual("gone");
     }).pipe(logLevel),
-  {
-    tags: ["provider:stripe", "provider:stripe:account", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider.skipIf(!CONNECT_ENABLED)(
@@ -219,8 +213,5 @@ test.provider.skipIf(!CONNECT_ENABLED)(
       const gone = yield* waitUntilGone(deployed.id);
       expect(gone).toEqual("gone");
     }).pipe(logLevel),
-  {
-    tags: ["provider:stripe", "provider:stripe:account", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

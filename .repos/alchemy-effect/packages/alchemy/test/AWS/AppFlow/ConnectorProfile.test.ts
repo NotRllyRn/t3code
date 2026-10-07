@@ -46,7 +46,6 @@ test.provider(
         "ConnectorAuthenticationException",
       ]).toContain(error._tag);
     }),
-  { tags: ["provider:aws", "provider:aws:appflow", "live"] },
 );
 
 test.provider(
@@ -58,7 +57,6 @@ test.provider(
       });
       expect(response.connectorProfileDetails ?? []).toHaveLength(0);
     }),
-  { tags: ["provider:aws", "provider:aws:appflow", "live"] },
 );
 
 // Full lifecycle requires real vendor credentials (human-in-the-loop OAuth
@@ -115,5 +113,5 @@ test.provider.skipIf(!process.env.AWS_TEST_APPFLOW_CONNECTOR)(
       });
       expect(gone.connectorProfileDetails ?? []).toHaveLength(0);
     }),
-  { tags: ["provider:aws", "provider:aws:appflow", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );

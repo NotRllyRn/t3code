@@ -71,8 +71,6 @@ export interface NodeServeEntryOptions {
    * @default "none"
    */
   readonly notFoundHandling?: NodeServeNotFoundHandling | undefined;
-  /** HTML file served for a 404-page fallback, relative to the client directory. @default "404.html" */
-  readonly errorPage?: string | undefined;
   /** @default 3000 */
   readonly defaultPort?: number | undefined;
   /**
@@ -256,7 +254,7 @@ ${
     : ""
 }${
         notFoundPage
-          ? `      const notFound = lookupStatic(${JSON.stringify(`/${options.errorPage ?? "404.html"}`)});
+          ? `      const notFound = lookupStatic("/404.html");
       if (notFound !== undefined) {
         if (req.method === "HEAD") {
           res.writeHead(404);
@@ -441,16 +439,5 @@ export const writeNodeServeEntry = (
       .writeFileString(options.servePath, source)
       .pipe(Effect.mapError(fail("Failed to write the Node serve entry")));
     const serveModule = yield* toOutputFile(options.serveModuleName, source);
-    return pinNodeServeModule(
-      {
-        ...options.output,
-        nodeServe: {
-          clientDirExpression: options.clientDirExpression,
-          handler: options.handler,
-          htmlHandling: options.htmlHandling,
-          notFoundHandling: options.notFoundHandling,
-        },
-      },
-      serveModule,
-    );
+    return pinNodeServeModule(options.output, serveModule);
   });

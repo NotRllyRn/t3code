@@ -99,14 +99,7 @@ test.provider(
       });
       expect(deactivated.active).toEqual(false);
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:stripe",
-      "provider:stripe:paymentmethodconfiguration",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -146,12 +139,5 @@ test.provider(
         after.find((configuration) => configuration.id === deployed.id),
       ).toBeUndefined();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:stripe",
-      "provider:stripe:paymentmethodconfiguration",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

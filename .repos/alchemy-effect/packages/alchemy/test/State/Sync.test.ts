@@ -7,7 +7,7 @@ import {
 import { describe, expect, it } from "alchemy-test";
 import * as Effect from "effect/Effect";
 
-describe("syncState", { tags: ["unit", "local"] }, () => {
+describe("syncState", () => {
   it.effect(
     "copies source resources and overwrites matching destination resources",
     () =>

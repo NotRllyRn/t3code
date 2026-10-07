@@ -43,7 +43,6 @@ test.provider(
       );
       expect(g._tag).toBe("NotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:medialive", "live"] },
 );
 
 // ---------------------------------------------------------------------------
@@ -105,10 +104,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertInputSecurityGroupDeleted(created.inputSecurityGroupId);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:medialive", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // ---------------------------------------------------------------------------
@@ -187,10 +183,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertInputDeleted(replaced.inputId);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:medialive", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 // ---------------------------------------------------------------------------
@@ -236,10 +229,7 @@ test.provider(
       yield* assertInputDeleted(input.inputId);
       yield* assertInputSecurityGroupDeleted(isg.inputSecurityGroupId);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:medialive", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 // ---------------------------------------------------------------------------
@@ -427,15 +417,7 @@ test.provider.skipIf(!process.env.AWS_TEST_MEDIALIVE)(
       yield* assertChannelDeleted(channel.channelId);
       yield* assertInputDeleted(input.inputId);
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:iam",
-      "provider:aws:medialive",
-      "live",
-    ],
-    timeout: 600_000,
-  },
+  { timeout: 600_000 },
 );
 
 // ---------------------------------------------------------------------------

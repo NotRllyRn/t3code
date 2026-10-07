@@ -92,7 +92,6 @@ export type ProductFeature = Resource<
  * ```
  *
  * @resource
- * @product Product
  */
 export const ProductFeature = Resource<ProductFeature>("Stripe.ProductFeature");
 

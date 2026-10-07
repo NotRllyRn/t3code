@@ -78,54 +78,36 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:ai",
-      "provider:cloudflare:secretsstore",
-      "live",
-    ],
-  },
 );
 
-test.provider(
-  "explicit alias threads through the naming contract",
-  (stack) =>
-    Effect.gen(function* () {
-      yield* stack.destroy();
+test.provider("explicit alias threads through the naming contract", (stack) =>
+  Effect.gen(function* () {
+    yield* stack.destroy();
 
-      const deployed = yield* stack.deploy(
-        Effect.gen(function* () {
-          const store = yield* Cloudflare.SecretsStore.Store("PkAliasStore");
-          const gateway = yield* Cloudflare.AI.Gateway("PkAliasGateway", {
-            id: GATEWAY_ID + "-alias",
-            storeId: store.storeId,
-          });
-          return yield* Cloudflare.AI.ProviderKey("PkAliasKey", {
-            store,
-            gatewayId: gateway.gatewayId,
-            providerSlug: "anthropic",
-            alias: "evals",
-            value: Redacted.make("alchemy-test-not-a-real-key"),
-          });
-        }),
-      );
+    const deployed = yield* stack.deploy(
+      Effect.gen(function* () {
+        const store = yield* Cloudflare.SecretsStore.Store("PkAliasStore");
+        const gateway = yield* Cloudflare.AI.Gateway("PkAliasGateway", {
+          id: GATEWAY_ID + "-alias",
+          storeId: store.storeId,
+        });
+        return yield* Cloudflare.AI.ProviderKey("PkAliasKey", {
+          store,
+          gatewayId: gateway.gatewayId,
+          providerSlug: "anthropic",
+          alias: "evals",
+          value: Redacted.make("alchemy-test-not-a-real-key"),
+        });
+      }),
+    );
 
-      expect(deployed.secret.secretName).toEqual(
-        `${GATEWAY_ID}-alias_anthropic_evals`,
-      );
-      expect(deployed.gatewayProvider.alias).toEqual("evals");
+    expect(deployed.secret.secretName).toEqual(
+      `${GATEWAY_ID}-alias_anthropic_evals`,
+    );
+    expect(deployed.gatewayProvider.alias).toEqual("evals");
 
-      yield* stack.destroy();
-    }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:ai",
-      "provider:cloudflare:secretsstore",
-      "live",
-    ],
-  },
+    yield* stack.destroy();
+  }).pipe(logLevel),
 );
 
 test.provider(
@@ -194,14 +176,6 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:ai",
-      "provider:cloudflare:secretsstore",
-      "live",
-    ],
-  },
 );
 
 test.provider(
@@ -249,12 +223,4 @@ test.provider(
         );
       expect(secretAfter).toBeUndefined();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:ai",
-      "provider:cloudflare:secretsstore",
-      "live",
-    ],
-  },
 );

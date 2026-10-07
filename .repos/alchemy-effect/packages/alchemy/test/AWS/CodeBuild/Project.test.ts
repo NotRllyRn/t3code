@@ -196,15 +196,7 @@ test.provider(
       const after = yield* getProject;
       expect(after).toBeUndefined();
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:codebuild",
-      "provider:aws:iam",
-      "live",
-    ],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );
 
 // Exercise the StartBuild + BatchGetBuilds path end-to-end against a
@@ -331,13 +323,5 @@ test.provider(
       ),
     );
   },
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:codebuild",
-      "provider:aws:iam",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

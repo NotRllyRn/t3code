@@ -5,7 +5,7 @@ import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import { MinimumLogLevel } from "effect/References";
 import * as Schedule from "effect/Schedule";
-import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClient from "effect/unstable/http/HttpClient";
 import * as pathe from "pathe";
 
 // Mirrors the marker logged by `fixtures/tail/tail-producer.ts` on every
@@ -152,13 +152,5 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:kv",
-      "provider:cloudflare:worker",
-      "local",
-    ],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

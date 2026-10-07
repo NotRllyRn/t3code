@@ -1,8 +1,8 @@
 import * as Fly from "alchemy/Fly";
 import * as Effect from "effect/Effect";
-import { HttpServerRequest } from "effect/http/HttpServerRequest";
-import * as HttpServerResponse from "effect/http/HttpServerResponse";
-import { API_PORT, Cache } from "./shared.ts";
+import { HttpServerRequest } from "effect/unstable/http/HttpServerRequest";
+import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
+import { API_PORT, Cache, Site } from "./shared.ts";
 
 /**
  * HTTP Service that PINGs Upstash Redis via {@link Fly.ReadRedis}.
@@ -10,6 +10,7 @@ import { API_PORT, Cache } from "./shared.ts";
 export default class Api extends Fly.Service<Api>()(
   "Api",
   {
+    app: Site,
     main: import.meta.url,
     region: "iad",
     port: API_PORT,

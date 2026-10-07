@@ -1,13 +1,13 @@
+// @effect-diagnostics preferSchemaOverJson:off
 import * as NodeServices from "@effect/platform-node/NodeServices";
+import type * as CodexClient from "effect-codex-app-server/client";
 import { it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
-import * as Exit from "effect/Exit";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
-import * as Scope from "effect/Scope";
 import { createModelSelection } from "@t3tools/shared/model";
 import { expect } from "vite-plus/test";
 
@@ -17,6 +17,11 @@ import * as ServerConfig from "../config.ts";
 import * as TextGeneration from "./TextGeneration.ts";
 import { makeCodexTextGeneration } from "./CodexTextGeneration.ts";
 import { writeFakeCli } from "../testUtils/fakeCli.ts";
+import type {
+  CodexBrokerIntegration,
+  CodexBrokerSession,
+} from "../provider/Layers/CodexBrokerAuth.ts";
+import type { CodexBrokerLease } from "../provider/Layers/CodexBrokerClient.ts";
 const decodeCodexSettings = Schema.decodeSync(CodexSettings);
 
 const DEFAULT_TEST_MODEL_SELECTION = createModelSelection(
@@ -24,7 +29,7 @@ const DEFAULT_TEST_MODEL_SELECTION = createModelSelection(
   "gpt-5.4-mini",
 );
 
-const layerCodexTextGenerationTest = ServerConfig.ServerConfig.layerTest(process.cwd(), {
+const CodexTextGenerationTestLayer = ServerConfig.ServerConfig.layerTest(process.cwd(), {
   prefix: "t3code-codex-text-generation-test-",
 }).pipe(Layer.provideMerge(NodeServices.layer));
 
@@ -148,15 +153,17 @@ function withFakeCodexEnv<A, E, R>(
     const config = decodeCodexSettings({ binaryPath: codexPath, launchArgs: input.launchArgs });
     const textGeneration = yield* makeCodexTextGeneration(
       config,
-      input.environment === undefined ? undefined : { ...process.env, ...input.environment },
-      Effect.succeed(
-        (input.models ?? []).map((slug) => ({
-          slug,
-          name: slug,
-          isCustom: false,
-          capabilities: null,
-        })),
-      ),
+      input.environment,
+      {
+        getModels: Effect.succeed(
+          (input.models ?? []).map((slug) => ({
+            slug,
+            name: slug,
+            isCustom: false,
+            capabilities: null,
+          })),
+        ),
+      },
       input.managedRuntime
         ? Effect.succeed({
             config,
@@ -169,10 +176,128 @@ function withFakeCodexEnv<A, E, R>(
   }).pipe(Effect.scoped);
 }
 
-it.layer(layerCodexTextGenerationTest)("CodexTextGeneration", (it) => {
-  it.effect.each(["gpt-5.6-luna", "openai.gpt-5.6-luna"])(
-    "dispatches the qualified live model for %s",
-    (selectedModel) =>
+it.layer(CodexTextGenerationTestLayer)("CodexTextGeneration", (it) => {
+  it.effect("uses an ephemeral app-server with memory-only broker auth", () =>
+    Effect.gen(function* () {
+      const handlers = new Map<string, (payload: unknown) => Effect.Effect<void>>();
+      const requests: Array<{ readonly method: string; readonly payload: unknown }> = [];
+      const client = {
+        request: (method: string, payload: unknown) => {
+          requests.push({ method, payload });
+          if (method === "thread/start") {
+            return Effect.succeed({ thread: { id: "provider-thread" } });
+          }
+          if (method === "turn/start") {
+            return Effect.gen(function* () {
+              yield* (
+                handlers.get("item/completed")?.({
+                  completedAtMs: 1,
+                  threadId: "provider-thread",
+                  turnId: "provider-turn",
+                  item: {
+                    id: "message",
+                    type: "agentMessage",
+                    text: JSON.stringify({ subject: "Broker generated subject", body: "" }),
+                  },
+                }) ?? Effect.void
+              );
+              yield* (
+                handlers.get("turn/completed")?.({
+                  threadId: "provider-thread",
+                  turn: { id: "provider-turn", items: [], status: "completed" },
+                }) ?? Effect.void
+              );
+              return { turn: { id: "provider-turn" } };
+            });
+          }
+          return Effect.succeed({});
+        },
+        handleServerRequest: () => Effect.void,
+        handleServerNotification: (
+          method: string,
+          handler: (payload: unknown) => Effect.Effect<void>,
+        ) =>
+          Effect.sync(() => {
+            handlers.set(method, handler);
+          }),
+      } as unknown as CodexClient.CodexAppServerClient["Service"];
+      const lease: CodexBrokerLease = {
+        status: "ok",
+        accountId: "account",
+        accountLabel: "Account",
+        accessToken: "memory-only-token",
+        chatgptAccountId: "chatgpt-account",
+        expiresAt: "2099-01-01T00:00:00Z",
+        shortRemainingPercent: 90,
+        weeklyRemainingPercent: 80,
+        shortResetsAt: null,
+        weeklyResetsAt: null,
+      };
+      const session: CodexBrokerSession = {
+        brokerSessionId: "session",
+        lease: Effect.succeed(lease),
+        applyLogin: (appClient) =>
+          appClient
+            .request("account/login/start", {
+              type: "chatgptAuthTokens",
+              accessToken: lease.accessToken,
+              chatgptAccountId: lease.chatgptAccountId,
+            })
+            .pipe(Effect.asVoid),
+        registerRefreshHandler: () => Effect.void,
+        beginLogicalTurn: () => Effect.succeed({ lease, accountChanged: false }),
+        reportTerminalFailure: () => Effect.succeed({ lease, accountChanged: false }),
+        completeLogicalTurn: () => Effect.void,
+      };
+      const brokerIntegration: CodexBrokerIntegration = {
+        instanceId: "instance",
+        client: { health: Effect.void, route: () => Effect.die("unused") },
+        acquireEphemeralAuth: () => Effect.succeed(session),
+        newEphemeralSession: () => Effect.succeed(session),
+        newInteractiveSession: () => Effect.succeed(session),
+      };
+      const textGeneration = yield* makeCodexTextGeneration(
+        decodeCodexSettings({}),
+        {},
+        {
+          brokerIntegration,
+          getModels: Effect.succeed([
+            {
+              slug: "openai.gpt-5.6-luna",
+              name: "Luna",
+              isCustom: false,
+              capabilities: null,
+            },
+          ]),
+          withAppServerClient: () => Effect.succeed({ client }),
+        },
+      );
+
+      const generated = yield* textGeneration.generateCommitMessage({
+        cwd: process.cwd(),
+        branch: "feature/broker",
+        stagedSummary: "M README.md",
+        stagedPatch: "diff --git a/README.md b/README.md",
+        modelSelection: createModelSelection(ProviderInstanceId.make("codex"), "gpt-5.6-luna"),
+      });
+
+      expect(generated.subject).toBe("Broker generated subject");
+      expect(requests.some(({ method }) => method === "account/login/start")).toBe(true);
+      const turnRequest = requests.find(({ method }) => method === "turn/start");
+      expect(turnRequest?.payload).toMatchObject({
+        approvalPolicy: "never",
+        model: "openai.gpt-5.6-luna",
+        sandboxPolicy: { type: "readOnly" },
+      });
+      expect(requests.find(({ method }) => method === "thread/start")?.payload).toMatchObject({
+        model: "openai.gpt-5.6-luna",
+      });
+      expect(JSON.stringify(turnRequest?.payload)).not.toContain("memory-only-token");
+    }),
+  );
+
+  for (const selectedModel of ["gpt-5.6-luna", "openai.gpt-5.6-luna"]) {
+    it.effect(`dispatches the qualified live model for ${selectedModel}`, () =>
       withFakeCodexEnv(
         {
           output: JSON.stringify({ title: "Bedrock title" }),
@@ -190,7 +315,8 @@ it.layer(layerCodexTextGenerationTest)("CodexTextGeneration", (it) => {
             expect(result.title).toBe("Bedrock title");
           }),
       ),
-  );
+    );
+  }
   it.effect("generates and sanitizes commit messages without branch by default", () =>
     withFakeCodexEnv(
       {
@@ -402,76 +528,6 @@ it.layer(layerCodexTextGenerationTest)("CodexTextGeneration", (it) => {
           });
 
           expect(generated.branch).toBe("feat/session");
-        }),
-    ),
-  );
-
-  it.effect.each([
-    {
-      mode: "static",
-      output: "Add Search",
-      expected: "team/add-search",
-      instruction: "without a prefix or namespace",
-    },
-    {
-      mode: "semantic",
-      output: "feat/add-search",
-      expected: "feat/add-search",
-      instruction: "semantic prefix",
-    },
-    {
-      mode: "custom",
-      output: "Julius/ABC-123.v2",
-      expected: "Julius/ABC-123.v2",
-      instruction: "Preserve the issue ID and capitalization.",
-    },
-  ] as const)("generates a branch using $mode naming", (example) =>
-    withFakeCodexEnv(
-      {
-        output: JSON.stringify({ branch: example.output }),
-        stdinMustContain: example.instruction,
-      },
-      (textGeneration) =>
-        Effect.gen(function* () {
-          const generated = yield* textGeneration.generateBranchName({
-            cwd: process.cwd(),
-            message: "Add search",
-            modelSelection: DEFAULT_TEST_MODEL_SELECTION,
-            naming: {
-              mode: example.mode,
-              prefix: "team/",
-              instructions: "Preserve the issue ID and capitalization.",
-            },
-          });
-          expect(generated.branch).toBe(example.expected);
-        }),
-    ),
-  );
-
-  it.effect("generates branch names even when the ambient scope is already closed", () =>
-    withFakeCodexEnv(
-      {
-        output: JSON.stringify({
-          branch: "feat/background-generation",
-        }),
-      },
-      (textGeneration) =>
-        Effect.gen(function* () {
-          // Background fibers (e.g. the worktree branch rename fork) can run
-          // after their launching request's scope has closed; temp files must
-          // not be tied to that ambient scope or they are reaped on creation.
-          const closedScope = yield* Scope.make();
-          yield* Scope.close(closedScope, Exit.void);
-
-          const generated = yield* textGeneration
-            .generateBranchName({
-              cwd: process.cwd(),
-              message: "Please update session handling.",
-              modelSelection: DEFAULT_TEST_MODEL_SELECTION,
-            })
-            .pipe(Effect.provideService(Scope.Scope, closedScope));
-
-          expect(generated.branch).toBe("feat/background-generation");
         }),
     ),
   );

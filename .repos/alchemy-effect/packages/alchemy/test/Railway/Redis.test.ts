@@ -1,5 +1,4 @@
-import { Query } from "@distilled.cloud/core/query";
-import { Railway as RailwayApi } from "@distilled.cloud/railway";
+import * as railway from "@distilled.cloud/railway";
 import * as Provider from "@/Provider";
 import * as Railway from "@/Railway";
 import { suitePartition } from "./suiteProject.ts";
@@ -21,53 +20,6 @@ const redisCommand = (...args: Parameters<typeof Railway.runRedisCommand>) =>
 
 const REDIS_VALUE = "alchemy-railway-redis";
 
-const readVariables = Query.fn(
-  (projectId: string, environmentId: string, serviceId: string) =>
-    RailwayApi.variables({
-      projectId,
-      environmentId,
-      serviceId,
-      unrendered: true,
-    }),
-);
-
-const readServiceDeletedAt = Query.fn((id: string) => ({
-  deletedAt: RailwayApi.service({ id }).deletedAt,
-}));
-
-const readService = Query.fn((id: string) => {
-  const service = RailwayApi.service({ id });
-  return {
-    id: service.id,
-    name: service.name,
-    projectId: service.projectId,
-    deletedAt: service.deletedAt,
-  };
-});
-
-const readServiceInstance = Query.fn(
-  (environmentId: string, serviceId: string) => {
-    const instance = RailwayApi.serviceInstance({ environmentId, serviceId });
-    return {
-      serviceId: instance.serviceId,
-      image: instance.source.image,
-    };
-  },
-);
-
-const readTcpProxies = Query.fn((environmentId: string, serviceId: string) =>
-  RailwayApi.tcpProxies({ environmentId, serviceId }).pipe(
-    Query.map((proxy) => ({
-      id: proxy.id,
-      domain: proxy.domain,
-      proxyPort: proxy.proxyPort,
-      applicationPort: proxy.applicationPort,
-      deletedAt: proxy.deletedAt,
-      syncStatus: proxy.syncStatus,
-    })),
-  ),
-);
-
 const asVariableMap = (value: unknown): Record<string, string> => {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     return {};
@@ -86,19 +38,28 @@ const readServiceVariables = (
   environmentId: string,
   serviceId: string,
 ) =>
-  readVariables(projectId, environmentId, serviceId).pipe(
-    Effect.map(asVariableMap),
-    Effect.catchTag("RailwayNotFound", () =>
-      Effect.succeed({} as Record<string, string>),
-    ),
-  );
+  railway
+    .variables({
+      projectId,
+      environmentId,
+      serviceId,
+      unrendered: true,
+    })
+    .pipe(
+      Effect.map(asVariableMap),
+      railway.catchTags(["RailwayNotFound"], () =>
+        Effect.succeed({} as Record<string, string>),
+      ),
+    );
 
 const waitUntilGone = (serviceId: string) =>
-  readServiceDeletedAt(serviceId).pipe(
+  railway.service({ id: serviceId }, { deletedAt: true }).pipe(
     Effect.map((service) =>
       service.deletedAt != null ? ("gone" as const) : ("found" as const),
     ),
-    Effect.catchTag("RailwayNotFound", () => Effect.succeed("gone" as const)),
+    railway.catchTags(["RailwayNotFound"], () =>
+      Effect.succeed("gone" as const),
+    ),
     Effect.repeat({
       schedule: Schedule.spaced("1 second"),
       until: (status) => status === "gone",
@@ -111,24 +72,38 @@ const waitUntilProxyGone = (
   serviceId: string,
   id: string,
 ) =>
-  readTcpProxies(environmentId, serviceId).pipe(
-    Effect.map((items) =>
-      items.some(
-        (proxy) =>
-          proxy.id === id &&
-          proxy.deletedAt == null &&
-          proxy.syncStatus !== "DELETED",
-      )
-        ? ("found" as const)
-        : ("gone" as const),
-    ),
-    Effect.catchTag("RailwayNotFound", () => Effect.succeed("gone" as const)),
-    Effect.repeat({
-      schedule: Schedule.spaced("1 second"),
-      until: (status) => status === "gone",
-      times: 10,
-    }),
-  );
+  railway
+    .tcpProxies(
+      { environmentId, serviceId },
+      {
+        id: true,
+        domain: true,
+        proxyPort: true,
+        applicationPort: true,
+        deletedAt: true,
+        syncStatus: true,
+      },
+    )
+    .pipe(
+      Effect.map((items) =>
+        items.some(
+          (proxy) =>
+            proxy.id === id &&
+            proxy.deletedAt == null &&
+            proxy.syncStatus !== "DELETED",
+        )
+          ? ("found" as const)
+          : ("gone" as const),
+      ),
+      railway.catchTags(["RailwayNotFound"], () =>
+        Effect.succeed("gone" as const),
+      ),
+      Effect.repeat({
+        schedule: Schedule.spaced("1 second"),
+        until: (status) => status === "gone",
+        times: 10,
+      }),
+    );
 
 test.provider(
   "create, set/get via tcp proxy, update, list, and delete redis",
@@ -169,18 +144,24 @@ test.provider(
       expect(created.proxy.domain).toEqual(expect.any(String));
       expect(created.proxy.proxyPort).toEqual(expect.any(Number));
 
-      const fetched = yield* readService(created.cache.serviceId);
+      const fetched = yield* railway.service(
+        { id: created.cache.serviceId },
+        { id: true, name: true, projectId: true, deletedAt: true },
+      );
       expect(fetched.id).toEqual(created.cache.serviceId);
       expect(fetched.name).toEqual(created.cache.name);
       expect(fetched.projectId).toEqual(created.cache.projectId);
       expect(fetched.deletedAt).toBeNull();
 
-      const instance = yield* readServiceInstance(
-        created.cache.environmentId,
-        created.cache.serviceId,
+      const instance = yield* railway.serviceInstance(
+        {
+          environmentId: created.cache.environmentId,
+          serviceId: created.cache.serviceId,
+        },
+        { serviceId: true, source: { image: true } },
       );
       expect(instance.serviceId).toEqual(created.cache.serviceId);
-      expect(instance.image).toEqual(expect.stringContaining("redis"));
+      expect(instance.source?.image).toEqual(expect.stringContaining("redis"));
 
       const vars = yield* readServiceVariables(
         created.cache.projectId,
@@ -250,7 +231,12 @@ test.provider(
       expect(updated.cache.privateHost).toEqual(`${nextName}.railway.internal`);
       expect(updated.proxy.id).toEqual(created.proxy.id);
 
-      const fetchedUpdate = yield* readService(updated.cache.serviceId);
+      const fetchedUpdate = yield* railway.service(
+        {
+          id: updated.cache.serviceId,
+        },
+        { name: true },
+      );
       expect(fetchedUpdate.name).toEqual(nextName);
 
       yield* stack.destroy();
@@ -264,17 +250,5 @@ test.provider(
       const gone = yield* waitUntilGone(created.cache.serviceId);
       expect(gone).toEqual("gone");
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:railway",
-      "provider:railway:project",
-      "provider:railway:projectenvironment",
-      "provider:railway:redis",
-      "provider:railway:service",
-      "provider:railway:tcpproxy",
-      "provider:railway:variable",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

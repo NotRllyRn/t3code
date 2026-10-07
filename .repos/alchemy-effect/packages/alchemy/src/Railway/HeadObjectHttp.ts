@@ -8,7 +8,6 @@ import { HeadObject } from "./HeadObject.ts";
  * `headObject` against the Railway endpoint with the bucket's credentials.
  *
  * @layer
- * @product Bucket
  * @provides Railway.HeadObject
  */
 export const HeadObjectHttp = Layer.effect(

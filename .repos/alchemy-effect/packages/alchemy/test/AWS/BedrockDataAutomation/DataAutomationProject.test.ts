@@ -72,7 +72,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:bedrockdataautomation", "live"] },
 );
 
 test.provider(
@@ -146,10 +145,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertProjectDeleted(project.projectArn);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:bedrockdataautomation", "live"],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );
 
 test.provider(
@@ -200,8 +196,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertProjectDeleted(project.projectArn);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:bedrockdataautomation", "live"],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

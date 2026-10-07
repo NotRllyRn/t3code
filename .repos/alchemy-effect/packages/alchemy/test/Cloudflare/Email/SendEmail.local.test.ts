@@ -7,7 +7,7 @@ import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import { MinimumLogLevel } from "effect/References";
 import * as Schedule from "effect/Schedule";
-import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClient from "effect/unstable/http/HttpClient";
 import * as pathe from "pathe";
 import LocalSendEmailWorker from "./fixtures/local-worker.ts";
 import RemoteEmailWorker from "./fixtures/remote-email-worker.ts";
@@ -171,15 +171,7 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:email",
-      "provider:cloudflare:worker",
-      "local",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 /**
@@ -229,15 +221,7 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:email",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 const FROM = process.env.CLOUDFLARE_TEST_EMAIL_FROM;
@@ -278,13 +262,5 @@ test.provider.skipIf(skipRemote)(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:email",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

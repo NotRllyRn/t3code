@@ -115,7 +115,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertPoolDeleted(pool.userPoolId);
     }),
-  { tags: ["provider:aws", "provider:aws:cognito", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -182,7 +182,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertPoolDeleted(replaced.userPoolId);
     }),
-  { tags: ["provider:aws", "provider:aws:cognito", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );
 
 // Regression: https://github.com/alchemy-run/alchemy/issues/1311 — email OTP
@@ -275,16 +275,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertPoolDeleted(created.pool.userPoolId);
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:cognito",
-      "provider:aws:kms",
-      "provider:aws:lambda",
-      "live",
-    ],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 // UpdateUserPool resets any field omitted from its body to the service
@@ -360,7 +351,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertPoolDeleted(pool.userPoolId);
     }),
-  { tags: ["provider:aws", "provider:aws:cognito", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -414,5 +405,5 @@ test.provider(
       // nothing was created — the validation runs before any API call
       yield* stack.destroy();
     }),
-  { tags: ["provider:aws", "provider:aws:cognito", "live"], timeout: 60_000 },
+  { timeout: 60_000 },
 );

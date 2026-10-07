@@ -30,142 +30,132 @@ const main = pathe.resolve(import.meta.dirname, "consumer-worker.ts");
  * issued every reconcile (so settings drift gets corrected even when
  * `olds.settings` matches `news.settings`).
  */
-test.provider(
-  "create, update settings, replace script, delete",
-  (stack) =>
-    Effect.gen(function* () {
-      const env = yield* CloudflareEnvironment;
-      const { accountId } = yield* env;
+test.provider("create, update settings, replace script, delete", (stack) =>
+  Effect.gen(function* () {
+    const env = yield* CloudflareEnvironment;
+    const { accountId } = yield* env;
 
-      yield* stack.destroy();
+    yield* stack.destroy();
 
-      const initial = yield* stack.deploy(
-        Effect.gen(function* () {
-          const queue = yield* Cloudflare.Queues.Queue("Q");
-          const workerA = yield* Cloudflare.Worker("WorkerA", {
-            main,
-            compatibility: { date: "2024-01-01" },
-          });
-          const consumer = yield* Cloudflare.Queues.Consumer("Consumer", {
-            queueId: queue.queueId,
-            scriptName: workerA.workerName,
-            settings: { batchSize: 5, maxRetries: 3 },
-          });
-          return { queue, workerA, consumer };
-        }),
-      );
+    const initial = yield* stack.deploy(
+      Effect.gen(function* () {
+        const queue = yield* Cloudflare.Queues.Queue("Q");
+        const workerA = yield* Cloudflare.Worker("WorkerA", {
+          main,
+          compatibility: { date: "2024-01-01" },
+        });
+        const consumer = yield* Cloudflare.Queues.Consumer("Consumer", {
+          queueId: queue.queueId,
+          scriptName: workerA.workerName,
+          settings: { batchSize: 5, maxRetries: 3 },
+        });
+        return { queue, workerA, consumer };
+      }),
+    );
 
-      expect(initial.consumer.consumerId).toBeTypeOf("string");
-      expect(initial.consumer.scriptName).toEqual(initial.workerA.workerName);
+    expect(initial.consumer.consumerId).toBeTypeOf("string");
+    expect(initial.consumer.scriptName).toEqual(initial.workerA.workerName);
 
-      const live = yield* queues.getConsumer({
+    const live = yield* queues.getConsumer({
+      accountId,
+      queueId: initial.queue.queueId,
+      consumerId: initial.consumer.consumerId,
+    });
+    expect("scriptName" in live ? live.scriptName : undefined).toEqual(
+      initial.workerA.workerName,
+    );
+
+    // Settings-only change is an update, not a replace — consumerId
+    // must remain stable.
+    const updated = yield* stack.deploy(
+      Effect.gen(function* () {
+        const queue = yield* Cloudflare.Queues.Queue("Q");
+        const workerA = yield* Cloudflare.Worker("WorkerA", {
+          main,
+          compatibility: { date: "2024-01-01" },
+        });
+        const consumer = yield* Cloudflare.Queues.Consumer("Consumer", {
+          queueId: queue.queueId,
+          scriptName: workerA.workerName,
+          settings: { batchSize: 25, maxRetries: 7 },
+        });
+        return { queue, workerA, consumer };
+      }),
+    );
+
+    expect(updated.consumer.consumerId).toEqual(initial.consumer.consumerId);
+
+    const liveUpdated = yield* queues.getConsumer({
+      accountId,
+      queueId: updated.queue.queueId,
+      consumerId: updated.consumer.consumerId,
+    });
+    expect(liveUpdated.settings?.batchSize).toEqual(25);
+    expect(liveUpdated.settings?.maxRetries).toEqual(7);
+
+    // Script change is a delete-first replace: Cloudflare's
+    // updateConsumer silently ignores script_name on an existing
+    // consumer, and the platform allows only one Worker consumer
+    // per queue, so the engine must tear the old consumer down
+    // before creating the new one. WorkerA stays yielded across
+    // the deploy so it isn't garbage-collected mid-replace and
+    // race the Worker.delete with Cloudflare's queue↔script sync.
+    const replaced = yield* stack.deploy(
+      Effect.gen(function* () {
+        const queue = yield* Cloudflare.Queues.Queue("Q");
+        yield* Cloudflare.Worker("WorkerA", {
+          main,
+          compatibility: { date: "2024-01-01" },
+        });
+        const workerB = yield* Cloudflare.Worker("WorkerB", {
+          main,
+          compatibility: { date: "2024-01-01" },
+        });
+        const consumer = yield* Cloudflare.Queues.Consumer("Consumer", {
+          queueId: queue.queueId,
+          scriptName: workerB.workerName,
+          settings: { batchSize: 25, maxRetries: 7 },
+        });
+        return { queue, workerB, consumer };
+      }),
+    );
+
+    expect(replaced.consumer.consumerId).not.toEqual(
+      initial.consumer.consumerId,
+    );
+    expect(replaced.consumer.scriptName).toEqual(replaced.workerB.workerName);
+
+    const liveReplaced = yield* queues.getConsumer({
+      accountId,
+      queueId: replaced.queue.queueId,
+      consumerId: replaced.consumer.consumerId,
+    });
+    expect(
+      "scriptName" in liveReplaced ? liveReplaced.scriptName : undefined,
+    ).toEqual(replaced.workerB.workerName);
+
+    // The original consumer must be gone after the replace.
+    const oldExit = yield* Effect.exit(
+      queues.getConsumer({
         accountId,
-        queueId: initial.queue.queueId,
+        queueId: replaced.queue.queueId,
         consumerId: initial.consumer.consumerId,
-      });
-      expect("scriptName" in live ? live.scriptName : undefined).toEqual(
-        initial.workerA.workerName,
-      );
+      }),
+    );
+    expect(Exit.isFailure(oldExit)).toBe(true);
 
-      // Settings-only change is an update, not a replace — consumerId
-      // must remain stable.
-      const updated = yield* stack.deploy(
-        Effect.gen(function* () {
-          const queue = yield* Cloudflare.Queues.Queue("Q");
-          const workerA = yield* Cloudflare.Worker("WorkerA", {
-            main,
-            compatibility: { date: "2024-01-01" },
-          });
-          const consumer = yield* Cloudflare.Queues.Consumer("Consumer", {
-            queueId: queue.queueId,
-            scriptName: workerA.workerName,
-            settings: { batchSize: 25, maxRetries: 7 },
-          });
-          return { queue, workerA, consumer };
-        }),
-      );
+    yield* stack.destroy();
 
-      expect(updated.consumer.consumerId).toEqual(initial.consumer.consumerId);
-
-      const liveUpdated = yield* queues.getConsumer({
-        accountId,
-        queueId: updated.queue.queueId,
-        consumerId: updated.consumer.consumerId,
-      });
-      expect(liveUpdated.settings?.batchSize).toEqual(25);
-      expect(liveUpdated.settings?.maxRetries).toEqual(7);
-
-      // Script change is a delete-first replace: Cloudflare's
-      // updateConsumer silently ignores script_name on an existing
-      // consumer, and the platform allows only one Worker consumer
-      // per queue, so the engine must tear the old consumer down
-      // before creating the new one. WorkerA stays yielded across
-      // the deploy so it isn't garbage-collected mid-replace and
-      // race the Worker.delete with Cloudflare's queue↔script sync.
-      const replaced = yield* stack.deploy(
-        Effect.gen(function* () {
-          const queue = yield* Cloudflare.Queues.Queue("Q");
-          yield* Cloudflare.Worker("WorkerA", {
-            main,
-            compatibility: { date: "2024-01-01" },
-          });
-          const workerB = yield* Cloudflare.Worker("WorkerB", {
-            main,
-            compatibility: { date: "2024-01-01" },
-          });
-          const consumer = yield* Cloudflare.Queues.Consumer("Consumer", {
-            queueId: queue.queueId,
-            scriptName: workerB.workerName,
-            settings: { batchSize: 25, maxRetries: 7 },
-          });
-          return { queue, workerB, consumer };
-        }),
-      );
-
-      expect(replaced.consumer.consumerId).not.toEqual(
-        initial.consumer.consumerId,
-      );
-      expect(replaced.consumer.scriptName).toEqual(replaced.workerB.workerName);
-
-      const liveReplaced = yield* queues.getConsumer({
+    // Post-destroy: the new consumer must be gone on Cloudflare too.
+    const exit = yield* Effect.exit(
+      queues.getConsumer({
         accountId,
         queueId: replaced.queue.queueId,
         consumerId: replaced.consumer.consumerId,
-      });
-      expect(
-        "scriptName" in liveReplaced ? liveReplaced.scriptName : undefined,
-      ).toEqual(replaced.workerB.workerName);
-
-      // The original consumer must be gone after the replace.
-      const oldExit = yield* Effect.exit(
-        queues.getConsumer({
-          accountId,
-          queueId: replaced.queue.queueId,
-          consumerId: initial.consumer.consumerId,
-        }),
-      );
-      expect(Exit.isFailure(oldExit)).toBe(true);
-
-      yield* stack.destroy();
-
-      // Post-destroy: the new consumer must be gone on Cloudflare too.
-      const exit = yield* Effect.exit(
-        queues.getConsumer({
-          accountId,
-          queueId: replaced.queue.queueId,
-          consumerId: replaced.consumer.consumerId,
-        }),
-      );
-      expect(Exit.isFailure(exit)).toBe(true);
-    }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:queue",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-  },
+      }),
+    );
+    expect(Exit.isFailure(exit)).toBe(true);
+  }).pipe(logLevel),
 );
 
 /**
@@ -179,88 +169,78 @@ test.provider(
  * `noop` and skips drift detection by design — drift correction
  * only happens when something the user-controlled changes).
  */
-test.provider(
-  "recreates consumer after out-of-band delete",
-  (stack) =>
-    Effect.gen(function* () {
-      const env = yield* CloudflareEnvironment;
-      const { accountId } = yield* env;
+test.provider("recreates consumer after out-of-band delete", (stack) =>
+  Effect.gen(function* () {
+    const env = yield* CloudflareEnvironment;
+    const { accountId } = yield* env;
 
-      yield* stack.destroy();
+    yield* stack.destroy();
 
-      const initial = yield* stack.deploy(
-        Effect.gen(function* () {
-          const queue = yield* Cloudflare.Queues.Queue("Q");
-          const worker = yield* Cloudflare.Worker("Worker", {
-            main,
-            compatibility: { date: "2024-01-01" },
-          });
-          const consumer = yield* Cloudflare.Queues.Consumer("Consumer", {
-            queueId: queue.queueId,
-            scriptName: worker.workerName,
-            settings: { batchSize: 5 },
-          });
-          return { queue, worker, consumer };
-        }),
-      );
+    const initial = yield* stack.deploy(
+      Effect.gen(function* () {
+        const queue = yield* Cloudflare.Queues.Queue("Q");
+        const worker = yield* Cloudflare.Worker("Worker", {
+          main,
+          compatibility: { date: "2024-01-01" },
+        });
+        const consumer = yield* Cloudflare.Queues.Consumer("Consumer", {
+          queueId: queue.queueId,
+          scriptName: worker.workerName,
+          settings: { batchSize: 5 },
+        });
+        return { queue, worker, consumer };
+      }),
+    );
 
-      // Out-of-band delete via the SDK directly.
-      yield* queues.deleteConsumer({
+    // Out-of-band delete via the SDK directly.
+    yield* queues.deleteConsumer({
+      accountId,
+      queueId: initial.queue.queueId,
+      consumerId: initial.consumer.consumerId,
+    });
+
+    const recovered = yield* stack.deploy(
+      Effect.gen(function* () {
+        const queue = yield* Cloudflare.Queues.Queue("Q");
+        const worker = yield* Cloudflare.Worker("Worker", {
+          main,
+          compatibility: { date: "2024-01-01" },
+        });
+        const consumer = yield* Cloudflare.Queues.Consumer("Consumer", {
+          queueId: queue.queueId,
+          scriptName: worker.workerName,
+          settings: { batchSize: 11 },
+        });
+        return { queue, worker, consumer };
+      }),
+    );
+
+    expect(recovered.consumer.consumerId).toBeTypeOf("string");
+    // The new consumer must be reachable on Cloudflare — the previous
+    // implementation died with "already exists but could not be found"
+    // because listConsumers was single-page and ConsumerAlreadyExists
+    // was caught by a generic `Effect.catch`. A freshly-created consumer
+    // can briefly 404 from this out-of-band read under load, so ride out
+    // the read-after-create lag before asserting.
+    const live = yield* queues
+      .getConsumer({
         accountId,
-        queueId: initial.queue.queueId,
-        consumerId: initial.consumer.consumerId,
-      });
-
-      const recovered = yield* stack.deploy(
-        Effect.gen(function* () {
-          const queue = yield* Cloudflare.Queues.Queue("Q");
-          const worker = yield* Cloudflare.Worker("Worker", {
-            main,
-            compatibility: { date: "2024-01-01" },
-          });
-          const consumer = yield* Cloudflare.Queues.Consumer("Consumer", {
-            queueId: queue.queueId,
-            scriptName: worker.workerName,
-            settings: { batchSize: 11 },
-          });
-          return { queue, worker, consumer };
+        queueId: recovered.queue.queueId,
+        consumerId: recovered.consumer.consumerId,
+      })
+      .pipe(
+        Effect.retry({
+          while: (e) => e._tag === "ConsumerNotFound",
+          schedule: Schedule.exponential("500 millis"),
+          times: 8,
         }),
       );
+    expect("scriptName" in live ? live.scriptName : undefined).toEqual(
+      recovered.worker.workerName,
+    );
 
-      expect(recovered.consumer.consumerId).toBeTypeOf("string");
-      // The new consumer must be reachable on Cloudflare — the previous
-      // implementation died with "already exists but could not be found"
-      // because listConsumers was single-page and ConsumerAlreadyExists
-      // was caught by a generic `Effect.catch`. A freshly-created consumer
-      // can briefly 404 from this out-of-band read under load, so ride out
-      // the read-after-create lag before asserting.
-      const live = yield* queues
-        .getConsumer({
-          accountId,
-          queueId: recovered.queue.queueId,
-          consumerId: recovered.consumer.consumerId,
-        })
-        .pipe(
-          Effect.retry({
-            while: (e) => e._tag === "ConsumerNotFound",
-            schedule: Schedule.exponential("500 millis"),
-            times: 8,
-          }),
-        );
-      expect("scriptName" in live ? live.scriptName : undefined).toEqual(
-        recovered.worker.workerName,
-      );
-
-      yield* stack.destroy();
-    }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:queue",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-  },
+    yield* stack.destroy();
+  }).pipe(logLevel),
 );
 
 /**
@@ -270,78 +250,68 @@ test.provider(
  * `output.consumerId` is missing — so the consumer is adopted instead
  * of producing a duplicate-create attempt.
  */
-test.provider(
-  "adopts existing consumer after local state loss",
-  (stack) =>
-    Effect.gen(function* () {
-      const { accountId } = yield* yield* CloudflareEnvironment;
+test.provider("adopts existing consumer after local state loss", (stack) =>
+  Effect.gen(function* () {
+    const { accountId } = yield* yield* CloudflareEnvironment;
 
-      yield* stack.destroy();
+    yield* stack.destroy();
 
-      const initial = yield* stack.deploy(
-        Effect.gen(function* () {
-          const queue = yield* Cloudflare.Queues.Queue("Q");
-          const worker = yield* Cloudflare.Worker("Worker", {
-            main,
-            compatibility: { date: "2024-01-01" },
-          });
-          const consumer = yield* Cloudflare.Queues.Consumer("Consumer", {
-            queueId: queue.queueId,
-            scriptName: worker.workerName,
-          });
-          return { queue, worker, consumer };
-        }),
-      );
-
-      // Wipe just the Consumer entry — Queue and Worker stay so the
-      // redeploy reuses the same queueId / scriptName.
-      yield* Effect.gen(function* () {
-        const state = yield* yield* State;
-        yield* state.delete({
-          stack: stack.name,
-          stage: stack.stage,
-          fqn: "Consumer",
+    const initial = yield* stack.deploy(
+      Effect.gen(function* () {
+        const queue = yield* Cloudflare.Queues.Queue("Q");
+        const worker = yield* Cloudflare.Worker("Worker", {
+          main,
+          compatibility: { date: "2024-01-01" },
         });
-      }).pipe(Effect.provide(stack.state));
+        const consumer = yield* Cloudflare.Queues.Consumer("Consumer", {
+          queueId: queue.queueId,
+          scriptName: worker.workerName,
+        });
+        return { queue, worker, consumer };
+      }),
+    );
 
-      const adopted = yield* stack.deploy(
-        Effect.gen(function* () {
-          const queue = yield* Cloudflare.Queues.Queue("Q");
-          const worker = yield* Cloudflare.Worker("Worker", {
-            main,
-            compatibility: { date: "2024-01-01" },
-          });
-          const consumer = yield* Cloudflare.Queues.Consumer("Consumer", {
-            queueId: queue.queueId,
-            scriptName: worker.workerName,
-          });
-          return { queue, worker, consumer };
-        }),
-      );
-
-      // Adoption: the consumerId from Cloudflare equals the one we
-      // created originally — we did not duplicate-create.
-      expect(adopted.consumer.consumerId).toEqual(initial.consumer.consumerId);
-
-      const live = yield* queues.getConsumer({
-        accountId,
-        queueId: adopted.queue.queueId,
-        consumerId: adopted.consumer.consumerId,
+    // Wipe just the Consumer entry — Queue and Worker stay so the
+    // redeploy reuses the same queueId / scriptName.
+    yield* Effect.gen(function* () {
+      const state = yield* yield* State;
+      yield* state.delete({
+        stack: stack.name,
+        stage: stack.stage,
+        fqn: "Consumer",
       });
-      expect("scriptName" in live ? live.scriptName : undefined).toEqual(
-        adopted.worker.workerName,
-      );
+    }).pipe(Effect.provide(stack.state));
 
-      yield* stack.destroy();
-    }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:queue",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-  },
+    const adopted = yield* stack.deploy(
+      Effect.gen(function* () {
+        const queue = yield* Cloudflare.Queues.Queue("Q");
+        const worker = yield* Cloudflare.Worker("Worker", {
+          main,
+          compatibility: { date: "2024-01-01" },
+        });
+        const consumer = yield* Cloudflare.Queues.Consumer("Consumer", {
+          queueId: queue.queueId,
+          scriptName: worker.workerName,
+        });
+        return { queue, worker, consumer };
+      }),
+    );
+
+    // Adoption: the consumerId from Cloudflare equals the one we
+    // created originally — we did not duplicate-create.
+    expect(adopted.consumer.consumerId).toEqual(initial.consumer.consumerId);
+
+    const live = yield* queues.getConsumer({
+      accountId,
+      queueId: adopted.queue.queueId,
+      consumerId: adopted.consumer.consumerId,
+    });
+    expect("scriptName" in live ? live.scriptName : undefined).toEqual(
+      adopted.worker.workerName,
+    );
+
+    yield* stack.destroy();
+  }).pipe(logLevel),
 );
 
 /**
@@ -435,14 +405,6 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:queue",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-  },
 );
 
 /**
@@ -535,14 +497,6 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:queue",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-  },
 );
 
 /**
@@ -553,64 +507,61 @@ test.provider(
  * malformed. The live provider's `delete` short-circuits on the non-live
  * id, so destroy succeeds and the state row is removed cleanly.
  */
-test.provider(
-  "suppresses deletion of a dev-only consumer",
-  (stack) =>
-    Effect.gen(function* () {
-      const { accountId } = yield* yield* CloudflareEnvironment;
+test.provider("suppresses deletion of a dev-only consumer", (stack) =>
+  Effect.gen(function* () {
+    const { accountId } = yield* yield* CloudflareEnvironment;
 
-      yield* stack.destroy();
+    yield* stack.destroy();
 
-      const devQueueId = generateLocalId();
-      const devConsumerId = generateLocalId();
+    const devQueueId = generateLocalId();
+    const devConsumerId = generateLocalId();
 
-      yield* Effect.gen(function* () {
-        const state = yield* yield* State;
-        yield* state.set({
-          stack: stack.name,
-          stage: stack.stage,
+    yield* Effect.gen(function* () {
+      const state = yield* yield* State;
+      yield* state.set({
+        stack: stack.name,
+        stage: stack.stage,
+        fqn: "Consumer",
+        value: {
+          kind: "resource",
+          status: "created",
+          resourceType: "Cloudflare.Queues.Consumer",
+          namespace: undefined,
           fqn: "Consumer",
-          value: {
-            kind: "resource",
-            status: "created",
-            resourceType: "Cloudflare.Queues.Consumer",
-            namespace: undefined,
-            fqn: "Consumer",
-            logicalId: "Consumer",
-            instanceId: "00000000000000000000000000000002",
-            providerVersion: 0,
-            bindings: [],
-            downstream: [],
-            props: {
-              queueId: devQueueId,
-              scriptName: "dev-worker",
-            },
-            attr: {
-              consumerId: devConsumerId,
-              queueId: devQueueId,
-              scriptName: "dev-worker",
-              accountId,
-            },
-          } satisfies CreatedResourceState,
-        });
+          logicalId: "Consumer",
+          instanceId: "00000000000000000000000000000002",
+          providerVersion: 0,
+          bindings: [],
+          downstream: [],
+          props: {
+            queueId: devQueueId,
+            scriptName: "dev-worker",
+          },
+          attr: {
+            consumerId: devConsumerId,
+            queueId: devQueueId,
+            scriptName: "dev-worker",
+            accountId,
+          },
+        } satisfies CreatedResourceState,
       });
+    });
 
-      // Destroy must not attempt a (malformed) live delete against the dev ids.
-      const exit = yield* Effect.exit(stack.destroy());
-      expect(Exit.isSuccess(exit)).toBe(true);
+    // Destroy must not attempt a (malformed) live delete against the dev ids.
+    const exit = yield* Effect.exit(stack.destroy());
+    expect(Exit.isSuccess(exit)).toBe(true);
 
-      // The dev-only resource is removed from state.
-      const persisted = yield* Effect.gen(function* () {
-        const state = yield* yield* State;
-        return yield* state.get({
-          stack: stack.name,
-          stage: stack.stage,
-          fqn: "Consumer",
-        });
+    // The dev-only resource is removed from state.
+    const persisted = yield* Effect.gen(function* () {
+      const state = yield* yield* State;
+      return yield* state.get({
+        stack: stack.name,
+        stage: stack.stage,
+        fqn: "Consumer",
       });
-      expect(persisted).toBeUndefined();
-    }).pipe(logLevel),
-  { tags: ["provider:cloudflare", "provider:cloudflare:queue", "live"] },
+    });
+    expect(persisted).toBeUndefined();
+  }).pipe(logLevel),
 );
 
 /**
@@ -626,85 +577,75 @@ test.provider(
  * (not `noop`), so `reconcile` runs, re-observes the live consumer, and
  * the persisted id is healed back to the real one.
  */
-test.provider(
-  "promotes a dev consumer to a live consumer on deploy",
-  (stack) =>
-    Effect.gen(function* () {
-      const { accountId } = yield* yield* CloudflareEnvironment;
+test.provider("promotes a dev consumer to a live consumer on deploy", (stack) =>
+  Effect.gen(function* () {
+    const { accountId } = yield* yield* CloudflareEnvironment;
 
-      yield* stack.destroy();
+    yield* stack.destroy();
 
-      const buildStack = Effect.gen(function* () {
-        const queue = yield* Cloudflare.Queues.Queue("Q");
-        const worker = yield* Cloudflare.Worker("Worker", {
-          main,
-          compatibility: { date: "2024-01-01" },
-        });
-        const consumer = yield* Cloudflare.Queues.Consumer("Consumer", {
-          queueId: queue.queueId,
-          scriptName: worker.workerName,
-          settings: { batchSize: 5 },
-        });
-        return { queue, worker, consumer };
+    const buildStack = Effect.gen(function* () {
+      const queue = yield* Cloudflare.Queues.Queue("Q");
+      const worker = yield* Cloudflare.Worker("Worker", {
+        main,
+        compatibility: { date: "2024-01-01" },
       });
+      const consumer = yield* Cloudflare.Queues.Consumer("Consumer", {
+        queueId: queue.queueId,
+        scriptName: worker.workerName,
+        settings: { batchSize: 5 },
+      });
+      return { queue, worker, consumer };
+    });
 
-      const initial = yield* stack.deploy(buildStack);
-      expect(isLiveId(initial.consumer.consumerId)).toBe(true);
+    const initial = yield* stack.deploy(buildStack);
+    expect(isLiveId(initial.consumer.consumerId)).toBe(true);
 
-      // Rewrite the persisted consumerId back to a dev id, simulating a
-      // consumer that was minted in `alchemy dev`.
-      const devQueueId = generateLocalId();
-      const devConsumerId = generateLocalId();
-      yield* Effect.gen(function* () {
-        const state = yield* yield* State;
-        const currentConsumer = (yield* state.get({
-          stack: stack.name,
-          stage: stack.stage,
-          fqn: "Consumer",
-        })) as CreatedResourceState;
-        yield* state.set({
-          stack: stack.name,
-          stage: stack.stage,
-          fqn: "Consumer",
-          value: {
-            ...currentConsumer,
-            attr: {
-              ...currentConsumer.attr,
-              queueId: devQueueId,
-              consumerId: devConsumerId,
-            },
+    // Rewrite the persisted consumerId back to a dev id, simulating a
+    // consumer that was minted in `alchemy dev`.
+    const devQueueId = generateLocalId();
+    const devConsumerId = generateLocalId();
+    yield* Effect.gen(function* () {
+      const state = yield* yield* State;
+      const currentConsumer = (yield* state.get({
+        stack: stack.name,
+        stage: stack.stage,
+        fqn: "Consumer",
+      })) as CreatedResourceState;
+      yield* state.set({
+        stack: stack.name,
+        stage: stack.stage,
+        fqn: "Consumer",
+        value: {
+          ...currentConsumer,
+          attr: {
+            ...currentConsumer.attr,
+            queueId: devQueueId,
+            consumerId: devConsumerId,
           },
-        });
+        },
       });
+    });
 
-      const promoted = yield* stack.deploy(buildStack);
+    const promoted = yield* stack.deploy(buildStack);
 
-      // The dev id was promoted back to the real, live consumer id.
-      expect(isLiveId(promoted.consumer.consumerId)).toBe(true);
-      expect(isLiveId(promoted.queue.queueId)).toBe(true);
-      expect(promoted.consumer.consumerId).not.toEqual(devConsumerId);
-      expect(promoted.consumer.consumerId).toEqual(initial.consumer.consumerId);
-      expect(promoted.queue.queueId).toEqual(initial.queue.queueId);
+    // The dev id was promoted back to the real, live consumer id.
+    expect(isLiveId(promoted.consumer.consumerId)).toBe(true);
+    expect(isLiveId(promoted.queue.queueId)).toBe(true);
+    expect(promoted.consumer.consumerId).not.toEqual(devConsumerId);
+    expect(promoted.consumer.consumerId).toEqual(initial.consumer.consumerId);
+    expect(promoted.queue.queueId).toEqual(initial.queue.queueId);
 
-      const live = yield* queues.getConsumer({
-        accountId,
-        queueId: promoted.queue.queueId,
-        consumerId: promoted.consumer.consumerId,
-      });
-      expect("scriptName" in live ? live.scriptName : undefined).toEqual(
-        promoted.worker.workerName,
-      );
+    const live = yield* queues.getConsumer({
+      accountId,
+      queueId: promoted.queue.queueId,
+      consumerId: promoted.consumer.consumerId,
+    });
+    expect("scriptName" in live ? live.scriptName : undefined).toEqual(
+      promoted.worker.workerName,
+    );
 
-      yield* stack.destroy();
-    }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:queue",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-  },
+    yield* stack.destroy();
+  }).pipe(logLevel),
 );
 
 /**
@@ -714,47 +655,37 @@ test.provider(
  * consumer, then assert the consumer is present in the exhaustively-
  * paginated result, hydrated into the same `Attributes` shape `read` returns.
  */
-test.provider(
-  "list enumerates the deployed consumer",
-  (stack) =>
-    Effect.gen(function* () {
-      yield* stack.destroy();
+test.provider("list enumerates the deployed consumer", (stack) =>
+  Effect.gen(function* () {
+    yield* stack.destroy();
 
-      const deployed = yield* stack.deploy(
-        Effect.gen(function* () {
-          const queue = yield* Cloudflare.Queues.Queue("Q");
-          const worker = yield* Cloudflare.Worker("Worker", {
-            main,
-            compatibility: { date: "2024-01-01" },
-          });
-          const consumer = yield* Cloudflare.Queues.Consumer("Consumer", {
-            queueId: queue.queueId,
-            scriptName: worker.workerName,
-            settings: { batchSize: 7 },
-          });
-          return { queue, worker, consumer };
-        }),
-      );
+    const deployed = yield* stack.deploy(
+      Effect.gen(function* () {
+        const queue = yield* Cloudflare.Queues.Queue("Q");
+        const worker = yield* Cloudflare.Worker("Worker", {
+          main,
+          compatibility: { date: "2024-01-01" },
+        });
+        const consumer = yield* Cloudflare.Queues.Consumer("Consumer", {
+          queueId: queue.queueId,
+          scriptName: worker.workerName,
+          settings: { batchSize: 7 },
+        });
+        return { queue, worker, consumer };
+      }),
+    );
 
-      const provider = yield* Provider.findProvider(Cloudflare.Queues.Consumer);
-      const all = yield* provider.list();
+    const provider = yield* Provider.findProvider(Cloudflare.Queues.Consumer);
+    const all = yield* provider.list();
 
-      const found = all.find(
-        (c) => c.consumerId === deployed.consumer.consumerId,
-      );
-      expect(found).toBeDefined();
-      expect(found?.queueId).toEqual(deployed.queue.queueId);
-      expect(found?.scriptName).toEqual(deployed.worker.workerName);
-      expect(found?.accountId).toBeTypeOf("string");
+    const found = all.find(
+      (c) => c.consumerId === deployed.consumer.consumerId,
+    );
+    expect(found).toBeDefined();
+    expect(found?.queueId).toEqual(deployed.queue.queueId);
+    expect(found?.scriptName).toEqual(deployed.worker.workerName);
+    expect(found?.accountId).toBeTypeOf("string");
 
-      yield* stack.destroy();
-    }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:queue",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-  },
+    yield* stack.destroy();
+  }).pipe(logLevel),
 );

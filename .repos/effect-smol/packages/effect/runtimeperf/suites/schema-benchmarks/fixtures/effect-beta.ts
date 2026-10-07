@@ -66,10 +66,7 @@ const parsingCase = (input, errors, success) => () => {
   const run = Schema.decodeUnknownOption(makeSchema())
   return {
     run: () => run(input, { errors }),
-    validate: (result) => {
-      assert.equal(Option.isSome(result), success)
-      if (success && Option.isSome(result)) assert.deepEqual(result.value, validData)
-    }
+    validate: (result) => assert.equal(Option.isSome(result), success)
   }
 }
 

@@ -130,7 +130,6 @@ export interface Branch extends Resource<
  * ```
  *
  * @resource
- * @product Project
  */
 export const Branch = Resource<Branch>("Prisma.Branch");
 

@@ -190,7 +190,6 @@ export interface PromotionCode extends Resource<
  * ```
  *
  * @resource
- * @product Product
  */
 export const PromotionCode = Resource<PromotionCode>("Stripe.PromotionCode");
 

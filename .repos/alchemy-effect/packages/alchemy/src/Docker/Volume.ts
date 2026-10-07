@@ -104,7 +104,6 @@ export interface Volume extends Resource<
  * ```
  *
  * @resource
- * @product Volume
  */
 export const Volume = Resource<Volume>("Docker.Volume");
 

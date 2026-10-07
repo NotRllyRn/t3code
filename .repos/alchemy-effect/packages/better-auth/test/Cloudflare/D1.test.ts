@@ -75,15 +75,7 @@ test(
     const anonymous = yield* getJson<{ email: string | null }>(`${url}/me`);
     expect(anonymous.email).toBeNull();
   }),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:d1",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test(
@@ -98,13 +90,5 @@ test(
     );
     expect(me.email).toBeNull();
   }),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:d1",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

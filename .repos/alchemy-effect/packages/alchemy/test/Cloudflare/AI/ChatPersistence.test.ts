@@ -5,7 +5,7 @@ import { expect } from "alchemy-test";
 import * as Effect from "effect/Effect";
 import { MinimumLogLevel } from "effect/References";
 import * as Schedule from "effect/Schedule";
-import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClient from "effect/unstable/http/HttpClient";
 import { Gateway } from "./fixtures/Gateway.ts";
 import ChatPersistenceTestWorker from "./fixtures/ChatPersistenceWorker.ts";
 
@@ -81,15 +81,7 @@ test(
     // prompt and the assistant reply.
     expect(body.turns).toBe(2);
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:ai",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test(
@@ -124,15 +116,7 @@ test(
     // restored history.
     expect(b2.turns).toBe(4);
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:ai",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );
 
 test(
@@ -163,13 +147,5 @@ test(
     expect(rb.status).toBe(200);
     expect(((yield* rb.json) as { turns: number }).turns).toBe(2);
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:ai",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

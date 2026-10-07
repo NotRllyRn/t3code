@@ -8,7 +8,6 @@ import { UpdateIssuingCardholder } from "./UpdateIssuingCardholder.ts";
  * the Function or Worker Effect.
  *
  * @layer
- * @product Issuing
  * @provides Stripe.UpdateIssuingCardholder
  */
 export const UpdateIssuingCardholderHttp = Layer.effect(

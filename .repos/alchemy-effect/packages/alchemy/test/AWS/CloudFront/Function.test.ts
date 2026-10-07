@@ -44,10 +44,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertFunctionDeleted(deployed.fn.functionName);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:cloudfront", "live"],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );
 
 // `FunctionConfig.Comment` is patched optional in
@@ -82,10 +79,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertFunctionDeleted(deployed.functionName);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:cloudfront", "live"],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );
 
 const assertFunctionDeleted = (name: string) =>

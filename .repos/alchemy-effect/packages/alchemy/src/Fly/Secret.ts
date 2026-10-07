@@ -197,7 +197,6 @@ const SecretResource = Resource<Secret>("Fly.Secret");
  * ```
  *
  * @resource
- * @product Secret
  */
 export const Secret: typeof SecretResource = Object.assign(
   (

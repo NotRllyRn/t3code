@@ -5,10 +5,10 @@ import * as Layer from "effect/Layer";
 import { EnvironmentId } from "@t3tools/contracts";
 import { RelayMobileClientId } from "@t3tools/contracts/relay";
 import { ManagedRelay } from "@t3tools/client-runtime/relay";
-import { layerRemoteHttpClient } from "@t3tools/client-runtime/rpc";
-import { HttpClient } from "effect/http";
+import { remoteHttpClientLayer } from "@t3tools/client-runtime/rpc";
+import { HttpClient } from "effect/unstable/http";
 
-import * as MobileStorage from "../../persistence/mobile-storage";
+import { MobileStorage } from "../../persistence/mobile-storage";
 
 import { linkEnvironmentToCloudWithPreference } from "./linkEnvironment";
 
@@ -63,7 +63,7 @@ const createProofMock = vi.fn(
   (input: { readonly method: string; readonly url: string; readonly accessToken?: string }) =>
     Effect.succeed(`dpop:${input.method}:${input.url}`),
 );
-const layerTestDpopSigner = Layer.succeed(
+const testDpopSignerLayer = Layer.succeed(
   ManagedRelay.ManagedRelayDpopSigner,
   ManagedRelay.ManagedRelayDpopSigner.of({
     thumbprint: Effect.succeed("client-proof-key-thumbprint"),
@@ -71,13 +71,13 @@ const layerTestDpopSigner = Layer.succeed(
   }),
 );
 
-function layerCloudClient() {
-  const layerHttpClient = layerRemoteHttpClient((input, init) => globalThis.fetch(input, init));
+function cloudClientLayer() {
+  const httpClientLayer = remoteHttpClientLayer((input, init) => globalThis.fetch(input, init));
   return Layer.mergeAll(
-    layerHttpClient,
+    httpClientLayer,
     Layer.succeed(
-      MobileStorage.MobileStorage,
-      MobileStorage.MobileStorage.of({
+      MobileStorage,
+      MobileStorage.of({
         loadSavedConnections: Effect.succeed([]),
         saveConnection: () => Effect.void,
         clearSavedConnection: () => Effect.void,
@@ -93,7 +93,7 @@ function layerCloudClient() {
     ManagedRelay.layer({
       relayUrl: "https://relay.example.test",
       clientId: RelayMobileClientId,
-    }).pipe(Layer.provideMerge(layerTestDpopSigner), Layer.provide(layerHttpClient)),
+    }).pipe(Layer.provideMerge(testDpopSignerLayer), Layer.provide(httpClientLayer)),
   );
 }
 
@@ -104,9 +104,9 @@ const withCloudServices = <A, E>(
     | HttpClient.HttpClient
     | ManagedRelay.ManagedRelayClient
     | ManagedRelay.ManagedRelayDpopSigner
-    | MobileStorage.MobileStorage
+    | MobileStorage
   >,
-) => effect.pipe(Effect.provide(layerCloudClient()));
+) => effect.pipe(Effect.provide(cloudClientLayer()));
 
 function validLinkProof() {
   return "signed-environment-link-jwt";
@@ -293,6 +293,7 @@ describe("mobile cloud link environment client", () => {
       const bodies: Array<unknown> = [];
       const fetchMock = vi.fn((url: string | URL, init?: RequestInit) => {
         if (init?.body) {
+          // @effect-diagnostics-next-line preferSchemaOverJson:off
           bodies.push(JSON.parse(requestBodyText(init.body)));
         }
         if (String(url).endsWith("/v1/client/environment-link-challenges")) {
@@ -347,6 +348,7 @@ describe("mobile cloud link environment client", () => {
       const bodies: Array<Record<string, unknown>> = [];
       const fetchMock = vi.fn((url: string | URL, init?: RequestInit) => {
         if (init?.body) {
+          // @effect-diagnostics-next-line preferSchemaOverJson:off
           bodies.push(JSON.parse(requestBodyText(init.body)) as Record<string, unknown>);
         }
         if (String(url).endsWith("/v1/client/environment-link-challenges")) {

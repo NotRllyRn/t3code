@@ -126,8 +126,5 @@ test.provider(
         );
       expect(destinationGone).toBe(true);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:eventbridge", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

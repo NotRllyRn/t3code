@@ -21,7 +21,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:lexv2", "live"] },
 );
 
 const lexBotRole = Role("LexBotRole", {
@@ -223,8 +222,5 @@ test.provider(
       yield* assertBotGone(created.bot.botId);
     }),
   // Observed ~15s live; headroom for slow deletes and the wait-until-gone.
-  {
-    tags: ["provider:aws", "provider:aws:iam", "provider:aws:lexv2", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

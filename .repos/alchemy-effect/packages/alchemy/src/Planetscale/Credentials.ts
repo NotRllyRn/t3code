@@ -9,11 +9,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 import * as CredentialsCache from "../Auth/CredentialsCache.ts";
-import {
-  deferUntilFirstUse,
-  orDieCredentialsUnavailable,
-  resolveProviderConfig,
-} from "../Auth/Resolve.ts";
+import { resolveProviderConfig } from "../Auth/Resolve.ts";
 import {
   PLANETSCALE_AUTH_PROVIDER_NAME,
   type PlanetscaleAuthConfig,
@@ -75,23 +71,10 @@ export const fromAuthProvider = () =>
       const apiBaseUrl = yield* Config.String("PLANETSCALE_API_BASE_URL").pipe(
         Config.withDefault(DEFAULT_API_BASE_URL),
       );
-      // Defer profile lookup and credential resolution until first use, so
-      // building the provider layers never requires a configured profile.
-      const resolve = yield* resolveProviderConfig<
+      const { profileName, resolve } = yield* resolveProviderConfig<
         PlanetscaleAuthConfig,
         PlanetscaleResolvedCredentials
-      >(PLANETSCALE_AUTH_PROVIDER_NAME).pipe(
-        Effect.flatMap(({ profileName, resolve }) =>
-          Effect.mapError(
-            resolve,
-            (e) =>
-              new ConfigError({
-                message: `Failed to resolve Planetscale credentials from ${profileName === undefined ? "the CI environment" : `profile '${profileName}'`}: ${e.message}`,
-              }),
-          ),
-        ),
-        deferUntilFirstUse,
-      );
+      >(PLANETSCALE_AUTH_PROVIDER_NAME);
 
       // Cache until shortly before the OAuth token expires (service tokens
       // never expire) so a long `alchemy dev` session re-resolves — and
@@ -119,7 +102,13 @@ export const fromAuthProvider = () =>
                 apiBaseUrl,
               },
         ),
-        orDieCredentialsUnavailable(PLANETSCALE_AUTH_PROVIDER_NAME),
+        Effect.mapError(
+          (e) =>
+            new ConfigError({
+              message: `Failed to resolve Planetscale credentials from ${profileName === undefined ? "the CI environment" : `profile '${profileName}'`}: ${(e as { message?: string }).message ?? String(e)}`,
+            }),
+        ),
+        Effect.orDie,
       );
     }),
   );

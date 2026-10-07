@@ -27,7 +27,6 @@ test.provider.skipIf(!!process.env.FAST)(
       yield* stack.destroy();
       yield* assertUsagePlanDeleted(plan.id);
     }),
-  { tags: ["provider:aws", "provider:aws:apigateway", "live"] },
 );
 
 test.provider.skipIf(!!process.env.FAST)(
@@ -59,7 +58,6 @@ test.provider.skipIf(!!process.env.FAST)(
       yield* stack.destroy();
       yield* assertUsagePlanDeleted(plan.id);
     }),
-  { tags: ["provider:aws", "provider:aws:apigateway", "live"] },
 );
 
 test.provider.skipIf(!!process.env.FAST)(
@@ -84,5 +82,4 @@ test.provider.skipIf(!!process.env.FAST)(
       yield* stack.destroy();
       yield* assertUsagePlanDeleted(plan.id);
     }),
-  { tags: ["provider:aws", "provider:aws:apigateway", "live"] },
 );

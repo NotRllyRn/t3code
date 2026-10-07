@@ -23,7 +23,6 @@ test.provider(
       );
       expect(error._tag).toBe("SubnetGroupNotFoundFault");
     }),
-  { tags: ["provider:aws", "provider:aws:dax", "live"] },
 );
 
 // Resolve default-for-AZ subnets from the account's default VPC.
@@ -116,8 +115,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertGone(group.subnetGroupName);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:dax", "provider:aws:ec2", "live"],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

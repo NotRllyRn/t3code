@@ -58,7 +58,14 @@ export const fromField = (
   field: rdsdata.Field,
   typeName: string | undefined,
 ): unknown => {
-  const f = field;
+  const f = field as {
+    stringValue?: string;
+    longValue?: number;
+    doubleValue?: number;
+    booleanValue?: boolean;
+    blobValue?: unknown;
+    isNull?: boolean;
+  };
   if (f.isNull) {
     return null;
   }
@@ -73,17 +80,8 @@ export const fromField = (
   if (f.doubleValue !== undefined) return f.doubleValue;
   if (f.booleanValue !== undefined) return f.booleanValue;
   if (f.blobValue !== undefined) return f.blobValue;
-  if (f.arrayValue !== undefined) return fromArrayValue(f.arrayValue);
   return null;
 };
-
-const fromArrayValue = (value: rdsdata.ArrayValue): unknown[] =>
-  value.arrayValues?.map(fromArrayValue) ??
-  value.booleanValues ??
-  value.longValues ??
-  value.doubleValues ??
-  value.stringValues ??
-  [];
 
 /**
  * Map an `executeStatement` response (with `includeResultMetadata: true`)

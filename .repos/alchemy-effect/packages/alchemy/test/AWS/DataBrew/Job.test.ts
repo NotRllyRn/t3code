@@ -154,16 +154,7 @@ test.provider(
       expect(yield* getJob(created.profileJob.jobName)).toBeUndefined();
       expect(yield* getJob(created.recipeJob.jobName)).toBeUndefined();
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:databrew",
-      "provider:aws:iam",
-      "provider:aws:s3",
-      "live",
-    ],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 // A live DataBrew job run spins up managed Spark capacity (billed per
@@ -228,14 +219,5 @@ test.provider.skipIf(!process.env.AWS_TEST_SLOW)(
       yield* stack.destroy();
       expect(yield* getJob(created.job.jobName)).toBeUndefined();
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:databrew",
-      "provider:aws:iam",
-      "provider:aws:s3",
-      "live",
-    ],
-    timeout: 900_000,
-  },
+  { timeout: 900_000 },
 );

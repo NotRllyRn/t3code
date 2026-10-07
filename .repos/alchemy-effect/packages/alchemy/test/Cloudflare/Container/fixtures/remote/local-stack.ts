@@ -11,11 +11,9 @@ import LocalRemoteContainerWorker from "./local-worker.ts";
  * application, or a workers.dev worker with the live `Container.test.ts`
  * deployment when the two files run concurrently.
  */
-export const state = Alchemy.inMemoryState();
-
 export default Alchemy.Stack(
   "LocalRemoteContainerStack",
-  { providers: Cloudflare.providers(), state },
+  { providers: Cloudflare.providers(), state: Cloudflare.state() },
   Effect.gen(function* () {
     const worker = yield* LocalRemoteContainerWorker;
     return { url: worker.url.as<string>() };

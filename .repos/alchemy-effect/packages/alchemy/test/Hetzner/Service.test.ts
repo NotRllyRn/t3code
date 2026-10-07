@@ -1,12 +1,11 @@
 import * as Hetzner from "@/Hetzner";
 import * as Test from "@/Test/Alchemy";
-import * as servers from "@distilled.cloud/hetzner/servers";
-import * as volumes from "@distilled.cloud/hetzner/volumes";
+import { Services } from "@distilled.cloud/hetzner";
 import { expect } from "alchemy-test";
 import * as Effect from "effect/Effect";
 import { MinimumLogLevel } from "effect/References";
 import * as Schedule from "effect/Schedule";
-import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClient from "effect/unstable/http/HttpClient";
 import Api from "./fixtures/api.ts";
 import { Data, MARKER } from "./fixtures/shared.ts";
 import Worker from "./fixtures/worker.ts";
@@ -21,7 +20,7 @@ const logLevel = Effect.provideService(
 const hasHetznerCreds = !!process.env.HCLOUD_TOKEN;
 
 const waitUntilGone = (id: number) =>
-  servers.getServer({ id }).pipe(
+  Services.servers.getServer({ id }).pipe(
     Effect.as("found" as const),
     Effect.catchTag("NotFound", () => Effect.succeed("gone" as const)),
     Effect.repeat({
@@ -54,13 +53,13 @@ test.provider.skipIf(!hasHetznerCreds)(
       expect(deployed.api.code.hash).toEqual(expect.any(String));
       expect(deployed.worker.unitName).not.toEqual(deployed.api.unitName);
 
-      const fetched = yield* servers.getServer({
+      const fetched = yield* Services.servers.getServer({
         id: deployed.api.serverId,
       });
       expect(fetched.server?.id).toEqual(deployed.api.serverId);
       expect(fetched.server?.public_net.ipv4?.ip).toEqual(deployed.api.ipv4);
 
-      const liveVolume = yield* volumes.getVolume({
+      const liveVolume = yield* Services.volumes.getVolume({
         id: deployed.volume.id,
       });
       expect(liveVolume.volume.server).toEqual(deployed.api.serverId);
@@ -86,16 +85,5 @@ test.provider.skipIf(!hasHetznerCreds)(
       const gone = yield* waitUntilGone(deployed.api.serverId);
       expect(gone).toEqual("gone");
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:hetzner",
-      "provider:hetzner:mountvolume",
-      "provider:hetzner:server",
-      "provider:hetzner:service",
-      "provider:hetzner:volume",
-      "live",
-    ],
-    timeout: 180_000,
-    exclusive: true,
-  },
+  { timeout: 180_000, exclusive: true },
 );

@@ -101,7 +101,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertCheckGone(check.id);
     }),
-  { tags: ["provider:aws", "provider:aws:route53", "live"], timeout: 180_000 },
+  { timeout: 180_000 },
 );
 
 test.provider(
@@ -143,5 +143,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertCheckGone(replaced.id);
     }),
-  { tags: ["provider:aws", "provider:aws:route53", "live"], timeout: 180_000 },
+  { timeout: 180_000 },
 );

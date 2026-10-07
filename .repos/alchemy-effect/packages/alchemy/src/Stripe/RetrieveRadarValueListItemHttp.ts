@@ -7,7 +7,6 @@ import { makeHttpStripeIdBinding } from "./StripeHttp.ts";
  * HTTP implementation of {@link RetrieveRadarValueListItem}.
  *
  * @layer
- * @product Radar
  * @provides Stripe.RetrieveRadarValueListItem
  */
 export const RetrieveRadarValueListItemHttp = Layer.effect(

@@ -1,7 +1,6 @@
 import { waitUntilDeleted } from "./GraphQL.ts";
 import { createHash } from "node:crypto";
-import { Query } from "@distilled.cloud/core/query";
-import { Railway, type VariableUpsertInput } from "@distilled.cloud/railway";
+import * as railway from "@distilled.cloud/railway";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
@@ -279,7 +278,6 @@ const VariableResource = Resource<Variable>("Railway.Variable");
  * ```
  *
  * @resource
- * @product Service
  */
 export const Variable: typeof VariableResource = Object.assign(
   (
@@ -369,40 +367,24 @@ const asVariableMap = (value: unknown): Record<string, string> => {
   return out;
 };
 
-const readVariables = Query.fn(
-  (projectId: string, environmentId: string, serviceId?: string) =>
-    Railway.variables({
-      projectId,
-      environmentId,
-      ...(serviceId !== undefined ? { serviceId } : {}),
-      unrendered: true,
-    }),
-);
-
-const variableUpsert = Query.fn((input: VariableUpsertInput) =>
-  Railway.variableUpsert({ input }),
-);
-
-const variableDelete = Query.fn(
-  (input: {
-    projectId: string;
-    environmentId: string;
-    name: string;
-    serviceId?: string;
-  }) => Railway.variableDelete({ input }),
-);
-
 const listVariableMap = (
   projectId: string,
   environmentId: string,
   serviceId?: string,
 ) =>
-  readVariables(projectId, environmentId, serviceId).pipe(
-    Effect.map(asVariableMap),
-    Effect.catchTag("RailwayNotFound", () =>
-      Effect.succeed({} as Record<string, string>),
-    ),
-  );
+  railway
+    .variables({
+      projectId,
+      environmentId,
+      ...(serviceId !== undefined ? { serviceId } : {}),
+      unrendered: true,
+    })
+    .pipe(
+      Effect.map(asVariableMap),
+      railway.catchTags(["RailwayNotFound"], () =>
+        Effect.succeed({} as Record<string, string>),
+      ),
+    );
 
 const getValue = (
   projectId: string,
@@ -421,40 +403,43 @@ const upsertVariable = (input: {
   value: string;
   serviceId?: string;
 }) =>
-  variableUpsert({
-    projectId: input.projectId,
-    environmentId: input.environmentId,
-    name: input.name,
-    value: input.value,
-    skipDeploys: true,
-    ...(input.serviceId !== undefined ? { serviceId: input.serviceId } : {}),
+  railway.upsertVariable({
+    input: {
+      projectId: input.projectId,
+      environmentId: input.environmentId,
+      name: input.name,
+      value: input.value,
+      skipDeploys: true,
+      ...(input.serviceId !== undefined ? { serviceId: input.serviceId } : {}),
+    },
   });
 
 const listEnvironmentIds = (project: {
   projectId: string;
   environmentId: string;
 }) =>
-  Query.items(
-    Railway.environments({ projectId: project.projectId, first: 50 }).pipe(
-      Query.map((env) => ({ id: env.id, deletedAt: env.deletedAt })),
-    ),
-  ).pipe(
-    Stream.filter((env) => env.deletedAt == null),
-    Stream.map((env) => env.id),
-    Stream.runCollect,
-    Effect.map((ids) => {
-      const set = new Set(Array.from(ids));
-      if (project.environmentId.length > 0) {
-        set.add(project.environmentId);
-      }
-      return Array.from(set);
-    }),
-    Effect.catchTag("RailwayNotFound", () =>
-      Effect.succeed(
-        project.environmentId.length > 0 ? [project.environmentId] : [],
+  railway.environments
+    .items(
+      { projectId: project.projectId, first: 50 },
+      { id: true, deletedAt: true },
+    )
+    .pipe(
+      Stream.filter((env) => env.deletedAt == null),
+      Stream.map((env) => env.id),
+      Stream.runCollect,
+      Effect.map((ids) => {
+        const set = new Set(Array.from(ids));
+        if (project.environmentId.length > 0) {
+          set.add(project.environmentId);
+        }
+        return Array.from(set);
+      }),
+      railway.catchTags(["RailwayNotFound"], () =>
+        Effect.succeed(
+          project.environmentId.length > 0 ? [project.environmentId] : [],
+        ),
       ),
-    ),
-  );
+    );
 
 export const VariableProvider = () =>
   Provider.succeed(Variable, {
@@ -654,14 +639,18 @@ export const VariableProvider = () =>
       ) {
         return;
       }
-      yield* variableDelete({
-        projectId: output.projectId,
-        environmentId: output.environmentId,
-        name: output.name,
-        ...(output.serviceId !== undefined
-          ? { serviceId: output.serviceId }
-          : {}),
-      }).pipe(Effect.catchTag("RailwayNotFound", () => Effect.void));
+      yield* railway
+        .deleteVariable({
+          input: {
+            projectId: output.projectId,
+            environmentId: output.environmentId,
+            name: output.name,
+            ...(output.serviceId !== undefined
+              ? { serviceId: output.serviceId }
+              : {}),
+          },
+        })
+        .pipe(railway.catchTags(["RailwayNotFound"], () => Effect.void));
       yield* waitUntilDeleted(
         "Variable",
         `${output.environmentId}/${output.serviceId ?? "shared"}/${output.name}`,

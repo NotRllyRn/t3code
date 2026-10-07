@@ -134,10 +134,7 @@ test.provider(
       // Destroy again — delete must be idempotent (already gone).
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:ai", "live"],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );
 
 test.provider(
@@ -169,10 +166,7 @@ test.provider(
 
       yield* expectGone(accountId, nameB);
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:ai", "live"],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );
 
 // Canonical `list()` test (account-scoped collection): deploy a real
@@ -196,10 +190,7 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:ai", "live"],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );
 
 test.provider(
@@ -224,10 +215,7 @@ test.provider(
       const stillThere = yield* getNamespace(accountId, "default");
       expect(stillThere.name).toEqual("default");
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:ai", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -270,8 +258,5 @@ test.provider(
 
       yield* expectGone(accountId, healed.namespace.name);
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:ai", "live"],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

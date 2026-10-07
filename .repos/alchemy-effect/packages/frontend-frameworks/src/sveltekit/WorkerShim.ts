@@ -53,12 +53,9 @@
  * that produces the final workerd-ready modules.
  */
 export interface WorkerShimOptions {
-  /**
-   * Relative import path to the generated server-instance module (kit's
-   * `generateServerInstance` output, exporting a pre-built `server`).
-   */
+  /** Relative import path to kit's server entry (`.../output/server/index.js`). */
   readonly serverImport: string;
-  /** Relative import path to the generated route-manifest module. */
+  /** Relative import path to the generated manifest module. */
   readonly manifestImport: string;
   /** Name of the static-assets binding. */
   readonly assetsBinding: string;
@@ -91,7 +88,7 @@ const matches_kit_route = (pathname) => {
     if (!path.startsWith(base_path)) return false;
     path = path.slice(base_path.length) || '/';
   }
-  for (const route of routes) {
+  for (const route of manifest._.routes) {
     if (route.pattern.test(path)) return true;
   }
   return false;
@@ -116,13 +113,15 @@ const spaDeferral = (assetsBinding: string): string => /* js */ `
 
 export const generateWorkerShim = (options: WorkerShimOptions): string =>
   /* js */ `
-import { server } from ${JSON.stringify(options.serverImport)};
-import { assets, app_path, prerendered, base_path, routes } from ${JSON.stringify(options.manifestImport)};
+import { Server } from ${JSON.stringify(options.serverImport)};
+import { manifest, prerendered, base_path } from ${JSON.stringify(options.manifestImport)};
 import { env } from 'cloudflare:workers';
 
-const app_dir = \`/\${app_path}\`;
-const immutable = \`\${app_dir}/immutable/\`;
-const version_file = \`\${app_dir}/version.json\`;
+const server = new Server(manifest);
+
+const app_path = \`/\${manifest.appPath}\`;
+const immutable = \`\${app_path}/immutable/\`;
+const version_file = \`\${app_path}/version.json\`;
 
 // Inline pragma-cache over \`caches.default\` (replaces the upstream
 // adapter's external cache dependency).
@@ -203,7 +202,7 @@ export default {
     const filename = stripped_pathname.slice(base_path.length + 1);
     if (filename) {
       is_static_asset =
-        assets.has(filename) || assets.has(filename + '/index.html');
+        manifest.assets.has(filename) || manifest.assets.has(filename + '/index.html');
     }
 
     let location = pathname.at(-1) === '/' ? stripped_pathname : pathname + '/';

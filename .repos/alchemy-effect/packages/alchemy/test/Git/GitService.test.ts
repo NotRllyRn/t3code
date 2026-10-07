@@ -15,9 +15,9 @@ import * as Effect from "effect/Effect";
 import { MinimumLogLevel } from "effect/References";
 import * as Result from "effect/Result";
 import * as Schedule from "effect/Schedule";
-import * as HttpClient from "effect/http/HttpClient";
-import * as HttpClientRequest from "effect/http/HttpClientRequest";
-import * as HttpApiClient from "effect/http-api/HttpApiClient";
+import * as HttpClient from "effect/unstable/http/HttpClient";
+import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
+import * as HttpApiClient from "effect/unstable/httpapi/HttpApiClient";
 import { GitApi, type Oid } from "@/Git/Api.ts";
 import { makeTestStack, TEST_SECRET } from "./fixtures/stack.ts";
 
@@ -91,15 +91,10 @@ const purgeRepo = Effect.fn(function* (
   repo: string,
 ) {
   const admin = yield* makeClient(url, TEST_SECRET);
-  // edgeRetry on every step: a freshly deployed workers.dev route serves
-  // transient non-JSON 404s/5xx for a few seconds (typed 404s decode fine
-  // and are NOT retried).
-  yield* admin.repos.delete({ params: { owner, repo } }).pipe(
-    Effect.catchTag("RepoNotFound", () => Effect.void),
-    edgeRetry,
-  );
+  yield* admin.repos
+    .delete({ params: { owner, repo } })
+    .pipe(Effect.catchTag("RepoNotFound", () => Effect.void));
   yield* admin.repos.get({ params: { owner, repo } }).pipe(
-    edgeRetry,
     Effect.as(false),
     Effect.catchTag("RepoNotFound", () => Effect.succeed(true)),
     Effect.repeat({
@@ -189,15 +184,7 @@ test(
       );
     expect(gone.deleted).toBe(true);
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test(
@@ -249,13 +236,5 @@ test(
 
     yield* admin.repos.delete({ params });
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

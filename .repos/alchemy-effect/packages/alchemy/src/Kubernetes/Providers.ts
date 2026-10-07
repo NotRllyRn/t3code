@@ -1,11 +1,9 @@
 import * as Layer from "effect/Layer";
-import { DockerLive } from "../Docker/Docker.ts";
 import * as Provider from "../Provider.ts";
 import { builtinAdapters } from "./BuiltinAdapters.ts";
 import { Deployment, DeploymentProvider } from "./Deployment.ts";
 import { HelmChart, HelmChartProvider } from "./HelmChart.ts";
 import { Job, JobProvider } from "./Job.ts";
-import { LocalCluster, LocalClusterProvider } from "./LocalCluster.ts";
 import { Manifest, ManifestProvider } from "./Manifest.ts";
 
 export class Providers extends Provider.ProviderCollection<Providers>()(
@@ -14,8 +12,8 @@ export class Providers extends Provider.ProviderCollection<Providers>()(
 
 /**
  * The Kubernetes provider layer: the cluster-agnostic workload providers
- * (`Deployment`, `Job`, `Manifest`, `HelmChart`), `LocalCluster`, and the
- * built-in cluster adapters (`kubeconfig`, `token`, `client-cert`, `exec`).
+ * (`Deployment`, `Job`, `Manifest`, `HelmChart`) plus the built-in
+ * cluster adapters (`kubeconfig`, `token`, `client-cert`, `exec`).
  *
  * Managed-cloud clusters need their platform's adapter alongside — e.g.
  * targeting an `AWS.EKS.Cluster` requires `AWS.providers()` in the same
@@ -31,19 +29,14 @@ export class Providers extends Provider.ProviderCollection<Providers>()(
 export const providers = () =>
   Layer.effect(
     Providers,
-    Provider.collection([Deployment, HelmChart, Job, LocalCluster, Manifest]),
+    Provider.collection([Deployment, HelmChart, Job, Manifest]),
   ).pipe(
     Layer.provide(
       Layer.mergeAll(
         DeploymentProvider(),
         HelmChartProvider(),
         JobProvider(),
-        LocalClusterProvider(),
         ManifestProvider(),
-      ).pipe(
-        // Workloads build `main` / `context` images with the Docker CLI for
-        // connections that declare a `registry`.
-        Layer.provide(DockerLive),
       ),
     ),
     // The built-in adapters are provideMerged (not just provided) so the

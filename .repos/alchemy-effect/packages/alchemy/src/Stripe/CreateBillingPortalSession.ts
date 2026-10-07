@@ -31,7 +31,6 @@ import type { RuntimeContext } from "../RuntimeContext.ts";
  * ```
  *
  * @binding
- * @product Billing
  */
 export interface CreateBillingPortalSession extends Binding.Service<
   CreateBillingPortalSession,

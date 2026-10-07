@@ -20,12 +20,6 @@ import {
   type WorkerEvent,
 } from "./WorkerRuntime.ts";
 import type { WorkflowExport } from "../Workflows/Workflow.ts";
-import type { SqlMigrationsExport } from "./SqlMigrationsRuntime.ts";
-
-export type WorkerExport =
-  | DurableObjectExport
-  | WorkflowExport
-  | SqlMigrationsExport;
 
 export interface WorkerRuntimeContext extends Serverless.FunctionContext {
   export(name: string, value: any): Effect.Effect<void>;
@@ -34,7 +28,7 @@ export interface WorkerRuntimeContext extends Serverless.FunctionContext {
 
 export const makeWorkerRuntimeContext = (id: string): WorkerRuntimeContext => {
   const listeners: Effect.Effect<Serverless.FunctionListener>[] = [];
-  const exports: Record<string, WorkerExport> = {};
+  const exports: Record<string, DurableObjectExport | WorkflowExport> = {};
   const env: Record<string, any> = {};
   let userShape: Record<string, unknown> | undefined;
 

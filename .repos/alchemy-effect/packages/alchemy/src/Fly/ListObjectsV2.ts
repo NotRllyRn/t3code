@@ -25,7 +25,6 @@ export interface ListObjectsV2Request extends Omit<
  * ```
  *
  * @binding
- * @product Bucket
  */
 export interface ListObjectsV2 extends Binding.Service<
   ListObjectsV2,

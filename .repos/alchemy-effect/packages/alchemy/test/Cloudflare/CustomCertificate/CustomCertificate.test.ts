@@ -96,14 +96,6 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:customcertificate",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-  },
 );
 
 // `list()` fans out over every zone in the account, paginates each zone's
@@ -156,14 +148,7 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:customcertificate",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider.skipIf(!entitledZoneId)(
@@ -260,12 +245,5 @@ test.provider.skipIf(!entitledZoneId)(
         );
       expect(gone._tag).toEqual("CustomCertificateNotFound");
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:customcertificate",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

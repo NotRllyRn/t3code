@@ -1,4 +1,4 @@
-import * as Hetzner from "@distilled.cloud/hetzner";
+import { Services } from "@distilled.cloud/hetzner";
 import type {
   CreateZoneRrsetRequestRecordsItem,
   GetZoneRrsetResponseRrset,
@@ -217,7 +217,6 @@ export type RecordSet = Resource<
  * ```
  *
  * @resource
- * @product DNS
  */
 export const RecordSet = Resource<RecordSet>("Hetzner.RecordSet");
 
@@ -340,7 +339,7 @@ const retryLocked = <A, E extends { readonly _tag: string }, R>(
   );
 
 const getRrset = (zoneId: number, name: string, type: string) =>
-  Hetzner.zoneRrsets
+  Services.zoneRrsets
     .getZoneRrset({
       id_or_name: String(zoneId),
       rr_name: name,
@@ -355,7 +354,7 @@ const findByLabels = (zoneId: number, id: string) =>
   Effect.gen(function* () {
     const selector = labelSelector(yield* createInternalLabels(id));
     if (selector.length === 0) return undefined;
-    return yield* Hetzner.zoneRrsets.listZoneRrsets
+    return yield* Services.zoneRrsets.listZoneRrsets
       .items({
         id_or_name: String(zoneId),
         label_selector: selector,
@@ -375,13 +374,13 @@ export const RecordSetProvider = () =>
     stables: ["id", "zoneId", "name", "type"],
     nuke: { dependsOn: ["Hetzner.Zone"] },
     list: Effect.fn(function* () {
-      const zones = yield* Hetzner.zones.listZones
+      const zones = yield* Services.zones.listZones
         .items({ per_page: 50 })
         .pipe(Stream.runCollect);
       const rows = yield* Effect.forEach(
         [...zones],
         (zone) =>
-          Hetzner.zoneRrsets.listZoneRrsets
+          Services.zoneRrsets.listZoneRrsets
             .items({
               id_or_name: String(zone.id),
               label_selector: alchemyStackSelector,
@@ -460,7 +459,7 @@ export const RecordSetProvider = () =>
       // 2. Ensure
       if (current === undefined) {
         const created = yield* retryLocked(
-          Hetzner.zoneRrsets
+          Services.zoneRrsets
             .createZoneRrset({
               id_or_name: String(zoneId),
               name,
@@ -501,7 +500,7 @@ export const RecordSetProvider = () =>
       const observedLabels = tagRecord(current.labels);
       if (!labelsEqual(observedLabels, labels)) {
         const updated = yield* retryLocked(
-          Hetzner.zoneRrsets.updateZoneRrset({
+          Services.zoneRrsets.updateZoneRrset({
             id_or_name: zoneRef,
             rr_name: name,
             rr_type: type,
@@ -514,7 +513,7 @@ export const RecordSetProvider = () =>
       // Sync — TTL
       if (news.ttl !== undefined && news.ttl !== (current.ttl ?? undefined)) {
         const { action } = yield* retryLocked(
-          Hetzner.zoneRrsetActions.changeZoneRrsetTtl({
+          Services.zoneRrsetActions.changeZoneRrsetTtl({
             id_or_name: zoneRef,
             rr_name: name,
             rr_type: type,
@@ -528,7 +527,7 @@ export const RecordSetProvider = () =>
       // Sync — records (order-insensitive; value identifies a record)
       if (!recordsEqual(current.records.map(compactRecord), desiredRecords)) {
         const { action } = yield* retryLocked(
-          Hetzner.zoneRrsetActions.setZoneRrsetRecords({
+          Services.zoneRrsetActions.setZoneRrsetRecords({
             id_or_name: zoneRef,
             rr_name: name,
             rr_type: type,
@@ -542,7 +541,7 @@ export const RecordSetProvider = () =>
       // Sync — change protection
       if (current.protection.change !== desiredProtection) {
         const { action } = yield* retryLocked(
-          Hetzner.zoneRrsetActions.changeZoneRrsetProtection({
+          Services.zoneRrsetActions.changeZoneRrsetProtection({
             id_or_name: zoneRef,
             rr_name: name,
             rr_type: type,
@@ -564,7 +563,7 @@ export const RecordSetProvider = () =>
 
       if (current.protection.change) {
         const { action } = yield* retryLocked(
-          Hetzner.zoneRrsetActions.changeZoneRrsetProtection({
+          Services.zoneRrsetActions.changeZoneRrsetProtection({
             id_or_name: String(zoneId),
             rr_name: name,
             rr_type: type,
@@ -575,7 +574,7 @@ export const RecordSetProvider = () =>
       }
 
       const deleted = yield* retryLocked(
-        Hetzner.zoneRrsets
+        Services.zoneRrsets
           .deleteZoneRrset({
             id_or_name: String(zoneId),
             rr_name: name,

@@ -168,7 +168,6 @@ export type WebhookEndpoint = Resource<
  * ```
  *
  * @resource
- * @product Webhook
  */
 export const WebhookEndpoint = Resource<WebhookEndpoint>(
   "Stripe.WebhookEndpoint",

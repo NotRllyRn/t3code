@@ -50,15 +50,7 @@ test.provider(
       );
       expect(error._tag).toBe("LicenseConfigurationNotFound");
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:iam",
-      "provider:aws:licensemanager",
-      "live",
-    ],
-    timeout: 60_000,
-  },
+  { timeout: 60_000 },
 );
 
 // CreateLicenseConfiguration has a small DAILY account quota (~10 creates;
@@ -172,28 +164,17 @@ test.provider.skipIf(!RUN_CREATE_LIFECYCLE)(
       const gone = yield* getLive(licenses.licenseConfigurationArn);
       expect(gone).toBeUndefined();
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:iam",
-      "provider:aws:licensemanager",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
-test.provider(
-  "diff: changing licenseCountingType forces replacement",
-  () =>
-    Effect.gen(function* () {
-      const result = yield* callDiff(
-        { licenseCountingType: "Instance", licenseCount: 2 },
-        { licenseCountingType: "Core", licenseCount: 2 },
-      );
-      expect(result).toEqual({ action: "replace" });
-    }),
-  { tags: ["provider:aws", "provider:aws:licensemanager", "live"] },
+test.provider("diff: changing licenseCountingType forces replacement", () =>
+  Effect.gen(function* () {
+    const result = yield* callDiff(
+      { licenseCountingType: "Instance", licenseCount: 2 },
+      { licenseCountingType: "Core", licenseCount: 2 },
+    );
+    expect(result).toEqual({ action: "replace" });
+  }),
 );
 
 test.provider.skipIf(!RUN_CREATE_LIFECYCLE)(
@@ -237,13 +218,5 @@ test.provider.skipIf(!RUN_CREATE_LIFECYCLE)(
       const gone = yield* getLive(second.licenseConfigurationArn);
       expect(gone).toBeUndefined();
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:iam",
-      "provider:aws:licensemanager",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

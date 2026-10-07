@@ -24,7 +24,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:appintegrations", "live"] },
 );
 
 const assertGone = (id: string) =>
@@ -107,14 +106,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertGone(integration.dataIntegrationId);
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:appintegrations",
-      "provider:aws:kms",
-      "provider:aws:s3",
-      "live",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

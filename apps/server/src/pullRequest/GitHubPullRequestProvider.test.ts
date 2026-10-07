@@ -2,14 +2,10 @@ import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
-import * as Result from "effect/Result";
 import type { PullRequestReaction } from "@t3tools/contracts";
 
-import { decodePullRequestDetailJson } from "./gitHubPullRequestJson.ts";
-import * as GitHubApi from "../sourceControl/GitHubApi.ts";
 import * as GitHubCli from "../sourceControl/GitHubCli.ts";
 import * as GitHubPullRequestCli from "./GitHubPullRequestCli.ts";
-import type { GitHubPullRequestCore } from "./gitHubPullRequestJson.ts";
 import { gitHubViewerPermissions, loginAvatarUrl, make } from "./GitHubPullRequestProvider.ts";
 import type { GitHubReviewThreadComments } from "./gitHubPullRequestJson.ts";
 
@@ -32,7 +28,6 @@ it.effect("maps credential verification failures without relabeling operation fa
     const provider = yield* make.pipe(
       Effect.provide(
         Layer.mock(GitHubPullRequestCli.GitHubPullRequestCli)({
-          revalidateChecks: (_input, read) => read,
           withVerifiedCredential: (_input, use) =>
             verificationFails
               ? Effect.fail(
@@ -64,63 +59,12 @@ it.effect("maps credential verification failures without relabeling operation fa
   }),
 );
 
-it.effect("refreshes checks without permissions or comparison reads", () =>
-  Effect.gen(function* () {
-    let reads = 0;
-    const snapshot = Result.getOrThrow(
-      decodePullRequestDetailJson(`{
-      "number": 7, "title": "Checks", "url": "https://github.com/acme/web/pull/7",
-      "headRefName": "feature", "baseRefName": "main", "state": "OPEN",
-      "createdAt": "2026-07-01T00:00:00Z", "updatedAt": "2026-07-01T00:00:00Z"
-    }`),
-    );
-    const provider = yield* make.pipe(
-      Effect.provide(
-        Layer.mock(GitHubPullRequestCli.GitHubPullRequestCli)({
-          revalidateChecks: (_input, read) => read,
-          getPullRequestDetail: () =>
-            Effect.sync(() => {
-              reads++;
-              return {
-                ...snapshot,
-                ...coreFields,
-                state: reads === 3 ? ("merged" as const) : ("open" as const),
-                checks: [
-                  {
-                    name: "build",
-                    status: reads === 1 ? ("pending" as const) : ("success" as const),
-                    description: null,
-                    url: null,
-                  },
-                ],
-              };
-            }),
-        }),
-      ),
-    );
-    const read = provider.getChangeRequestChecks;
-    if (read === undefined) return yield* Effect.die("checks read missing");
-    for (let tick = 1; tick <= 3; tick++) {
-      const result = yield* read({
-        cwd: "/w",
-        repository: "acme/web",
-        host: "github.com",
-        number: 7,
-      });
-      expect(result.checks[0]?.status).toBe(tick === 1 ? "pending" : "success");
-      expect(result.state).toBe(tick === 3 ? "merged" : "open");
-    }
-    expect(reads).toBe(3);
-  }),
-);
-
 it.effect("uses one narrow read for a linked pull request summary", () =>
   Effect.gen(function* () {
     let summaryReads = 0;
     const provider = yield* make.pipe(
       Effect.provide(
         Layer.mock(GitHubPullRequestCli.GitHubPullRequestCli)({
-          revalidateChecks: (_input, read) => read,
           getPullRequestSummary: () =>
             Effect.sync(() => {
               summaryReads += 1;
@@ -170,7 +114,6 @@ it.effect("declares host-native stacks and passes the one the CLI reads through"
     const provider = yield* make.pipe(
       Effect.provide(
         Layer.mock(GitHubPullRequestCli.GitHubPullRequestCli)({
-          revalidateChecks: (_input, read) => read,
           getPullRequestStack: (input) => Effect.succeed(input.number === 7 ? stack : null),
         }),
       ),
@@ -190,7 +133,6 @@ it.effect("reports a failed stack read against its own operation", () =>
     const provider = yield* make.pipe(
       Effect.provide(
         Layer.mock(GitHubPullRequestCli.GitHubPullRequestCli)({
-          revalidateChecks: (_input, read) => read,
           getPullRequestStack: () =>
             Effect.fail(
               new GitHubPullRequestCli.GitHubPullRequestReadError({
@@ -333,7 +275,7 @@ describe("gitHubViewerPermissions", () => {
             number: 7,
           })
           .pipe(
-            Effect.provideService(GitHubApi.PinnedGitHubCredential, {
+            Effect.provideService(GitHubCli.PinnedGitHubCredential, {
               host: "github.com",
               token: Redacted.make("credential"),
               credentialFingerprint: fingerprint,
@@ -344,7 +286,6 @@ describe("gitHubViewerPermissions", () => {
     }).pipe(
       Effect.provide(
         Layer.mock(GitHubPullRequestCli.GitHubPullRequestCli)({
-          revalidateChecks: (_input, read) => read,
           getPullRequestDetail: () =>
             Effect.succeed({
               ...coreFields,
@@ -380,7 +321,7 @@ describe("gitHubViewerPermissions", () => {
               commits: [],
             }).pipe(
               Effect.flatMap((detail) =>
-                GitHubApi.PinnedGitHubCredential.pipe(
+                GitHubCli.PinnedGitHubCredential.pipe(
                   Effect.map((credential) => ({
                     ...detail,
                     viewerAccess: {
@@ -409,11 +350,6 @@ describe("gitHubViewerPermissions", () => {
         number: 7,
       });
 
-      const readChecks = provider.getChangeRequestChecks;
-      if (readChecks === undefined) return yield* Effect.die("checks read missing");
-      expect(
-        yield* readChecks({ cwd: "/w", repository: "acme/web", host: "github.com", number: 7 }),
-      ).toEqual({ state: detail.state, checks: detail.checks });
       expect(detail.workflowApprovalsRequired).toBe(1);
       expect(detail.checks).toEqual([
         {
@@ -438,7 +374,6 @@ describe("gitHubViewerPermissions", () => {
     }).pipe(
       Effect.provide(
         Layer.mock(GitHubPullRequestCli.GitHubPullRequestCli)({
-          revalidateChecks: (_input, read) => read,
           getPullRequestDetail: () =>
             Effect.succeed({
               ...coreFields,
@@ -488,6 +423,8 @@ describe("gitHubViewerPermissions", () => {
                 url: "https://github.com/acme/web/actions/runs/123",
               },
             ]),
+          getPullRequestBaseComparison: () =>
+            Effect.succeed({ behindBy: 0, viewerCanUpdate: true }),
           getViewerAccess: () =>
             Effect.succeed({
               canWrite: true,
@@ -583,8 +520,8 @@ it.effect("does not classify same-repository gates as fork workflow approvals", 
   }).pipe(
     Effect.provide(
       Layer.mock(GitHubPullRequestCli.GitHubPullRequestCli)({
-        revalidateChecks: (_input, read) => read,
         getPullRequestDetail: () => Effect.succeed({ ...openDetail, isCrossRepository: false }),
+        getPullRequestBaseComparison: () => Effect.succeed({ behindBy: 0, viewerCanUpdate: true }),
         listWorkflowRunsRequiringApproval: () =>
           Effect.die("same-repository pull requests must not probe fork workflow approvals"),
         getViewerAccess: () =>
@@ -622,8 +559,8 @@ it.effect("keeps an unsafe workflow approval scope visible as unknown", () =>
   }).pipe(
     Effect.provide(
       Layer.mock(GitHubPullRequestCli.GitHubPullRequestCli)({
-        revalidateChecks: (_input, read) => read,
         getPullRequestDetail: () => Effect.succeed(openDetail),
+        getPullRequestBaseComparison: () => Effect.succeed({ behindBy: 0, viewerCanUpdate: true }),
         listWorkflowRunsRequiringApproval: () =>
           Effect.fail(
             new GitHubPullRequestCli.GitHubWorkflowApprovalRefusedError({
@@ -665,13 +602,14 @@ it.effect("propagates workflow discovery rate limits", () =>
   }).pipe(
     Effect.provide(
       Layer.mock(GitHubPullRequestCli.GitHubPullRequestCli)({
-        revalidateChecks: (_input, read) => read,
         getPullRequestDetail: () => Effect.succeed(openDetail),
+        getPullRequestBaseComparison: () => Effect.succeed({ behindBy: 0, viewerCanUpdate: true }),
         listWorkflowRunsRequiringApproval: () =>
           Effect.fail(
-            new GitHubApi.GitHubApiRateLimitError({
-              host: "github.com",
-              operation: "listWorkflowRunsRequiringApproval",
+            new GitHubCli.GitHubCliRateLimitError({
+              command: "gh",
+              cwd: "/w",
+              cause: new Error("rate limited"),
             }),
           ),
         getViewerAccess: () =>
@@ -688,14 +626,6 @@ it.effect("propagates workflow discovery rate limits", () =>
 );
 
 describe("getViewerPermissions", () => {
-  const access = {
-    canWrite: true,
-    canTriage: true,
-    canUpdate: true,
-    didAuthor: false,
-    mergeCapabilities: { merge: true, squash: true, rebase: true },
-  };
-
   it.effect("checks fresh access without reading branch details for unrelated operations", () => {
     let accessReads = 0;
     return Effect.gen(function* () {
@@ -714,29 +644,44 @@ describe("getViewerPermissions", () => {
     }).pipe(
       Effect.provide(
         Layer.mock(GitHubPullRequestCli.GitHubPullRequestCli)({
-          revalidateChecks: (_input, read) => read,
           getPullRequestDetail: () => Effect.die("Unexpected detail read"),
-          getViewerAccess: () => Effect.sync(() => (accessReads++, access)),
+          getPullRequestBaseComparison: () => Effect.die("Unexpected comparison read"),
+          getViewerAccess: () =>
+            Effect.sync(() => {
+              accessReads++;
+              return {
+                canWrite: true,
+                canTriage: true,
+                canUpdate: true,
+                didAuthor: false,
+                mergeCapabilities: { merge: true, squash: true, rebase: true },
+              };
+            }),
         }),
       ),
     );
   });
 
-  const layerWithDetail = (
-    detail: Effect.Effect<GitHubPullRequestCore, GitHubPullRequestCli.GitHubPullRequestCliError>,
-    onDetail: (allowReserve: boolean) => void = () => {},
+  const layerWithComparison = (
+    comparison: Effect.Effect<{
+      readonly behindBy: number | null;
+      readonly viewerCanUpdate: boolean;
+    }>,
   ) =>
     Layer.mock(GitHubPullRequestCli.GitHubPullRequestCli)({
-      revalidateChecks: (_input, read) => read,
-      getPullRequestDetail: () =>
-        GitHubCli.AllowGitHubReserve.pipe(
-          Effect.tap((allowReserve) => Effect.sync(() => onDetail(allowReserve))),
-          Effect.flatMap(() => detail),
-        ),
-      getViewerAccess: () => Effect.die("Unexpected access read"),
+      getPullRequestDetail: () => Effect.succeed(openDetail),
+      getPullRequestBaseComparison: () => comparison,
+      getViewerAccess: () =>
+        Effect.succeed({
+          canWrite: true,
+          canTriage: true,
+          canUpdate: true,
+          didAuthor: false,
+          mergeCapabilities: { merge: true, squash: true, rebase: true },
+        }),
     });
 
-  it.effect("answers access and update-branch from the one detail read", () =>
+  it.effect("offers update-branch when the comparison grants it", () =>
     Effect.gen(function* () {
       const provider = yield* make;
       const permissions = yield* provider.getViewerPermissions({
@@ -746,20 +691,16 @@ describe("getViewerPermissions", () => {
         number: 7,
       });
 
-      expect(permissions.actions).toContain("merge");
       expect(permissions.actions).toContain("update-branch");
       expect(permissions.updateMethods).toEqual(["merge", "rebase"]);
     }).pipe(
-      Effect.provide(
-        layerWithDetail(
-          Effect.succeed({ ...openDetail, comparison: { behindBy: 3, viewerCanUpdate: true } }),
-        ),
-      ),
+      Effect.provide(layerWithComparison(Effect.succeed({ behindBy: 3, viewerCanUpdate: true }))),
     ),
   );
 
   it.effect("uses the GraphQL reserve for manual permission checks", () => {
-    let allowed: boolean | undefined;
+    let viewerAllowReserve: boolean | undefined;
+    let comparisonAllowReserve: boolean | undefined;
     return Effect.gen(function* () {
       const provider = yield* make;
       yield* provider.getViewerPermissions({
@@ -768,45 +709,35 @@ describe("getViewerPermissions", () => {
         host: "github.com",
         number: 7,
       });
-      expect(allowed).toBe(true);
+
+      expect(viewerAllowReserve).toBe(true);
+      expect(comparisonAllowReserve).toBe(true);
     }).pipe(
       Effect.provide(
-        layerWithDetail(Effect.succeed(openDetail), (allowReserve) => (allowed = allowReserve)),
+        Layer.mock(GitHubPullRequestCli.GitHubPullRequestCli)({
+          getPullRequestDetail: () => Effect.succeed(openDetail),
+          getPullRequestBaseComparison: (input) =>
+            Effect.sync(() => {
+              comparisonAllowReserve = input.allowReserve;
+              return { behindBy: 3, viewerCanUpdate: true };
+            }),
+          getViewerAccess: (input) =>
+            Effect.sync(() => {
+              viewerAllowReserve = input.allowReserve;
+              return {
+                canWrite: true,
+                canTriage: true,
+                canUpdate: true,
+                didAuthor: false,
+                mergeCapabilities: { merge: true, squash: true, rebase: true },
+              };
+            }),
+        }),
       ),
     );
   });
 
-  it.effect("still answers from the light access read when the detail read fails", () =>
-    Effect.gen(function* () {
-      const provider = yield* make;
-      const permissions = yield* provider.getViewerPermissions({
-        cwd: "/w",
-        repository: "acme/web",
-        host: "github.com",
-        number: 7,
-      });
-      expect(permissions.actions).toContain("merge");
-      expect(permissions.actions).not.toContain("update-branch");
-    }).pipe(
-      Effect.provide(
-        Layer.mock(GitHubPullRequestCli.GitHubPullRequestCli)({
-          revalidateChecks: (_input, read) => read,
-          getPullRequestDetail: () =>
-            Effect.fail(
-              new GitHubPullRequestCli.GitHubPullRequestReadError({
-                command: "gh",
-                cwd: "/w",
-                operation: "getPullRequestDetail",
-                cause: new Error("head changed"),
-              }),
-            ),
-          getViewerAccess: () => Effect.succeed(access),
-        }),
-      ),
-    ),
-  );
-
-  it.effect("withholds update-branch where GitHub could not compare the branch", () =>
+  it.effect("withholds update-branch when the comparison cannot be read", () =>
     Effect.gen(function* () {
       const provider = yield* make;
       const permissions = yield* provider.getViewerPermissions({
@@ -818,8 +749,32 @@ describe("getViewerPermissions", () => {
 
       expect(permissions.actions).not.toContain("update-branch");
       expect(permissions.updateMethods).toBeUndefined();
+      // The rest of the answer survives a comparison nobody could make.
       expect(permissions.actions).toContain("merge");
-    }).pipe(Effect.provide(layerWithDetail(Effect.succeed({ ...openDetail, comparison: null })))),
+    }).pipe(
+      Effect.provide(
+        Layer.mock(GitHubPullRequestCli.GitHubPullRequestCli)({
+          getPullRequestDetail: () => Effect.succeed(openDetail),
+          getPullRequestBaseComparison: () =>
+            Effect.fail(
+              new GitHubPullRequestCli.GitHubPullRequestReadError({
+                command: "gh",
+                cwd: "/w",
+                operation: "getPullRequestBaseComparison",
+                cause: new Error("unreadable"),
+              }),
+            ),
+          getViewerAccess: () =>
+            Effect.succeed({
+              canWrite: true,
+              canTriage: true,
+              canUpdate: true,
+              didAuthor: false,
+              mergeCapabilities: { merge: true, squash: true, rebase: true },
+            }),
+        }),
+      ),
+    ),
   );
 });
 
@@ -857,10 +812,8 @@ describe("getChangeRequest commits", () => {
     reviewThreads: [],
     commentCount: 0,
     truncated: false,
-    reviewThreadsTruncated: false,
     reactions: [],
     reactionsById: new Map<string, ReadonlyArray<PullRequestReaction>>(),
-    editedAtById: new Map<string, string>(),
     reviewers: [],
     avatarsByLogin: new Map<string, string>(),
     botLogins: new Set<string>(),
@@ -870,7 +823,6 @@ describe("getChangeRequest commits", () => {
 
   const layerWith = (commits: GitHubReviewThreadComments["commits"]) =>
     Layer.mock(GitHubPullRequestCli.GitHubPullRequestCli)({
-      revalidateChecks: (_input, read) => read,
       getPullRequestActivity: () =>
         Effect.succeed({
           author: baseDetail.author,
@@ -944,10 +896,8 @@ describe("getChangeRequestActivity dismissed reviews", () => {
     reviewThreads: [],
     commentCount: 0,
     truncated: false,
-    reviewThreadsTruncated: false,
     reactions: [],
     reactionsById: new Map(),
-    editedAtById: new Map([["PRR_1", "2026-07-04T00:00:00Z"]]),
     reviewers: [],
     avatarsByLogin: new Map(),
     botLogins: new Set(["macroscopeapp"]),
@@ -957,7 +907,6 @@ describe("getChangeRequestActivity dismissed reviews", () => {
   };
   const layerFor = (body: string) =>
     Layer.mock(GitHubPullRequestCli.GitHubPullRequestCli)({
-      revalidateChecks: (_input, read) => read,
       getPullRequestActivity: () =>
         Effect.succeed({ author: null, comments: [dismissedReview(body)], commits: [] }),
       listReviewThreadComments: () => Effect.succeed(threadComments),
@@ -979,7 +928,6 @@ describe("getChangeRequestActivity dismissed reviews", () => {
       Effect.map((activity) => {
         expect(activity.comments[0]?.body).toBe("Dismissing prior approval to re-evaluate 9b66581");
         expect(activity.comments[0]?.author?.isBot).toBe(true);
-        expect(activity.comments[0]?.editedAt).toBe("2026-07-04T00:00:00Z");
       }),
       Effect.provide(layerFor("<!-- Macroscope (Approvability) review body marker -->")),
     ),
@@ -1041,7 +989,6 @@ describe("editing", () => {
     }).pipe(
       Effect.provide(
         Layer.mock(GitHubPullRequestCli.GitHubPullRequestCli)({
-          revalidateChecks: (_input, read) => read,
           updatePullRequest: (input) => Effect.sync(() => void rewrites.push(input)),
           updateComment: (input) => Effect.sync(() => void rewrites.push(input)),
         }),

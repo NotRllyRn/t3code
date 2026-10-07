@@ -132,7 +132,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertRuleDeleted(rule.ruleName);
     }),
-  { tags: ["provider:aws", "provider:aws:xray", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -172,5 +172,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertRuleDeleted("alchemy-test-rule-b");
     }),
-  { tags: ["provider:aws", "provider:aws:xray", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );

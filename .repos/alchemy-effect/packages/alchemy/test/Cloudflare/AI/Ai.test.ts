@@ -5,7 +5,7 @@ import { expect } from "alchemy-test";
 import * as Effect from "effect/Effect";
 import { MinimumLogLevel } from "effect/References";
 import * as Schedule from "effect/Schedule";
-import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClient from "effect/unstable/http/HttpClient";
 import { AiAsyncWorker } from "./fixtures/AiAsyncWorker.ts";
 import AiBindingTestWorker from "./fixtures/AiBindingWorker.ts";
 
@@ -81,15 +81,7 @@ test(
     expect(typeof text).toBe("string");
     expect((text as string).length).toBeGreaterThan(0);
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:ai",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test(
@@ -110,15 +102,7 @@ test(
     expect(body.count).toBeGreaterThan(0);
     expect(body.names.some((name) => name.includes("llama-3.3"))).toBe(true);
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:ai",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test(
@@ -154,15 +138,7 @@ test(
     expect(body.usage.outputTokens).toBeGreaterThan(0);
     expect(body.finishReason).toBe("stop");
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:ai",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test(
@@ -194,15 +170,7 @@ test(
     expect(typeof text).toBe("string");
     expect((text as string).length).toBeGreaterThan(0);
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:ai",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test(
@@ -228,15 +196,7 @@ test(
     expect(body.count).toBeGreaterThan(0);
     expect(body.names.some((name) => name.includes("llama-3.3"))).toBe(true);
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:ai",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test(
@@ -275,13 +235,5 @@ test(
     expect(text.length).toBeGreaterThan(0);
     expect(finish).toBeDefined();
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:ai",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

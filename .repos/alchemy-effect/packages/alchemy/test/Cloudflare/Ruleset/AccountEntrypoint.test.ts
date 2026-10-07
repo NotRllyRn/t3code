@@ -157,10 +157,7 @@ test.provider(
       const remaining = yield* getEntrypointRules(accountId);
       expect(remaining).toEqual([]);
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:ruleset", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -239,8 +236,5 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:ruleset", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

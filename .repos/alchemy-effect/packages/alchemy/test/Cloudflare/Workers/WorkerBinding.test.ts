@@ -4,7 +4,7 @@ import { expect } from "alchemy-test";
 import * as Effect from "effect/Effect";
 import { MinimumLogLevel } from "effect/References";
 import * as Schedule from "effect/Schedule";
-import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClient from "effect/unstable/http/HttpClient";
 import Stack from "./fixtures/worker-worker-binding/stack.ts";
 
 const { test, beforeAll, afterAll, deploy, destroy } = Test.make({
@@ -42,10 +42,7 @@ test(
     expect(res.status).toBe(200);
     expect(yield* res.text).toBe("hello from BindingTargetWorker");
   }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:worker", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test(
@@ -60,10 +57,7 @@ test(
     expect(res.status).toBe(200);
     expect(yield* res.text).toBe("hello alice");
   }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:worker", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test(
@@ -78,8 +72,5 @@ test(
     expect(res.status).toBe(200);
     expect(yield* res.text).toBe("hello bob");
   }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:worker", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

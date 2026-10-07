@@ -58,7 +58,6 @@ test.provider.skipIf(entitled)(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  { tags: ["provider:cloudflare", "provider:cloudflare:logscontrol", "live"] },
 );
 
 test.provider.skipIf(!entitled)(
@@ -109,10 +108,7 @@ test.provider.skipIf(!entitled)(
       );
       expect(gone).toBeUndefined();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:logscontrol", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // Account-singleton `list()`: there is no account-wide collection API, so
@@ -137,7 +133,6 @@ test.provider.skipIf(entitled)(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  { tags: ["provider:cloudflare", "provider:cloudflare:logscontrol", "live"] },
 );
 
 // Live `list()` on an entitled account: deploy the singleton, then assert
@@ -171,8 +166,5 @@ test.provider.skipIf(!entitled)(
       const empty = yield* provider.list();
       expect(empty).toEqual([]);
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:logscontrol", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

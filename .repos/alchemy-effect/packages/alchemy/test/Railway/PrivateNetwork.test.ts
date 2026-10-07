@@ -1,5 +1,4 @@
-import { Query } from "@distilled.cloud/core/query";
-import { Railway as RailwayApi } from "@distilled.cloud/railway";
+import * as railway from "@distilled.cloud/railway";
 import * as Provider from "@/Provider";
 import * as Railway from "@/Railway";
 import { noopSession } from "@/Report";
@@ -45,82 +44,11 @@ const NetworkConfig = Schema.Struct({
   ),
 });
 
-const readEnvironmentConfig = Query.fn((id: string) => {
-  const environment = RailwayApi.environment({ id });
-  return { config: environment.config, configEtag: environment.configEtag };
-});
-
-const createService = Query.fn(
-  (input: {
-    projectId: string;
-    environmentId: string;
-    name: string;
-    image: string;
-  }) => {
-    const service = RailwayApi.serviceCreate({
-      input: {
-        projectId: input.projectId,
-        environmentId: input.environmentId,
-        name: input.name,
-        source: { image: input.image },
-      },
-    });
-    return { id: service.id, name: service.name };
-  },
-);
-
-const deleteService = Query.fn((id: string) =>
-  RailwayApi.serviceDelete({ id }),
-);
-
-const commitEnvironmentPatch = Query.fn(
-  (environmentId: string, patch: unknown) =>
-    RailwayApi.environmentPatchCommit({ environmentId, patch }),
-);
-
-const deployServiceInstance = Query.fn(
-  (environmentId: string, serviceId: string) =>
-    RailwayApi.serviceInstanceDeploy({ environmentId, serviceId }),
-);
-
-const readPrivateNetworks = Query.fn((environmentId: string) =>
-  RailwayApi.privateNetworks({ environmentId }).pipe(
-    Query.map((network) => ({
-      publicId: network.publicId,
-      name: network.name,
-      dnsName: network.dnsName,
-      deletedAt: network.deletedAt,
-    })),
-  ),
-);
-
-const readEnvironmentPatches = Query.fn((environmentId: string) =>
-  RailwayApi.environmentPatches({ environmentId, first: 5 }).pipe(
-    Query.map((patch) => ({
-      status: patch.status,
-      lastAppliedError: patch.lastAppliedError,
-    })),
-  ),
-);
-
-const readPrivateNetworkEndpoint = Query.fn(
-  (input: {
-    environmentId: string;
-    privateNetworkId: string;
-    serviceId: string;
-  }) =>
-    RailwayApi.privateNetworkEndpoint(input).pipe(
-      Query.map((endpoint) => ({
-        publicId: endpoint.publicId,
-        dnsName: endpoint.dnsName,
-        deletedAt: endpoint.deletedAt,
-        syncStatus: endpoint.syncStatus,
-      })),
-    ),
-);
-
 const readConfig = Effect.fn(function* (environmentId: string) {
-  const environment = yield* readEnvironmentConfig(environmentId);
+  const environment = yield* railway.environment(
+    { id: environmentId },
+    { config: { where: { decryptVariables: false } }, configEtag: true },
+  );
   return {
     config: yield* Schema.decodeUnknownEffect(NetworkConfig)(
       environment.config,
@@ -148,16 +76,23 @@ const readEndpoint = (input: {
   privateNetworkId: string;
   serviceId: string;
 }) =>
-  readPrivateNetworkEndpoint(input).pipe(
-    Effect.catchTag("RailwayNotFound", () => Effect.succeed(null)),
-    Effect.map((endpoint) =>
-      endpoint?.deletedAt == null &&
-      endpoint?.syncStatus !== "DELETED" &&
-      endpoint?.syncStatus !== "DELETING"
-        ? endpoint
-        : null,
-    ),
-  );
+  railway
+    .privateNetworkEndpoint(input, {
+      publicId: true,
+      dnsName: true,
+      deletedAt: true,
+      syncStatus: true,
+    })
+    .pipe(
+      railway.catchTags("RailwayNotFound", () => Effect.succeed(null)),
+      Effect.map((endpoint) =>
+        endpoint?.deletedAt == null &&
+        endpoint?.syncStatus !== "DELETED" &&
+        endpoint?.syncStatus !== "DELETING"
+          ? endpoint
+          : null,
+      ),
+    );
 
 const waitForEndpoint = (
   input: Parameters<typeof readEndpoint>[0],
@@ -184,9 +119,12 @@ const setPrefix = (
   serviceId: string,
   prefix: string | null,
 ) =>
-  commitEnvironmentPatch(environmentId, {
-    services: {
-      [serviceId]: { networking: { privateNetworkEndpoint: prefix } },
+  railway.environmentPatchCommit({
+    environmentId,
+    patch: {
+      services: {
+        [serviceId]: { networking: { privateNetworkEndpoint: prefix } },
+      },
     },
   });
 
@@ -198,26 +136,35 @@ test.provider(
       const partition = yield* stack.deploy(suitePartition);
       const environmentId = partition.environment.environmentId;
       const service = yield* Effect.acquireRelease(
-        createService({
-          projectId: partition.project.projectId,
-          environmentId,
-          name: "private-network-disable-fixture",
-          image: "nginx:alpine",
-        }),
+        railway.createService(
+          {
+            input: {
+              projectId: partition.project.projectId,
+              environmentId,
+              name: "private-network-disable-fixture",
+              source: { image: "nginx:alpine" },
+            },
+          },
+          { id: true },
+        ),
         (service) =>
-          deleteService(service.id).pipe(
-            Effect.catchTag("RailwayNotFound", () => Effect.void),
+          railway.deleteService({ id: service.id }).pipe(
+            railway.catchTags("RailwayNotFound", () => Effect.void),
             Effect.orDie,
           ),
       );
-      const [platformNetwork] = yield* readPrivateNetworks(environmentId);
+      const [platformNetwork] = yield* railway.privateNetworks(
+        { environmentId },
+        { publicId: true },
+      );
       yield* waitForEndpoint({
         environmentId,
         privateNetworkId: platformNetwork!.publicId,
         serviceId: service.id,
       });
-      const disablePatch = yield* commitEnvironmentPatch(environmentId, {
-        privateNetworkDisabled: true,
+      const disablePatch = yield* railway.environmentPatchCommit({
+        environmentId,
+        patch: { privateNetworkDisabled: true },
       });
       yield* Effect.logInfo("Private-network disable commit", { disablePatch });
       const disabled = yield* readConfig(environmentId).pipe(
@@ -229,8 +176,14 @@ test.provider(
       );
       yield* Effect.logInfo("Private-network disabled state", {
         privateNetworkDisabled: disabled.config.privateNetworkDisabled,
-        patches: yield* readEnvironmentPatches(environmentId),
-        networks: yield* readPrivateNetworks(environmentId),
+        patches: yield* railway.environmentPatches(
+          { environmentId, first: 5 },
+          { edges: { node: { status: true, lastAppliedError: true } } },
+        ),
+        networks: yield* railway.privateNetworks(
+          { environmentId },
+          { name: true, publicId: true, deletedAt: true },
+        ),
       });
       expect(disabled.config.privateNetworkDisabled).toBe(true);
 
@@ -258,7 +211,10 @@ test.provider(
       expect(created.network.previousPrivateNetworkDisabled).toBe(true);
       const enabled = yield* readConfig(environmentId);
       expect(enabled.config.privateNetworkDisabled).toBe(false);
-      const networks = yield* readPrivateNetworks(environmentId);
+      const networks = yield* railway.privateNetworks(
+        { environmentId },
+        { publicId: true, name: true, dnsName: true, deletedAt: true },
+      );
       expect(
         networks.find(
           (network) =>
@@ -308,16 +264,7 @@ test.provider(
       Effect.ensuring(stack.destroy().pipe(Effect.orDie)),
       logLevel,
     ),
-  {
-    tags: [
-      "provider:railway",
-      "provider:railway:privatenetwork",
-      "provider:railway:project",
-      "provider:railway:projectenvironment",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -329,12 +276,17 @@ test.provider(
       const environmentId = base.environment.environmentId;
 
       yield* Effect.acquireUseRelease(
-        createService({
-          projectId: base.project.projectId,
-          environmentId,
-          name: "private-network-fixture",
-          image: "nginx:alpine",
-        }),
+        railway.createService(
+          {
+            input: {
+              projectId: base.project.projectId,
+              environmentId,
+              name: "private-network-fixture",
+              source: { image: "nginx:alpine" },
+            },
+          },
+          { id: true, name: true },
+        ),
         (service) =>
           Effect.gen(function* () {
             const serviceRef = { serviceId: service.id, name: service.name };
@@ -344,16 +296,22 @@ test.provider(
               serviceId: service.id,
             };
             if ((yield* readEndpoint(input)) === null) {
-              yield* deployServiceInstance(environmentId, service.id);
+              yield* railway.serviceInstanceDeploy({
+                environmentId,
+                serviceId: service.id,
+              });
             }
             const platformEndpoint = yield* waitForEndpoint(input);
             const domainKey = yield* Effect.sync(() => crypto.randomUUID());
-            yield* commitEnvironmentPatch(environmentId, {
-              services: {
-                [service.id]: {
-                  networking: {
-                    privateNetworkEndpoint: "original",
-                    serviceDomains: { [domainKey]: {} },
+            yield* railway.environmentPatchCommit({
+              environmentId,
+              patch: {
+                services: {
+                  [service.id]: {
+                    networking: {
+                      privateNetworkEndpoint: "original",
+                      serviceDomains: { [domainKey]: {} },
+                    },
                   },
                 },
               },
@@ -503,20 +461,11 @@ test.provider(
             expect(external?.publicId).toBe(created.endpoint.publicId);
           }),
         (service) =>
-          deleteService(service.id).pipe(
-            Effect.catchTag("RailwayNotFound", () => Effect.void),
+          railway.deleteService({ id: service.id }).pipe(
+            railway.catchTags("RailwayNotFound", () => Effect.void),
             Effect.orDie,
           ),
       );
     }).pipe(Effect.ensuring(stack.destroy().pipe(Effect.orDie)), logLevel),
-  {
-    tags: [
-      "provider:railway",
-      "provider:railway:privatenetwork",
-      "provider:railway:project",
-      "provider:railway:projectenvironment",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

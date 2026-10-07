@@ -103,5 +103,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertGone(group.dbParameterGroupName);
     }),
-  { tags: ["provider:aws", "provider:aws:neptune", "live"], timeout: 240_000 },
+  { timeout: 240_000 },
 );

@@ -1,4 +1,4 @@
-import * as Hetzner from "@distilled.cloud/hetzner";
+import { Services } from "@distilled.cloud/hetzner";
 import type { GetActionResponseAction } from "@distilled.cloud/hetzner/actions";
 import * as Data from "effect/Data";
 import * as Duration from "effect/Duration";
@@ -70,8 +70,8 @@ export const waitForAction = (
   ref: ActionRef,
 ): Effect.Effect<
   GetActionResponseAction,
-  ActionFailed | ActionTimeout | Hetzner.actions.GetActionError,
-  Hetzner.actions.HetznerOpContext
+  ActionFailed | ActionTimeout | Services.actions.GetActionError,
+  Services.actions.HetznerOpContext
 > =>
   Effect.gen(function* () {
     if (typeof ref !== "number" && "status" in ref) {
@@ -82,7 +82,7 @@ export const waitForAction = (
     }
 
     const id = actionIdOf(ref);
-    return yield* Hetzner.actions.getAction({ id }).pipe(
+    return yield* Services.actions.getAction({ id }).pipe(
       Effect.flatMap(({ action }) =>
         Effect.gen(function* () {
           yield* failIfError(action);
@@ -118,8 +118,8 @@ export const waitForActions = (
   refs: ReadonlyArray<ActionRef>,
 ): Effect.Effect<
   GetActionResponseAction[],
-  ActionFailed | ActionTimeout | Hetzner.actions.GetActionError,
-  Hetzner.actions.HetznerOpContext
+  ActionFailed | ActionTimeout | Services.actions.GetActionError,
+  Services.actions.HetznerOpContext
 > => Effect.forEach(refs, waitForAction, { concurrency: 1 });
 
 /**
@@ -135,8 +135,8 @@ export const waitForZoneAction = (
   ref: ActionRef,
 ): Effect.Effect<
   GetActionResponseAction,
-  ActionFailed | ActionTimeout | Hetzner.zoneActions.GetZonesActionError,
-  Hetzner.zoneActions.HetznerOpContext
+  ActionFailed | ActionTimeout | Services.zoneActions.GetZonesActionError,
+  Services.zoneActions.HetznerOpContext
 > =>
   Effect.gen(function* () {
     if (typeof ref !== "number" && "status" in ref) {
@@ -147,7 +147,7 @@ export const waitForZoneAction = (
     }
 
     const id = actionIdOf(ref);
-    return yield* Hetzner.zoneActions.getZonesAction({ id }).pipe(
+    return yield* Services.zoneActions.getZonesAction({ id }).pipe(
       Effect.flatMap(({ action }) =>
         Effect.gen(function* () {
           yield* failIfError(action as GetActionResponseAction);

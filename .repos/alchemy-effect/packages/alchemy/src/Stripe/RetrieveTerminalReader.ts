@@ -24,7 +24,6 @@ export interface RetrieveTerminalReaderRequest extends Omit<
  * ```
  *
  * @binding
- * @product Terminal
  */
 export interface RetrieveTerminalReader extends Binding.Service<
   RetrieveTerminalReader,

@@ -8,13 +8,13 @@ import * as Path from "effect/Path";
 
 import * as VcsProjectConfig from "./VcsProjectConfig.ts";
 
-const layerTest = VcsProjectConfig.layer.pipe(
+const TestLayer = VcsProjectConfig.layer.pipe(
   Layer.provide(NodeServices.layer),
   Layer.provideMerge(NodeServices.layer),
 );
 
 describe("VcsProjectConfig", () => {
-  it.layer(layerTest)("uses an explicit requested VCS kind before config", (it) => {
+  it.layer(TestLayer)("uses an explicit requested VCS kind before config", (it) => {
     it.effect("returns the requested kind", () =>
       Effect.gen(function* () {
         const config = yield* VcsProjectConfig.VcsProjectConfig;
@@ -28,7 +28,7 @@ describe("VcsProjectConfig", () => {
     );
   });
 
-  it.layer(layerTest)("discovers .t3code/vcs.json from nested workspaces", (it) => {
+  it.layer(TestLayer)("discovers .t3code/vcs.json from nested workspaces", (it) => {
     it.effect("returns the configured kind", () =>
       Effect.gen(function* () {
         const fileSystem = yield* FileSystem.FileSystem;
@@ -42,6 +42,7 @@ describe("VcsProjectConfig", () => {
         yield* fileSystem.makeDirectory(nested, { recursive: true });
         yield* fileSystem.writeFileString(
           path.join(configDir, "vcs.json"),
+          // @effect-diagnostics-next-line preferSchemaOverJson:off
           JSON.stringify({ vcs: { kind: "jj" } }),
         );
 
@@ -53,7 +54,7 @@ describe("VcsProjectConfig", () => {
     );
   });
 
-  it.layer(layerTest)("continues to parent configs after a candidate inspect failure", (it) => {
+  it.layer(TestLayer)("continues to parent configs after a candidate inspect failure", (it) => {
     it.effect("logs the failed candidate and returns the parent config", () => {
       const messages: unknown[] = [];
       const logger = Logger.make<unknown, void>(({ message }) => {
@@ -71,6 +72,7 @@ describe("VcsProjectConfig", () => {
         yield* fileSystem.makeDirectory(configDir, { recursive: true });
         yield* fileSystem.writeFileString(
           path.join(configDir, "vcs.json"),
+          // @effect-diagnostics-next-line preferSchemaOverJson:off
           JSON.stringify({ vcs: { kind: "jj" } }),
         );
 
@@ -95,7 +97,7 @@ describe("VcsProjectConfig", () => {
     });
   });
 
-  it.layer(layerTest)("falls back to auto when no config exists", (it) => {
+  it.layer(TestLayer)("falls back to auto when no config exists", (it) => {
     it.effect("returns auto", () =>
       Effect.gen(function* () {
         const fileSystem = yield* FileSystem.FileSystem;
@@ -110,7 +112,7 @@ describe("VcsProjectConfig", () => {
     );
   });
 
-  it.layer(layerTest)("falls back to auto when config JSON is malformed", (it) => {
+  it.layer(TestLayer)("falls back to auto when config JSON is malformed", (it) => {
     it.effect("returns auto and logs the failed operation and path", () => {
       const messages: unknown[] = [];
       const logger = Logger.make<unknown, void>(({ message }) => {
@@ -148,7 +150,7 @@ describe("VcsProjectConfig", () => {
     });
   });
 
-  it.layer(layerTest)("falls back to auto when the config path cannot be read", (it) => {
+  it.layer(TestLayer)("falls back to auto when the config path cannot be read", (it) => {
     it.effect("retains the read failure context", () => {
       const messages: unknown[] = [];
       const logger = Logger.make<unknown, void>(({ message }) => {
@@ -182,7 +184,7 @@ describe("VcsProjectConfig", () => {
     });
   });
 
-  it.layer(layerTest)("falls back to auto when config kind is invalid", (it) => {
+  it.layer(TestLayer)("falls back to auto when config kind is invalid", (it) => {
     it.effect("returns auto", () =>
       Effect.gen(function* () {
         const fileSystem = yield* FileSystem.FileSystem;

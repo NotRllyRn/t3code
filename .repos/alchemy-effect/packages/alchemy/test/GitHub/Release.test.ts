@@ -128,15 +128,7 @@ test.provider(
       yield* assertDeleted("update", reset.releaseId);
       yield* stack.destroy();
     }),
-  {
-    tags: [
-      "provider:github",
-      "provider:github:release",
-      "provider:github:repository",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -174,15 +166,7 @@ test.provider(
       yield* assertDeleted("draft", updated.releaseId);
       yield* stack.destroy();
     }),
-  {
-    tags: [
-      "provider:github",
-      "provider:github:release",
-      "provider:github:repository",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -208,15 +192,7 @@ test.provider(
       yield* assertDeleted("prerelease", created.releaseId);
       yield* stack.destroy();
     }),
-  {
-    tags: [
-      "provider:github",
-      "provider:github:release",
-      "provider:github:repository",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -288,15 +264,7 @@ test.provider(
       yield* assertDeleted("list", created.releaseId);
       yield* stack.destroy();
     }),
-  {
-    tags: [
-      "provider:github",
-      "provider:github:release",
-      "provider:github:repository",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -320,13 +288,5 @@ test.provider(
       yield* assertDeleted("replace", replaced.releaseId);
       yield* stack.destroy();
     }),
-  {
-    tags: [
-      "provider:github",
-      "provider:github:release",
-      "provider:github:repository",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

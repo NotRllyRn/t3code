@@ -83,8 +83,5 @@ test.provider(
         );
       expect(gone).toBe("deleted");
     }),
-  {
-    tags: ["provider:aws", "provider:aws:apigatewayv2", "live"],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

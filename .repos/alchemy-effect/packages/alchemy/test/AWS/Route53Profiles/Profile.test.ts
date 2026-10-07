@@ -90,8 +90,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertProfileGone(third.profile.profileId);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:route53profiles", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

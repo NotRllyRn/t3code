@@ -125,7 +125,7 @@ test.provider(
       // image tag with it).
       yield* assertRepositoryDeleted(first.repositoryName);
     }).pipe(Effect.scoped),
-  { tags: ["provider:aws", "provider:aws:ecr", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -185,7 +185,7 @@ test.provider(
       // Destroying an owning Image force-deletes its repository.
       yield* assertRepositoryDeleted(image.repositoryName);
     }),
-  { tags: ["provider:aws", "provider:aws:ecr", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -262,7 +262,7 @@ test.provider(
       yield* assertRepositoryDeleted(first.repositoryName);
       yield* assertRepositoryDeleted(moved.repositoryName);
     }),
-  { tags: ["provider:aws", "provider:aws:ecr", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );
 
 class ImageStillExists extends Data.TaggedError("ImageStillExists") {}

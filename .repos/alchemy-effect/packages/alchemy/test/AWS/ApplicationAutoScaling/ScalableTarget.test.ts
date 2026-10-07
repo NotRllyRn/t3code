@@ -159,13 +159,5 @@ test.provider(
       );
       expect(gone).toBeUndefined();
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:applicationautoscaling",
-      "provider:aws:dynamodb",
-      "live",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

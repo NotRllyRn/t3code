@@ -99,8 +99,5 @@ test.provider.skipIf(!process.env.AWS_TEST_APPREGISTRY)(
       yield* stack.destroy();
       yield* assertAttributeGroupGone(created.attributeGroupId);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:appregistry", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

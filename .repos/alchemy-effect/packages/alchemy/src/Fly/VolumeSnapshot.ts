@@ -128,7 +128,6 @@ export type VolumeSnapshot = Resource<
  * ```
  *
  * @resource
- * @product Volume
  */
 export const VolumeSnapshot = Resource<VolumeSnapshot>("Fly.VolumeSnapshot");
 

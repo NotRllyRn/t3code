@@ -24,7 +24,6 @@ test.provider(
       );
       expect(error._tag).toBe("SecurityConfigurationNotFound");
     }),
-  { tags: ["provider:aws", "provider:aws:emr", "live"] },
 );
 
 const imdsDocument = {
@@ -116,5 +115,5 @@ test.provider(
       );
       expect(afterDestroy._tag).toBe("SecurityConfigurationNotFound");
     }),
-  { tags: ["provider:aws", "provider:aws:emr", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );

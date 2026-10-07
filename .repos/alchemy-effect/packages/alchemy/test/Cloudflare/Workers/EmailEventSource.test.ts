@@ -8,7 +8,7 @@ import { expect } from "alchemy-test";
 import * as Effect from "effect/Effect";
 import { MinimumLogLevel } from "effect/References";
 import * as Schedule from "effect/Schedule";
-import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClient from "effect/unstable/http/HttpClient";
 import EmailCatchAllWorker from "./fixtures/email-catchall-worker.ts";
 import EmailTestWorker from "./fixtures/email-worker.ts";
 
@@ -96,16 +96,7 @@ test.provider(
         { type: "literal", field: "to", value: INBOX },
       ]);
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:email",
-      "provider:cloudflare:worker",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test.skipIf(skipRoundTrip)(
@@ -178,15 +169,7 @@ test.skipIf(skipRoundTrip)(
       expect(msg.receivedAt).toBeGreaterThanOrEqual(resetAt);
     }
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:email",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 360_000,
-  },
+  { timeout: 360_000 },
 );
 
 // The catch-all form: `email({ zone })` with no matchers. Cloudflare
@@ -235,14 +218,5 @@ test.provider(
         );
       expect(strays).toEqual([]);
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:email",
-      "provider:cloudflare:worker",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

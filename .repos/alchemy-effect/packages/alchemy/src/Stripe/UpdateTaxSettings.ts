@@ -26,7 +26,6 @@ export interface UpdateTaxSettingsRequest extends CreateTaxSettingsRequest {}
  * ```
  *
  * @binding
- * @product Tax
  */
 export interface UpdateTaxSettings extends Binding.Service<
   UpdateTaxSettings,

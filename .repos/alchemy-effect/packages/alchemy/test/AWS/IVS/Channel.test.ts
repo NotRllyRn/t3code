@@ -24,7 +24,7 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:ivs", "live"], timeout: 60_000 },
+  { timeout: 60_000 },
 );
 
 const assertChannelGone = (arn: string) =>
@@ -104,5 +104,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertChannelGone(created.channelArn);
     }),
-  { tags: ["provider:aws", "provider:aws:ivs", "live"], timeout: 240_000 },
+  { timeout: 240_000 },
 );

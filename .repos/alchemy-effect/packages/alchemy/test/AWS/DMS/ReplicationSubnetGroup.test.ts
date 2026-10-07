@@ -143,8 +143,5 @@ test.provider(
       // its own failure silently.
       Effect.ensuring(reapDmsOrphans.pipe(Effect.orDie)),
     ),
-  {
-    tags: ["provider:aws", "provider:aws:dms", "provider:aws:ec2", "live"],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );

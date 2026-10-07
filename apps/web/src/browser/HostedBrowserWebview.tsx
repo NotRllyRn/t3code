@@ -1,10 +1,6 @@
 "use client";
 
-import type {
-  DesktopPreviewColorScheme,
-  PreviewViewportSetting,
-  ScopedThreadRef,
-} from "@t3tools/contracts";
+import type { PreviewViewportSetting, ScopedThreadRef } from "@t3tools/contracts";
 import { useShallow } from "zustand/react/shallow";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -22,7 +18,7 @@ import {
 } from "./browserViewportLayout";
 import { BrowserDeviceToolbar } from "./BrowserDeviceToolbar";
 import { BrowserViewportResizeHandles } from "./BrowserViewportResizeHandles";
-import { acquireDesktopTab, type AcquiredDesktopTab, withDesktopTab } from "./desktopTabLifetime";
+import { acquireDesktopTab, type AcquiredDesktopTab } from "./desktopTabLifetime";
 import { resolveHostedBrowserWebviewWrapperStyle } from "./hostedBrowserWebviewStyle";
 import { usePreviewWebviewConfig } from "./previewWebviewConfigState";
 import { useBrowserViewportResize } from "./useBrowserViewportResize";
@@ -60,16 +56,6 @@ export function HostedBrowserWebview(props: {
    */
   readonly profileId: string | undefined;
   readonly zoomFactor: number;
-  /** A tab of the desktop's own server; the server drives this webview's page. */
-  readonly serverDriven?: boolean;
-  /**
-   * For a server-driven tab, the appearance and zoom its environment published,
-   * which this webview follows so every client and agent sees one state.
-   */
-  readonly serverRendering?: {
-    readonly colorScheme: DesktopPreviewColorScheme;
-    readonly zoomFactor: number;
-  };
 }) {
   const {
     threadRef,
@@ -80,8 +66,6 @@ export function HostedBrowserWebview(props: {
     pictureInPicture,
     zoomFactor,
     profileId,
-    serverDriven = false,
-    serverRendering,
   } = props;
   const clientSettingsHydrated = useClientSettingsHydrated();
   const config = usePreviewWebviewConfig(threadRef.environmentId, profileId);
@@ -109,36 +93,18 @@ export function HostedBrowserWebview(props: {
     (state) => (state.activityByTabId[runtimeTabId] ?? 0) > 0,
   );
   const recordingActive = useActiveBrowserRecordingTabIds().has(runtimeTabId);
-  usePreviewBridge({ threadRef, tabId, runtimeTabId, serverDriven });
-
-  const serverColorScheme = serverRendering?.colorScheme;
-  const serverZoomFactor = serverRendering?.zoomFactor;
+  usePreviewBridge({ threadRef, tabId, runtimeTabId });
 
   useEffect(() => {
     if (!clientSettingsHydrated) return;
     crashRecoveryRef.current = INITIAL_WEBVIEW_CRASH_RECOVERY_STATE;
-    const lease = acquireDesktopTab(
-      runtimeTabId,
-      serverDriven ? { threadId: threadRef.threadId, tabId } : undefined,
-    );
+    const lease = acquireDesktopTab(runtimeTabId);
     tabLeaseRef.current = lease;
     return () => {
       if (tabLeaseRef.current === lease) tabLeaseRef.current = null;
       lease.release();
     };
-  }, [clientSettingsHydrated, runtimeTabId, serverDriven, tabId, threadRef.threadId]);
-
-  // A server tab looks the way its environment published, once the desktop tab exists.
-  useEffect(() => {
-    const bridge = window.desktopBridge?.preview;
-    if (!bridge || serverColorScheme === undefined) return;
-    withDesktopTab(runtimeTabId, () => bridge.setColorScheme(runtimeTabId, serverColorScheme));
-  }, [runtimeTabId, serverColorScheme]);
-  useEffect(() => {
-    const bridge = window.desktopBridge?.preview;
-    if (!bridge || serverZoomFactor === undefined) return;
-    withDesktopTab(runtimeTabId, () => bridge.setZoomFactor(runtimeTabId, serverZoomFactor));
-  }, [runtimeTabId, serverZoomFactor]);
+  }, [clientSettingsHydrated, runtimeTabId]);
 
   const [webviewGeneration, setWebviewGeneration] = useState(0);
   const [recoverySrc, setRecoverySrc] = useState(initialSrc);

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import * as Hetzner from "@distilled.cloud/hetzner";
+import { Services } from "@distilled.cloud/hetzner";
 import type { GetSshKeyResponseSshKey } from "@distilled.cloud/hetzner/ssh_keys";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
@@ -83,7 +83,6 @@ export type SshKey = Resource<
  * ```
  *
  * @resource
- * @product Server
  */
 export const SshKey = Resource<SshKey>("Hetzner.SshKey");
 
@@ -124,20 +123,20 @@ const fingerprintOf = (publicKey: string) =>
   });
 
 const getById = (id: number) =>
-  Hetzner.sshKeys.getSshKey({ id }).pipe(
+  Services.sshKeys.getSshKey({ id }).pipe(
     Effect.map(({ ssh_key }) => ssh_key),
     Effect.catchTag("NotFound", () => Effect.succeed(undefined)),
   );
 
 const findByName = (name: string) =>
-  Hetzner.sshKeys
+  Services.sshKeys
     .listSshKeys({ name, per_page: 50 })
     .pipe(
       Effect.map(({ ssh_keys }) => ssh_keys.find((key) => key.name === name)),
     );
 
 const findByFingerprint = (fingerprint: string) =>
-  Hetzner.sshKeys
+  Services.sshKeys
     .listSshKeys({ fingerprint, per_page: 50 })
     .pipe(Effect.map(({ ssh_keys }) => ssh_keys[0]));
 
@@ -191,7 +190,7 @@ export const SshKeyProvider = () =>
     }),
 
     list: () =>
-      Hetzner.sshKeys.listSshKeys
+      Services.sshKeys.listSshKeys
         .items({ label_selector: alchemyStackSelector, per_page: 50 })
         .pipe(
           Stream.runCollect,
@@ -212,7 +211,7 @@ export const SshKeyProvider = () =>
       });
 
       if (current === undefined) {
-        const created = yield* Hetzner.sshKeys
+        const created = yield* Services.sshKeys
           .createSshKey({
             name,
             public_key: news.publicKey,
@@ -237,7 +236,7 @@ export const SshKeyProvider = () =>
       const nameChanged = current.name !== name;
       const labelsChanged = upsert.length > 0 || removed.length > 0;
       if (nameChanged || labelsChanged) {
-        const updated = yield* Hetzner.sshKeys.updateSshKey({
+        const updated = yield* Services.sshKeys.updateSshKey({
           id: current.id,
           name: nameChanged ? name : undefined,
           labels: labelsChanged ? desiredLabels : undefined,
@@ -249,7 +248,7 @@ export const SshKeyProvider = () =>
     }),
 
     delete: Effect.fn(function* ({ output }) {
-      yield* Hetzner.sshKeys
+      yield* Services.sshKeys
         .deleteSshKey({ id: output.id })
         .pipe(Effect.catchTag("NotFound", () => Effect.void));
     }),

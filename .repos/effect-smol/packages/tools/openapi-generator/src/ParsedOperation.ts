@@ -10,14 +10,14 @@
  *
  * @since 4.0.0
  */
+import type * as Types from "effect/Types"
 import type {
   OpenAPISecurityRequirement,
   OpenAPISpecExternalDocs,
   OpenAPISpecLicense,
+  OpenAPISpecMethodName,
   OpenAPISpecServer
-} from "effect/http-api/OpenApi"
-import type { HttpMethod } from "effect/http/HttpMethod"
-import type * as Types from "effect/Types"
+} from "effect/unstable/httpapi/OpenApi"
 
 /**
  * Root OpenAPI metadata preserved for generated client and HttpApi output.
@@ -202,7 +202,7 @@ export interface ParsedOperation {
   readonly id: string
   readonly operationId: string | undefined
   readonly path: string
-  readonly method: Lowercase<HttpMethod>
+  readonly method: OpenAPISpecMethodName
   readonly tags: ReadonlyArray<string>
   readonly metadata: ParsedOperationMetadata
   readonly parameters: {
@@ -243,7 +243,7 @@ export interface ParsedOperation {
  */
 export const makeDeepMutable = (options: {
   readonly id: string
-  readonly method: Lowercase<HttpMethod>
+  readonly method: OpenAPISpecMethodName
   readonly pathIds: Array<string>
   readonly pathTemplate: string
   readonly description: string | undefined

@@ -100,11 +100,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertContactListDeleted(list.contactListName);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:ses", "live"],
-    timeout: 120_000,
-    exclusive: true,
-  },
+  { timeout: 120_000, exclusive: true },
 );
 
 test.provider(
@@ -137,9 +133,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertContactListDeleted("alchemy-test-contact-list-b");
     }),
-  {
-    tags: ["provider:aws", "provider:aws:ses", "live"],
-    timeout: 120_000,
-    exclusive: true,
-  },
+  { timeout: 120_000, exclusive: true },
 );

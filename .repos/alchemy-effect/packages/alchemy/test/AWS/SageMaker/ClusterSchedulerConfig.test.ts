@@ -20,7 +20,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFound");
     }),
-  { tags: ["provider:aws", "provider:aws:sagemaker", "live"] },
 );
 
 const findConfig = (configId: string) =>
@@ -123,8 +122,5 @@ test.provider.skipIf(!process.env.AWS_TEST_SAGEMAKER_HYPERPOD_EKS_CLUSTER_ARN)(
       const gone = yield* findConfig(policy.clusterSchedulerConfigId);
       expect(gone === undefined || gone.Status === "Deleted").toBe(true);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:sagemaker", "live"],
-    timeout: 600_000,
-  },
+  { timeout: 600_000 },
 );

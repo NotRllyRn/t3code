@@ -24,16 +24,16 @@ test(
         Effect.gen(function* () {
           const { ms, ok } = yield* timed(
             expectUrlContains("https://192.0.2.1/", "nope", {
-              timeout: "250 millis",
+              timeout: "8 seconds",
               label: "blackhole",
             }),
           );
           expect(ok).toBe(false);
-          expect(ms).toBeLessThan(3_000);
+          expect(ms).toBeLessThan(25_000);
         }),
       ),
     ),
-  { tags: ["unit", "provider:cloudflare", "local"], timeout: 5_000 },
+  { timeout: 60_000 },
 );
 
 test(
@@ -54,16 +54,16 @@ test(
           const port = (server.address() as { port: number }).port;
           const { ms, ok } = yield* timed(
             expectUrlContains(`http://127.0.0.1:${port}/`, "nope", {
-              timeout: "250 millis",
+              timeout: "8 seconds",
               label: "black-hole-response",
             }),
           );
           expect(ok).toBe(false);
-          expect(ms).toBeLessThan(3_000);
+          expect(ms).toBeLessThan(25_000);
         }),
       ),
     ),
-  { tags: ["unit", "provider:cloudflare", "local"], timeout: 5_000 },
+  { timeout: 60_000 },
 );
 
 test(
@@ -88,14 +88,14 @@ test(
           const port = (server.address() as { port: number }).port;
           const { ms, ok } = yield* timed(
             expectUrlContains(`http://127.0.0.1:${port}/`, "nope", {
-              timeout: "250 millis",
+              timeout: "8 seconds",
               label: "fast-502",
             }),
           );
           expect(ok).toBe(false);
-          expect(ms).toBeLessThan(3_000);
+          expect(ms).toBeLessThan(25_000);
         }),
       ),
     ),
-  { tags: ["unit", "provider:cloudflare", "local"], timeout: 5_000 },
+  { timeout: 60_000 },
 );

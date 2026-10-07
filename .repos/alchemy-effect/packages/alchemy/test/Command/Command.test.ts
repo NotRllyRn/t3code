@@ -32,7 +32,7 @@ test.provider(
       const all = yield* provider.list();
       expect(all).toEqual([]);
     }),
-  { tags: ["unit", "local"], timeout: 30000 },
+  { timeout: 30000 },
 );
 
 // All filesystem-mutating path scenarios live in one test: tests within a file
@@ -174,5 +174,5 @@ test.provider(
 
       yield* stack.destroy();
     }),
-  { tags: ["unit", "local"], timeout: 120000 },
+  { timeout: 120000 },
 );

@@ -24,7 +24,6 @@ export interface RetrieveEntitlementsFeatureRequest extends Omit<
  * ```
  *
  * @binding
- * @product Entitlements
  */
 export interface RetrieveEntitlementsFeature extends Binding.Service<
   RetrieveEntitlementsFeature,

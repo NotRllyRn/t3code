@@ -100,7 +100,6 @@ test.provider(
       );
       expect(t._tag).toBe("NotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:mediaconvert", "live"] },
 );
 
 test.provider(
@@ -127,7 +126,6 @@ test.provider(
         "ForbiddenException",
       ]).toContain(error._tag);
     }),
-  { tags: ["provider:aws", "provider:aws:mediaconvert", "live"] },
 );
 
 // ---------------------------------------------------------------------------
@@ -187,10 +185,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertQueueDeleted(QUEUE_NAME);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:mediaconvert", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // ---------------------------------------------------------------------------
@@ -243,10 +238,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertPresetDeleted(PRESET_NAME);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:mediaconvert", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // ---------------------------------------------------------------------------
@@ -306,10 +298,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertJobTemplateDeleted(TEMPLATE_NAME);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:mediaconvert", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // ---------------------------------------------------------------------------
@@ -380,10 +369,7 @@ test.provider.skipIf(!runJob)(
       // destroy() cancels the job if still in flight.
       yield* stack.destroy();
     }),
-  {
-    tags: ["provider:aws", "provider:aws:mediaconvert", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 // ---------------------------------------------------------------------------

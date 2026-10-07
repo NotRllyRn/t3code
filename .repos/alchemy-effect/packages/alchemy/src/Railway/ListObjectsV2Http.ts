@@ -8,7 +8,6 @@ import { ListObjectsV2 } from "./ListObjectsV2.ts";
  * `listObjectsV2` against the Railway endpoint with the bucket's credentials.
  *
  * @layer
- * @product Bucket
  * @provides Railway.ListObjectsV2
  */
 export const ListObjectsV2Http = Layer.effect(

@@ -63,7 +63,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertVolumeDeleted(volume.volumeId);
     }).pipe(logLevel),
-  { tags: ["provider:aws", "provider:aws:ec2", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );
 
 class AliasStillExists extends Data.TaggedError("AliasStillExists") {}
@@ -219,10 +219,7 @@ test.provider(
       ),
     );
   },
-  {
-    tags: ["provider:aws", "provider:aws:ec2", "provider:aws:kms", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 const assertVolumeDeleted = Effect.fn(function* (volumeId: string) {

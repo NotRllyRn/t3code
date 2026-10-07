@@ -1,7 +1,7 @@
 import * as Hetzner from "@/Hetzner";
 import * as Provider from "@/Provider";
 import * as Test from "@/Test/Alchemy";
-import * as firewalls from "@distilled.cloud/hetzner/firewalls";
+import { Services } from "@distilled.cloud/hetzner";
 import { expect } from "alchemy-test";
 import * as Effect from "effect/Effect";
 import { MinimumLogLevel } from "effect/References";
@@ -33,7 +33,7 @@ const httpRule: Hetzner.FirewallRule = {
 };
 
 const waitUntilGone = (id: number) =>
-  firewalls.getFirewall({ id }).pipe(
+  Services.firewalls.getFirewall({ id }).pipe(
     Effect.as("found" as const),
     Effect.catchTag("NotFound", () => Effect.succeed("gone" as const)),
     Effect.repeat({
@@ -74,7 +74,7 @@ test.provider.skipIf(!hasHetznerCreds)(
         ]),
       );
 
-      const fetched = yield* firewalls.getFirewall({
+      const fetched = yield* Services.firewalls.getFirewall({
         id: created.id,
       });
       expect(fetched.firewall.id).toEqual(created.id);
@@ -113,7 +113,7 @@ test.provider.skipIf(!hasHetznerCreds)(
         ]),
       );
 
-      const refetched = yield* firewalls.getFirewall({
+      const refetched = yield* Services.firewalls.getFirewall({
         id: updated.id,
       });
       expect(refetched.firewall.id).toEqual(created.id);
@@ -126,15 +126,7 @@ test.provider.skipIf(!hasHetznerCreds)(
       const gone = yield* waitUntilGone(created.id);
       expect(gone).toEqual("gone");
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:hetzner",
-      "provider:hetzner:firewall",
-      "provider:hetzner:service",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider.skipIf(!hasHetznerCreds)(
@@ -171,13 +163,5 @@ test.provider.skipIf(!hasHetznerCreds)(
       const gone = yield* waitUntilGone(deployed.id);
       expect(gone).toEqual("gone");
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:hetzner",
-      "provider:hetzner:firewall",
-      "provider:hetzner:service",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

@@ -56,7 +56,6 @@ import type { Secret } from "./Secret.ts";
  * ```
  *
  * @binding
- * @product Secret
  */
 export interface WriteSecret extends Binding.Service<
   WriteSecret,

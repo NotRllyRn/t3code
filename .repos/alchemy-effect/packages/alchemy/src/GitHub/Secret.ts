@@ -138,7 +138,6 @@ export interface Secret extends Resource<
  * ```
  *
  * @resource
- * @product Actions
  */
 export const Secret = Resource<Secret>("GitHub.Secret");
 

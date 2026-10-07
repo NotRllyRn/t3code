@@ -91,5 +91,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertStreamKeyGone(deployed.streamKey.streamKeyArn);
     }),
-  { tags: ["provider:aws", "provider:aws:ivs", "live"], timeout: 240_000 },
+  { timeout: 240_000 },
 );

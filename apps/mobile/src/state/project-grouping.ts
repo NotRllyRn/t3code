@@ -1,5 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
-import { AsyncResult } from "effect/reactivity";
+import { AsyncResult } from "effect/unstable/reactivity";
 
 import { mobilePreferencesAtom } from "./preferences";
 import {

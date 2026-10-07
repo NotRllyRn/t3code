@@ -124,10 +124,7 @@ test.provider(
       );
       expect(afterDestroy).toBeUndefined();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:tunnel", "live"],
-    timeout: 90_000,
-  },
+  { timeout: 90_000 },
 );
 
 test.provider(
@@ -182,8 +179,5 @@ test.provider(
       );
       expect(afterDestroy).toBeUndefined();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:tunnel", "live"],
-    timeout: 90_000,
-  },
+  { timeout: 90_000 },
 );

@@ -51,7 +51,7 @@ test.provider(
         expect(err._tag).toBe("LocationNotFound");
       }
     }),
-  { tags: ["provider:aws", "provider:aws:datasync", "live"], timeout: 60_000 },
+  { timeout: 60_000 },
 );
 
 test.provider(
@@ -167,14 +167,5 @@ test.provider(
       const gone = yield* waitUntilLocationGone(arn);
       expect(gone).toBe(true);
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:datasync",
-      "provider:aws:iam",
-      "provider:aws:s3",
-      "live",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

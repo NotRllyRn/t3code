@@ -81,34 +81,28 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:magictransit", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // Read-only: list() must resolve via the typed provider and return a
 // well-typed array even on unentitled accounts (the account-scoped
 // `MagicTransitNotOnboarded` gate is mapped to `[]`).
-test.provider(
-  "list returns a well-typed array of routes",
-  (stack) =>
-    Effect.gen(function* () {
-      yield* stack.destroy();
+test.provider("list returns a well-typed array of routes", (stack) =>
+  Effect.gen(function* () {
+    yield* stack.destroy();
 
-      const provider = yield* Provider.findProvider(
-        Cloudflare.MagicTransit.MagicStaticRoute,
-      );
-      const all = yield* provider.list();
-      expect(Array.isArray(all)).toBe(true);
-      for (const route of all) {
-        expect(typeof route.routeId).toBe("string");
-        expect(typeof route.accountId).toBe("string");
-      }
+    const provider = yield* Provider.findProvider(
+      Cloudflare.MagicTransit.MagicStaticRoute,
+    );
+    const all = yield* provider.list();
+    expect(Array.isArray(all)).toBe(true);
+    for (const route of all) {
+      expect(typeof route.routeId).toBe("string");
+      expect(typeof route.accountId).toBe("string");
+    }
 
-      yield* stack.destroy();
-    }).pipe(logLevel),
-  { tags: ["provider:cloudflare", "provider:cloudflare:magictransit", "live"] },
+    yield* stack.destroy();
+  }).pipe(logLevel),
 );
 
 test.provider.skipIf(!entitled)(
@@ -151,10 +145,7 @@ test.provider.skipIf(!entitled)(
 
       yield* expectGone(accountId, route.routeId);
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:magictransit", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider.skipIf(!entitled)(
@@ -225,8 +216,5 @@ test.provider.skipIf(!entitled)(
         );
       expect(tunnelGone).toBe(true);
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:magictransit", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

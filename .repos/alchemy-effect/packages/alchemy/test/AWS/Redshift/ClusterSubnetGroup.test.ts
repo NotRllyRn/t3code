@@ -23,7 +23,6 @@ test.provider(
       );
       expect(error._tag).toBe("ClusterSubnetGroupNotFoundFault");
     }),
-  { tags: ["provider:aws", "provider:aws:redshift", "live"] },
 );
 
 // Resolve default-for-AZ subnets in the default VPC (sorted for determinism).
@@ -121,8 +120,5 @@ test.provider(
       );
       expect(error._tag).toBe("ClusterSubnetGroupNotFoundFault");
     }),
-  {
-    tags: ["provider:aws", "provider:aws:ec2", "provider:aws:redshift", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

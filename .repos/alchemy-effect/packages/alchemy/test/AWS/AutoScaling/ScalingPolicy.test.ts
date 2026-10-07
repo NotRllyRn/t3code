@@ -99,15 +99,7 @@ test.provider(
       yield* assertPolicyGone(policy.policyName);
       yield* assertGroupGone("alchemy-test-policy-asg-list");
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:autoscaling",
-      "provider:aws:ec2",
-      "live",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );
 
 // Regression test for https://github.com/alchemy-run/alchemy/issues/736.
@@ -303,13 +295,5 @@ test.provider(
       yield* assertGroupGone(recoveryAsgName);
       yield* cleanupRecoveryLt;
     }).pipe(Effect.ensuring(cleanupRecoveryLt)),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:autoscaling",
-      "provider:aws:ec2",
-      "live",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

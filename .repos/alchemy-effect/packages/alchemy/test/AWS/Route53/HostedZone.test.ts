@@ -96,7 +96,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertZoneGone(zone.id);
     }),
-  { tags: ["provider:aws", "provider:aws:route53", "live"], timeout: 180_000 },
+  { timeout: 180_000 },
 );
 
 const forceZoneName = "alchemy-hostedzone-force.alchemy.";
@@ -141,7 +141,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertZoneGone(zone.id);
     }),
-  { tags: ["provider:aws", "provider:aws:route53", "live"], timeout: 180_000 },
+  { timeout: 180_000 },
 );
 
 // Regression test for https://github.com/alchemy-run/alchemy/issues/736.
@@ -233,7 +233,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertZoneGone(created.id);
     }),
-  { tags: ["provider:aws", "provider:aws:route53", "live"], timeout: 240_000 },
+  { timeout: 240_000 },
 );
 
 test.provider(
@@ -248,5 +248,5 @@ test.provider(
       );
       expect(true).toBe(true);
     }),
-  { tags: ["provider:aws", "provider:aws:route53", "live"], timeout: 60_000 },
+  { timeout: 60_000 },
 );

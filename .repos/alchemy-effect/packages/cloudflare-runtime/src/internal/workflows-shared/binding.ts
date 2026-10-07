@@ -15,7 +15,6 @@ import {
   isValidAddressableWorkflowInstanceId,
   isValidWorkflowInstanceId,
 } from "./lib/validators.ts";
-import { parseWorkflowSubscriptionOptions } from "./subscription.ts";
 import type {
   DatabaseInstance,
   DatabaseVersion,
@@ -24,10 +23,6 @@ import type {
   EngineLogs,
 } from "./engine.ts";
 import type { InstanceStatus as EngineInstanceStatus } from "./instance.ts";
-import type {
-  WorkflowSubscription,
-  WorkflowSubscriptionOptions,
-} from "./subscription.ts";
 import type {
   WorkflowInstanceModifier,
   WorkflowIntrospectionOperation,
@@ -631,13 +626,6 @@ export class WorkflowHandle extends RpcTarget implements WorkflowInstance {
       output: workflowOutput,
       error: workflowError,
     };
-  }
-
-  public async subscribe(
-    options?: WorkflowSubscriptionOptions,
-  ): Promise<WorkflowSubscription> {
-    const parsedOptions = parseWorkflowSubscriptionOptions(options);
-    return this.stub.subscribe(parsedOptions);
   }
 
   public async sendEvent(args: {

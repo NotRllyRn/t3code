@@ -24,7 +24,6 @@ export interface RetrieveCustomerRequest extends Omit<
  * ```
  *
  * @binding
- * @product Customer
  */
 export interface RetrieveCustomer extends Binding.Service<
   RetrieveCustomer,

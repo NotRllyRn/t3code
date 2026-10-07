@@ -119,10 +119,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertAnalyzerDeleted(analyzerName);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:accessanalyzer", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 const observedUnusedAccessAge = (
@@ -168,8 +165,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertAnalyzerDeleted(analyzerName);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:accessanalyzer", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

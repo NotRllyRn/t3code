@@ -134,7 +134,6 @@ export interface Image extends Resource<
  * ```
  *
  * @resource
- * @product Image
  */
 export const Image = Resource<Image>("Docker.Image");
 

@@ -160,16 +160,7 @@ test.provider(
 
       yield* stack.destroy();
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:dynamodb",
-      "provider:aws:s3",
-      "provider:aws:sqs",
-      "live",
-    ],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );
 
 test.provider(
@@ -221,7 +212,7 @@ test.provider(
 
       yield* stack.destroy();
     }),
-  { tags: ["provider:aws", "provider:aws:ssm", "local"], timeout: 300_000 },
+  { timeout: 300_000 },
 );
 
 test.provider(
@@ -271,7 +262,7 @@ test.provider(
       yield* stack.destroy();
     }),
   // First invoke pulls the Lambda runtime image on a cold machine.
-  { tags: ["provider:aws", "provider:aws:lambda", "local"], timeout: 600_000 },
+  { timeout: 600_000 },
 );
 
 test.provider(
@@ -320,7 +311,7 @@ test.provider(
 
       yield* stack.destroy();
     }),
-  { tags: ["provider:aws", "provider:aws:ecs", "local"], timeout: 300_000 },
+  { timeout: 300_000 },
 );
 
 test.provider(
@@ -367,5 +358,5 @@ test.provider(
 
       yield* stack.destroy();
     }),
-  { tags: ["provider:aws", "provider:aws:ecs", "live"], timeout: 300_000 },
+  { timeout: 300_000 },
 );

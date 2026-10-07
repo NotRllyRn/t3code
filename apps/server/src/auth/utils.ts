@@ -3,10 +3,9 @@ import type {
   AuthClientMetadataDeviceType,
   AuthClientPresentationMetadata,
 } from "@t3tools/contracts";
-import type * as HttpServerRequest from "effect/http/HttpServerRequest";
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- Effect's Crypto has no createHmac or timingSafeEqual.
+import type * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
 import * as NodeCrypto from "node:crypto";
-import * as Base64Url from "effect/encoding/Base64Url";
+import * as Encoding from "effect/Encoding";
 import * as Result from "effect/Result";
 
 const SESSION_COOKIE_NAME = "t3_session";
@@ -82,12 +81,12 @@ export function isRemoteReachableHost(host: string | undefined): boolean {
 
 export function base64UrlEncode(input: string | Uint8Array): string {
   return typeof input === "string"
-    ? Base64Url.encode(new TextEncoder().encode(input))
-    : Base64Url.encode(input);
+    ? Encoding.encodeBase64Url(new TextEncoder().encode(input))
+    : Encoding.encodeBase64Url(input);
 }
 
 export function base64UrlDecodeUtf8(input: string): string {
-  return Result.getOrThrow(Base64Url.decodeString(input));
+  return Result.getOrThrow(Encoding.decodeBase64UrlString(input));
 }
 
 export function signPayload(payload: string, secret: Uint8Array): string {

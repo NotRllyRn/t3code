@@ -166,10 +166,7 @@ test.provider(
 
       yield* expectGone(accountId, initial.bucket.bucketName);
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:r2", "live"],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );
 
 test.provider(
@@ -202,10 +199,7 @@ test.provider(
 
       yield* expectGone(accountId, deployed.bucket.bucketName);
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:r2", "live"],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );
 
 test.provider(
@@ -255,8 +249,5 @@ test.provider(
 
       yield* expectGone(accountId, initial.bucket.bucketName);
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:r2", "live"],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

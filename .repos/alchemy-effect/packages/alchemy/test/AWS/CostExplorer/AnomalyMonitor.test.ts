@@ -61,10 +61,7 @@ test.provider(
       );
       expect(error._tag).toBe("UnknownMonitorException");
     }),
-  {
-    tags: ["provider:aws", "provider:aws:costexplorer", "live"],
-    timeout: 60_000,
-  },
+  { timeout: 60_000 },
 );
 
 test.provider(
@@ -128,10 +125,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertMonitorGone(deployed.monitorArn);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:costexplorer", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // Monitor names are unique per account and the specification is create-only,
@@ -171,8 +165,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertMonitorGone(replaced.monitorArn);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:costexplorer", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

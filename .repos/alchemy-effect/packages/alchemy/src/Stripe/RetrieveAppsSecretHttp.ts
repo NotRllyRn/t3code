@@ -18,7 +18,6 @@ import {
  * `name` and `scope`.
  *
  * @layer
- * @product Secrets
  * @provides Stripe.RetrieveAppsSecret
  */
 export const RetrieveAppsSecretHttp = Layer.effect(

@@ -88,10 +88,7 @@ test.provider(
       const gone = yield* getDataset(created.dataset.datasetName);
       expect(gone).toBeUndefined();
     }),
-  {
-    tags: ["provider:aws", "provider:aws:databrew", "provider:aws:s3", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -146,8 +143,5 @@ test.provider(
       yield* stack.destroy();
       expect(yield* getDataset(nameB)).toBeUndefined();
     }),
-  {
-    tags: ["provider:aws", "provider:aws:databrew", "provider:aws:s3", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

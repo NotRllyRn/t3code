@@ -68,7 +68,7 @@ const callsFor = (stackName: string) =>
 const buildsFor = (stackName: string) =>
   modalBuilds.filter((b) => b.stack === stackName);
 
-describe("provider modes", { tags: ["unit", "local"] }, () => {
+describe("provider modes", () => {
   test.provider(
     "lookup resolves concrete modes while registration lookup stays lazy",
     (stack) =>
@@ -663,5 +663,4 @@ test(
       }),
     ),
   ),
-  { tags: ["unit", "local"] },
 );

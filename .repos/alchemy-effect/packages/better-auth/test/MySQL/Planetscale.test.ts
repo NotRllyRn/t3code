@@ -72,9 +72,5 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(Effect.provide(RuntimeContext.phantom)),
-  // Includes provisioning a fresh PlanetScale database.
-  {
-    tags: ["provider:planetscale", "provider:planetscale:mysql", "live"],
-    timeout: 240_000,
-  },
+  { timeout: 120_000 },
 );

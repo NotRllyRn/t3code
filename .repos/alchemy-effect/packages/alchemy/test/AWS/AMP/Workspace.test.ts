@@ -69,7 +69,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:amp", "live"] },
 );
 
 // AMP workspaces + rule/alert sub-resources are cheap and quick to
@@ -187,5 +186,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertWorkspaceDeleted(workspaceId);
     }),
-  { tags: ["provider:aws", "provider:aws:amp", "live"], timeout: 240_000 },
+  { timeout: 240_000 },
 );

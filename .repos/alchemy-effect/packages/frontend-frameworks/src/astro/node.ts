@@ -30,8 +30,6 @@ import {
   NODE_SERVE_ENTRY_FILE_NAME,
   relativeClientDirExpression,
   writeNodeServeEntry,
-  type NodeServeHtmlHandling,
-  type NodeServeNotFoundHandling,
 } from "../core/NodeServe.ts";
 import {
   DeployTargetError,
@@ -50,10 +48,7 @@ export const SERVER_ENTRYPOINT =
   "@alchemy.run/frontend-frameworks/astro/entrypoints/node-server";
 
 /** Node-specific target configuration. */
-export interface AstroNodeConfig {
-  readonly htmlHandling?: NodeServeHtmlHandling;
-  readonly notFoundHandling?: NodeServeNotFoundHandling;
-}
+export interface AstroNodeConfig {}
 
 export interface AstroNodeTarget extends AstroTarget<AstroNodeConfig> {}
 
@@ -193,12 +188,11 @@ const makeNodeAdapterTarget = (
             NODE_SERVE_ENTRY_FILE_NAME,
           );
           return yield* writeNodeServeEntry({
-            output: { ...output, distDirectory: output.clientDirectory },
+            output,
             servePath,
             serveModuleName: NODE_SERVE_ENTRY_FILE_NAME,
             clientDirExpression: `fileURLToPath(new URL("./", import.meta.url))`,
-            notFoundHandling: config.notFoundHandling ?? "spa",
-            htmlHandling: config.htmlHandling,
+            notFoundHandling: "spa",
             platform: "node",
           });
         }
@@ -233,8 +227,6 @@ const makeNodeAdapterTarget = (
             imports: `import { handler } from ${JSON.stringify(`./${entryName}`)};`,
             expr: "handler",
           },
-          notFoundHandling: config.notFoundHandling,
-          htmlHandling: config.htmlHandling,
           platform: "node",
         });
       }),

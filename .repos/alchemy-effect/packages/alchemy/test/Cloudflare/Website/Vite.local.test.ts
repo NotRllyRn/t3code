@@ -5,7 +5,7 @@ import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import { MinimumLogLevel } from "effect/References";
 import * as Schedule from "effect/Schedule";
-import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClient from "effect/unstable/http/HttpClient";
 import * as pathe from "pathe";
 import { cloneFixture } from "../Utils/Fixture.ts";
 
@@ -138,15 +138,7 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:queue",
-      "provider:cloudflare:website",
-      "local",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );
 
 /** Regression test for cron configuration dropped by the Vite child path. */
@@ -196,8 +188,5 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:website", "local"],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

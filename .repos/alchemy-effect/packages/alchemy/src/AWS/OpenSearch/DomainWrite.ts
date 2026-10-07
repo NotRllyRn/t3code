@@ -1,5 +1,4 @@
 import type * as Credentials from "@distilled.cloud/aws/Credentials";
-import type * as SigV4 from "@distilled.cloud/aws/SigV4";
 import type * as Effect from "effect/Effect";
 import * as Binding from "../../Binding.ts";
 import type {
@@ -23,7 +22,7 @@ export interface WriteDomainClient {
     options?: IndexDocumentOptions,
   ): Effect.Effect<
     WriteDocumentResponse,
-    OpenSearchApiError | Credentials.CredentialsError | SigV4.SigningError
+    OpenSearchApiError | Credentials.CredentialsError
   >;
   /**
    * Partially update one document (`POST /{index}/_update/{id}`). The body
@@ -36,7 +35,7 @@ export interface WriteDomainClient {
     options?: WriteDocumentOptions,
   ): Effect.Effect<
     WriteDocumentResponse,
-    OpenSearchApiError | Credentials.CredentialsError | SigV4.SigningError
+    OpenSearchApiError | Credentials.CredentialsError
   >;
   /**
    * Delete one document (`DELETE /{index}/_doc/{id}`). Deleting a missing
@@ -48,7 +47,7 @@ export interface WriteDomainClient {
     options?: WriteDocumentOptions,
   ): Effect.Effect<
     WriteDocumentResponse,
-    OpenSearchApiError | Credentials.CredentialsError | SigV4.SigningError
+    OpenSearchApiError | Credentials.CredentialsError
   >;
   /**
    * Bulk-apply index/create/update/delete operations (`POST /_bulk`). Pass
@@ -59,7 +58,7 @@ export interface WriteDomainClient {
     options?: WriteDocumentOptions,
   ): Effect.Effect<
     BulkResponse,
-    OpenSearchApiError | Credentials.CredentialsError | SigV4.SigningError
+    OpenSearchApiError | Credentials.CredentialsError
   >;
 }
 

@@ -67,7 +67,7 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
     }
   };
 
-  const layerUpdater = Layer.succeed(ElectronUpdater.ElectronUpdater, {
+  const updaterLayer = Layer.succeed(ElectronUpdater.ElectronUpdater, {
     setFeedURL: (options) =>
       Effect.sync(() => {
         feedUrls.push(options);
@@ -109,7 +109,7 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
       ).pipe(Effect.asVoid),
   } satisfies ElectronUpdater.ElectronUpdater["Service"]);
 
-  const layerWindow = Layer.succeed(ElectronWindow.ElectronWindow, {
+  const windowLayer = Layer.succeed(ElectronWindow.ElectronWindow, {
     create: () => Effect.die("unexpected BrowserWindow creation"),
     main: Effect.succeedNone,
     currentMainOrFirst: Effect.succeedNone,
@@ -145,9 +145,9 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
     }),
     waitForReady: () => Effect.succeed(true),
   };
-  const layerBackend = DesktopBackendPool.layerTest([stubBackendInstance]);
+  const backendLayer = DesktopBackendPool.layerTest([stubBackendInstance]);
 
-  const layerEnvironment = DesktopEnvironment.layer({
+  const environmentLayer = DesktopEnvironment.layer({
     dirname: "/repo/apps/desktop/src",
     homeDirectory: `/tmp/t3-desktop-updates-home-${process.pid}`,
     platform: options.platform ?? "darwin",
@@ -175,7 +175,7 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
     ...DesktopAppSettings.DEFAULT_DESKTOP_SETTINGS,
   };
   const setUpdateChannelError = options.setUpdateChannelError;
-  const layerSettings =
+  const settingsLayer =
     setUpdateChannelError || options.beforeSetUpdateChannel
       ? Layer.succeed(DesktopAppSettings.DesktopAppSettings, {
           get: Effect.sync(() => testSettings),
@@ -211,7 +211,7 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
   // Tracks the restart markers installs leave, so installs stay free of real
   // disk I/O that would outrun the tests' settle loops.
   const updateRestartMarkers = new Set<string>();
-  const layerFileSystem = FileSystem.layerNoop({
+  const fileSystemLayer = FileSystem.layerNoop({
     readFileString: (path) =>
       path === "/missing/resources/package-type" && options.packageType !== undefined
         ? Effect.succeed(options.packageType)
@@ -235,12 +235,12 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
   });
 
   const layer = DesktopUpdates.layer.pipe(
-    Layer.provide(layerFileSystem),
-    Layer.provideMerge(layerUpdater),
-    Layer.provideMerge(layerWindow),
-    Layer.provideMerge(layerBackend),
+    Layer.provide(fileSystemLayer),
+    Layer.provideMerge(updaterLayer),
+    Layer.provideMerge(windowLayer),
+    Layer.provideMerge(backendLayer),
     Layer.provideMerge(DesktopState.layer),
-    Layer.provideMerge(layerSettings),
+    Layer.provideMerge(settingsLayer),
     Layer.provideMerge(
       DesktopConfig.layerTest({
         T3CODE_HOME: `/tmp/t3-desktop-updates-test-${process.pid}`,
@@ -249,7 +249,7 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
         ...options.env,
       }),
     ),
-    Layer.provideMerge(layerEnvironment),
+    Layer.provideMerge(environmentLayer),
     Layer.provideMerge(NodeServices.layer),
   );
 

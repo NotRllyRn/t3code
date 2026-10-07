@@ -137,10 +137,7 @@ test.provider(
       // Destroy again — engine-level delete must be idempotent.
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:r2", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // list() — parent fan-out singleton. Ungated path: without external creds
@@ -166,10 +163,7 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:r2", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // Gated list() — with real creds the enabled bucket must appear in the
@@ -193,10 +187,7 @@ test.provider.skipIf(!sippyCreds)(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:r2", "live"],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );
 
 // Full lifecycle — requires env-supplied AWS source + R2 destination
@@ -247,8 +238,5 @@ test.provider.skipIf(!sippyCreds)(
       ).pipe(Effect.flip);
       expect(goneError._tag).toEqual("NoSuchBucket");
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:r2", "live"],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );

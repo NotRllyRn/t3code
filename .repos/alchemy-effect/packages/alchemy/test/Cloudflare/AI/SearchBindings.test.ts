@@ -4,7 +4,7 @@ import { expect } from "alchemy-test";
 import * as Effect from "effect/Effect";
 import { MinimumLogLevel } from "effect/References";
 import * as Schedule from "effect/Schedule";
-import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClient from "effect/unstable/http/HttpClient";
 import Stack from "./fixtures/bindings-stack.ts";
 
 const { test, beforeAll, afterAll, deploy, destroy } = Test.make({
@@ -65,16 +65,7 @@ test(
     expect(body.ns).toBe("object");
     expect(body.nsGet).toBe("function");
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:ai",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );
 
 // The Effect worker attaches the same two binding flavors via
@@ -129,14 +120,5 @@ test(
     expect(["object", "function"]).toContain(body.nsRaw);
     expect(body.nsChatCompletions).toBe("function");
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:ai",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

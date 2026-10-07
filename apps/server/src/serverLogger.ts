@@ -1,16 +1,16 @@
-import * as SharedObservability from "@t3tools/shared/observability";
+import { otlpSerializationLayer } from "@t3tools/shared/observability";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Logger from "effect/Logger";
 import * as References from "effect/References";
-import * as OtlpExporter from "effect/observability/OtlpExporter";
-import * as OtlpLogger from "effect/observability/OtlpLogger";
+import * as OtlpExporter from "effect/unstable/observability/OtlpExporter";
+import * as OtlpLogger from "effect/unstable/observability/OtlpLogger";
 
-import * as ServerConfig from "./config.ts";
+import { otlpResource, ServerConfig } from "./config.ts";
 
-export const layer = Effect.gen(function* () {
-  const config = yield* ServerConfig.ServerConfig;
-  const layerMinimumLogLevel = Layer.succeed(References.MinimumLogLevel, config.logLevel);
+export const ServerLoggerLive = Effect.gen(function* () {
+  const config = yield* ServerConfig;
+  const minimumLogLevelLayer = Layer.succeed(References.MinimumLogLevel, config.logLevel);
 
   const logs = config.otlpLogsExport;
   const otlpLogger =
@@ -20,7 +20,7 @@ export const layer = Effect.gen(function* () {
           url: config.otlpLogsUrl,
           exportInterval: `${logs.exportIntervalMs} millis`,
           headers: logs.headers,
-          resource: ServerConfig.otlpResource(config),
+          resource: otlpResource(config),
         });
 
   // `Logger.layer` writes the whole logger set rather than adding to it, so
@@ -35,15 +35,15 @@ export const layer = Effect.gen(function* () {
   // Recording events on spans is also the shape OpenTelemetry is deprecating,
   // in favor of the log-based events this logger emits:
   // https://opentelemetry.io/blog/2026/deprecating-span-events/
-  const layerLogger = Logger.layer(
+  const loggerLayer = Logger.layer(
     otlpLogger === undefined
       ? [Logger.consolePretty(), Logger.tracerLogger]
       : [Logger.consolePretty(), otlpLogger],
     { mergeWithExisting: false },
   ).pipe(
     Layer.provide(OtlpExporter.layerFlusher),
-    Layer.provide(SharedObservability.layerOtlpSerialization(logs.protocol)),
+    Layer.provide(otlpSerializationLayer(logs.protocol)),
   );
 
-  return Layer.mergeAll(layerLogger, layerMinimumLogLevel);
+  return Layer.mergeAll(loggerLayer, minimumLogLevelLayer);
 }).pipe(Layer.unwrap);

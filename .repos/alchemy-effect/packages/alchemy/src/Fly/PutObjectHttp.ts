@@ -8,7 +8,6 @@ import { PutObject } from "./PutObject.ts";
  * `putObject` against the Tigris endpoint with the bucket's credentials.
  *
  * @layer
- * @product Bucket
  * @provides Fly.PutObject
  */
 export const PutObjectHttp = Layer.effect(

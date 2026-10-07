@@ -138,16 +138,7 @@ test.provider(
       );
       expect(machineGone).toEqual("gone");
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:fly",
-      "provider:fly:app",
-      "provider:fly:machine",
-      "provider:fly:volume",
-      "live",
-    ],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test.provider(
@@ -208,16 +199,7 @@ test.provider(
       );
       expect(gone).toEqual("gone");
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:fly",
-      "provider:fly:app",
-      "provider:fly:machine",
-      "provider:fly:volume",
-      "live",
-    ],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test.provider(
@@ -310,14 +292,5 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:fly",
-      "provider:fly:app",
-      "provider:fly:machine",
-      "provider:fly:volume",
-      "live",
-    ],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

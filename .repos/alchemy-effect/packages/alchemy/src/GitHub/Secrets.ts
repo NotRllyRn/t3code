@@ -51,7 +51,6 @@ export interface SecretsProps {
  * ```
  *
  * @resource
- * @product Actions
  */
 export const Secrets = ({
   owner,

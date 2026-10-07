@@ -162,10 +162,7 @@ test.provider(
         replaced.output.outputId,
       );
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:stream", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -225,10 +222,7 @@ test.provider(
         healed.output.outputId,
       );
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:stream", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // `list()` enumerates every live input on the account (via
@@ -297,8 +291,5 @@ test.provider.skipIf(!process.env.CLOUDFLARE_TEST_STREAM_LIST)(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:stream", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

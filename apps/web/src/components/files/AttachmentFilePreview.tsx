@@ -3,13 +3,22 @@ import type { EnvironmentId } from "@t3tools/contracts";
 import { formatAttachmentSize } from "@t3tools/client-runtime/state/attachments";
 import { readFilePreviewResponse } from "@t3tools/client-runtime/file-preview";
 import { filePreviewKind, FILE_TEXT_PREVIEW_MAX_BYTES } from "@t3tools/shared/filePreview";
-import { ChevronRightIcon, DownloadIcon, Trash2Icon, WrapTextIcon, XIcon } from "lucide-react";
-import { Check, Code2, Copy, Eye, Table2 } from "lucide";
+import {
+  CheckIcon,
+  ChevronRightIcon,
+  Code2,
+  CopyIcon,
+  DownloadIcon,
+  Eye,
+  Table2,
+  Trash2Icon,
+  WrapTextIcon,
+  XIcon,
+} from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAssetUrlRefresh } from "~/assets/assetUrls";
 import ChatMarkdown from "~/components/ChatMarkdown";
-import { MorphIcon } from "~/components/MorphIcon";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { toastManager } from "~/components/ui/toast";
 import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
@@ -55,12 +64,9 @@ function renderedToggleLabel(mode: "markdown" | "html" | "table", rendered: bool
 export function AttachmentFilePreview(props: {
   name: string;
   mimeType: string;
-  /** Zero when unknown. */
   sizeBytes: number;
   file?: Blob | null;
   asset?: { environmentId: EnvironmentId; attachmentId: string };
-  /** An agent's HTML render, shown in the app theme. */
-  htmlRender?: boolean;
   /** First crumb: where the file comes from. */
   origin?: string;
   onRemove?: () => void;
@@ -245,12 +251,7 @@ export function AttachmentFilePreview(props: {
       <ReadOnlySourcePreview name={props.name} text={content.text} />
     )
   ) : kind === "pdf" || kind === "html" ? (
-    <BrowserDocumentFrame
-      src={url}
-      title={props.name}
-      pdf={kind === "pdf"}
-      htmlRender={props.htmlRender === true}
-    />
+    <BrowserDocumentFrame src={url} title={props.name} pdf={kind === "pdf"} />
   ) : kind === "audio" ? (
     <AudioPreview src={url} name={props.name} onError={() => setError("Unable to load audio.")} />
   ) : kind === "video" ? (
@@ -294,11 +295,9 @@ export function AttachmentFilePreview(props: {
           <span aria-current="page" className="min-w-0 truncate px-0.5 font-medium text-foreground">
             {props.name}
           </span>
-          {props.sizeBytes > 0 ? (
-            <span className="ml-2 shrink-0 text-muted-foreground">
-              {formatAttachmentSize(props.sizeBytes)}
-            </span>
-          ) : null}
+          <span className="ml-2 shrink-0 text-muted-foreground">
+            {formatAttachmentSize(props.sizeBytes)}
+          </span>
         </div>
         {renderedMode ? (
           <FileSurfaceAction
@@ -306,10 +305,13 @@ export function AttachmentFilePreview(props: {
             pressed={rendered}
             onPress={() => setRendered((value) => !value)}
           >
-            <MorphIcon
-              className="size-3.5"
-              icon={rendered ? Code2 : renderedMode === "table" ? Table2 : Eye}
-            />
+            {rendered ? (
+              <Code2 className="size-3.5" />
+            ) : renderedMode === "table" ? (
+              <Table2 className="size-3.5" />
+            ) : (
+              <Eye className="size-3.5" />
+            )}
           </FileSurfaceAction>
         ) : null}
         {showsRawText ? (
@@ -326,7 +328,7 @@ export function AttachmentFilePreview(props: {
             label={isCopied ? "Copied" : content.truncated ? "Copy preview" : "Copy contents"}
             onPress={() => copyToClipboard(content.text, undefined)}
           >
-            <MorphIcon className="size-3.5" icon={isCopied ? Check : Copy} />
+            {isCopied ? <CheckIcon className="size-3.5" /> : <CopyIcon className="size-3.5" />}
           </FileSurfaceAction>
         ) : null}
         {url ? (
@@ -351,8 +353,7 @@ export function AttachmentFilePreview(props: {
       </div>
       {content?.truncated ? (
         <FileSurfaceNotice>
-          Preview limited to the first 1 MB
-          {props.sizeBytes > 0 ? ` of a ${props.sizeBytes.toLocaleString()} byte file` : ""}. Save
+          Preview limited to the first 1 MB of a {props.sizeBytes.toLocaleString()} byte file. Save
           the file to read it in full.
         </FileSurfaceNotice>
       ) : null}

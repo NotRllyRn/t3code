@@ -25,7 +25,6 @@ test.provider(
       );
       expect(error._tag).toBe("ClusterNotFoundFault");
     }),
-  { tags: ["provider:aws", "provider:aws:dax", "live"] },
 );
 
 // Resolve two default-for-AZ subnets and the default security group.
@@ -154,14 +153,5 @@ test.provider.skipIf(!process.env.AWS_TEST_SLOW)(
       yield* assertClusterDeleting(cluster.clusterName);
     }),
   // cluster create (~10 min) + delete initiation, one test.
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:dax",
-      "provider:aws:ec2",
-      "provider:aws:iam",
-      "live",
-    ],
-    timeout: 1_500_000,
-  },
+  { timeout: 1_500_000 },
 );

@@ -4,7 +4,7 @@ import { expect } from "alchemy-test";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as Schedule from "effect/Schedule";
-import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClient from "effect/unstable/http/HttpClient";
 import Stack from "./fixtures/dynamic-worker-loader/stack.ts";
 
 const { test, beforeAll, afterAll, deploy, destroy } = Test.make({
@@ -56,10 +56,7 @@ test(
     const body = yield* readJson(asyncWorkerUrl);
     expect(body).toMatchObject({ mode: "async", ok: true });
   }),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:worker", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test(
@@ -69,10 +66,7 @@ test(
     const body = yield* readJson(effectWorkerUrl);
     expect(body).toMatchObject({ mode: "effect", ok: true });
   }),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:worker", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test(
@@ -82,10 +76,7 @@ test(
     const body = yield* readJson(`${effectWorkerUrl}/get`);
     expect(body).toMatchObject({ mode: "get", ok: true });
   }),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:worker", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test(
@@ -96,10 +87,7 @@ test(
     const body = yield* readJson(`${getWorkerUrl}/?id=${id}`);
     expect(body).toMatchObject({ id, hits: 1 });
   }),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:worker", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test(
@@ -124,10 +112,7 @@ test(
     expect(reused).toMatchObject({ id });
     expect((reused as { hits: number }).hits).toBeGreaterThanOrEqual(2);
   }),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:worker", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test(
@@ -138,10 +123,7 @@ test(
     const body = yield* readJson(`${getWorkerUrl}/?id=${id}&entrypoint=1`);
     expect(body).toMatchObject({ id, hits: 1 });
   }),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:worker", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 // `globalOutbound: null` must reach the runtime as `null` — coercing it to
@@ -156,10 +138,7 @@ test(
     const body = yield* readJson(`${effectWorkerUrl}/outbound/sandboxed`);
     expect(body).toMatchObject({ outbound: "blocked" });
   }),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:worker", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test(
@@ -169,8 +148,5 @@ test(
     const body = yield* readJson(`${effectWorkerUrl}/outbound/open`);
     expect(body).toMatchObject({ outbound: "allowed", status: 200 });
   }),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:worker", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

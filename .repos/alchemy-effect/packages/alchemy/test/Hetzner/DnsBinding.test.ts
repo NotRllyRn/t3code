@@ -1,8 +1,7 @@
-import * as zoneRrsets from "@distilled.cloud/hetzner/zone_rrsets";
 import { Action } from "@/Action";
 import * as Hetzner from "@/Hetzner";
 import * as Test from "@/Test/Alchemy";
-import * as zones from "@distilled.cloud/hetzner/zones";
+import { Services } from "@distilled.cloud/hetzner";
 import { expect } from "alchemy-test";
 import * as Effect from "effect/Effect";
 import { MinimumLogLevel } from "effect/References";
@@ -18,7 +17,7 @@ const logLevel = Effect.provideService(
 const hasHetznerCreds = !!process.env.HCLOUD_TOKEN;
 
 const waitUntilGone = (zoneId: number, name: string, type: string) =>
-  zoneRrsets
+  Services.zoneRrsets
     .getZoneRrset({
       id_or_name: String(zoneId),
       rr_name: name,
@@ -35,7 +34,7 @@ const waitUntilGone = (zoneId: number, name: string, type: string) =>
     );
 
 const waitUntilZoneGone = (zoneId: number) =>
-  zones.getZone({ id_or_name: String(zoneId) }).pipe(
+  Services.zones.getZone({ id_or_name: String(zoneId) }).pipe(
     Effect.as("found" as const),
     Effect.catchTag("NotFound", () => Effect.succeed("gone" as const)),
     Effect.repeat({
@@ -122,7 +121,7 @@ test.provider.skipIf(!hasHetznerCreds)(
       expect(out.probe.createdId).toEqual("api/A");
       expect(out.probe.updatedValue).toEqual("192.0.2.51");
 
-      const fetched = yield* zoneRrsets.getZoneRrset({
+      const fetched = yield* Services.zoneRrsets.getZoneRrset({
         id_or_name: String(out.zone.zoneId),
         rr_name: "www",
         rr_type: "A",
@@ -132,7 +131,7 @@ test.provider.skipIf(!hasHetznerCreds)(
         "192.0.2.1",
       ]);
 
-      const apiGone = yield* zoneRrsets
+      const apiGone = yield* Services.zoneRrsets
         .getZoneRrset({
           id_or_name: String(out.zone.zoneId),
           rr_name: "api",
@@ -151,14 +150,5 @@ test.provider.skipIf(!hasHetznerCreds)(
       const zoneGone = yield* waitUntilZoneGone(out.zone.zoneId);
       expect(zoneGone).toEqual("gone");
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:hetzner",
-      "provider:hetzner:recordset",
-      "provider:hetzner:service",
-      "provider:hetzner:zone",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

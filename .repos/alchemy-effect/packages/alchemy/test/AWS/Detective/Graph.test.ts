@@ -75,8 +75,5 @@ test.provider(
       const after = yield* firstGraphArn;
       expect(after).toBeUndefined();
     }),
-  {
-    tags: ["provider:aws", "provider:aws:detective", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

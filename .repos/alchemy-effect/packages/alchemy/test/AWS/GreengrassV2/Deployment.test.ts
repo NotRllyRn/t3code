@@ -23,7 +23,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:greengrassv2", "live"] },
 );
 
 const COMPONENT_NAME = "com.alchemy.test.GgDeploy";
@@ -133,13 +132,5 @@ test.provider(
       yield* stack.destroy();
       yield* waitUntilDeploymentGone(revised.deploymentId);
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:greengrassv2",
-      "provider:aws:iot",
-      "live",
-    ],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );

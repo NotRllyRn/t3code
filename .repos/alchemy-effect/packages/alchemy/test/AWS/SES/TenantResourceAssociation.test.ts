@@ -69,7 +69,7 @@ test.provider(
       ).pipe(Effect.catchTag("NotFoundException", () => Effect.succeed(false)));
       expect(gone).toBe(false);
     }),
-  { tags: ["provider:aws", "provider:aws:ses", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -132,5 +132,5 @@ test.provider(
 
       yield* stack.destroy();
     }),
-  { tags: ["provider:aws", "provider:aws:ses", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );

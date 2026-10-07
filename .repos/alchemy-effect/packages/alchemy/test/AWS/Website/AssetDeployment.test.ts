@@ -12,15 +12,12 @@ import * as Schedule from "effect/Schedule";
 
 const { test } = Test.make({ providers: AWS.providers() });
 
-test.provider(
-  "list returns [] for the non-listable AssetDeployment",
-  () =>
-    Effect.gen(function* () {
-      const provider = yield* Provider.findProvider(AssetDeployment);
-      const all = yield* provider.list();
-      expect(all).toEqual([]);
-    }),
-  { tags: ["provider:aws", "provider:aws:website", "live"] },
+test.provider("list returns [] for the non-listable AssetDeployment", () =>
+  Effect.gen(function* () {
+    const provider = yield* Provider.findProvider(AssetDeployment);
+    const all = yield* provider.list();
+    expect(all).toEqual([]);
+  }),
 );
 
 test.provider(
@@ -105,10 +102,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertBucketDeleted(bucketName);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:s3", "provider:aws:website", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 const listObjectKeys = (bucketName: string) =>

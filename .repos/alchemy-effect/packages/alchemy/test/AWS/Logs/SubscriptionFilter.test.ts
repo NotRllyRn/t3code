@@ -139,14 +139,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertFilterDeleted(replaced.logGroupName, replaced.filterName);
     }).pipe(Effect.onError(() => stack.destroy().pipe(Effect.ignore))),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:iam",
-      "provider:aws:kinesis",
-      "provider:aws:logs",
-      "live",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

@@ -1,4 +1,4 @@
-import * as Mime from "effect/http/Mime";
+import * as Mime from "effect/unstable/http/Mime";
 import {
   AuthOrchestrationOperateScope,
   AuthOrchestrationReadScope,
@@ -23,9 +23,9 @@ import {
   HttpServerResponse,
   HttpServerRequest,
   HttpServerRespondable,
-} from "effect/http";
-import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
-import { OtlpTracer, OtlpSerialization } from "effect/observability";
+} from "effect/unstable/http";
+import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
+import { OtlpTracer, OtlpSerialization } from "effect/unstable/observability";
 
 import * as ServerConfig from "./config.ts";
 import { ASSET_ROUTE_PREFIX, resolveAsset } from "./assets/AssetAccess.ts";
@@ -46,7 +46,6 @@ import {
   failEnvironmentInternal,
 } from "./auth/http.ts";
 import * as ServerEnvironment from "./environment/ServerEnvironment.ts";
-import { WEBHOOK_ROUTE_PREFIX } from "./scheduledTasks/ScheduledTaskService.ts";
 import { browserApiCorsAllowedHeaders, browserApiCorsAllowedMethods } from "./httpCors.ts";
 
 const OTLP_TRACES_PROXY_PATH = "/api/observability/v1/traces";
@@ -56,9 +55,7 @@ const SVG_CONTENT_SECURITY_POLICY = "default-src 'none'; style-src 'unsafe-inlin
 // HTML previews are agent output, not the app. The sandbox gives the document an
 // opaque origin: scripts run, but same-origin cookies, storage, and API calls are
 // out of reach. Relative sibling assets still load through their signed URLs.
-// No modals: agent HTML can open without a click (inline renders, and mobile
-// loads it as the top document), and must not raise blocking dialogs.
-const HTML_CONTENT_SECURITY_POLICY = "sandbox allow-scripts allow-forms allow-popups";
+const HTML_CONTENT_SECURITY_POLICY = "sandbox allow-scripts allow-forms allow-popups allow-modals";
 
 // Types a browser may render as a document if a proxy strips the disposition
 // header. Downloads of these fall back to octet-stream.
@@ -230,11 +227,11 @@ export const assetFileResponse = Effect.fn("assetFileResponse")(function* (
   return yield* HttpServerResponse.file(asset.path, { status, offset, bytesToRead, headers });
 });
 
-export const layerHttpCompression = HttpRouter.middleware(HttpMiddleware.compression(), {
+export const httpCompressionLayer = HttpRouter.middleware(HttpMiddleware.compression(), {
   global: true,
 });
 
-export const layerBrowserApiCors = Layer.unwrap(
+export const browserApiCorsLayer = Layer.unwrap(
   Effect.gen(function* () {
     const config = yield* ServerConfig.ServerConfig;
     const devOrigin = config.devUrl?.origin;
@@ -297,7 +294,7 @@ const authenticateRawRouteWithScope = (
     }
   });
 
-export const layerServerEnvironmentHttpApi = HttpApiBuilder.group(
+export const serverEnvironmentHttpApiLayer = HttpApiBuilder.group(
   EnvironmentHttpApi,
   "metadata",
   Effect.fnUntraced(function* (handlers) {
@@ -320,7 +317,7 @@ class DecodeOtlpTraceRecordsError extends Data.TaggedError("DecodeOtlpTraceRecor
 // tracing this proxy would add more server spans than it forwards.
 // withTracerEnabled(false) drops the handler's spans, including the forward.
 // untracedRequestsLayer drops the HTTP server span.
-export const layerOtlpTracesProxyRoute = HttpRouter.add(
+export const otlpTracesProxyRouteLayer = HttpRouter.add(
   "POST",
   OTLP_TRACES_PROXY_PATH,
   Effect.gen(function* () {
@@ -378,20 +375,18 @@ const UNTRACED_REQUEST_PATHS: ReadonlySet<string> = new Set([OTLP_TRACES_PROXY_P
 
 // Skips the HTTP server span for UNTRACED_REQUEST_PATHS. That span starts
 // before routing, so a route handler cannot skip it. TracerDisabledWhen is one
-// predicate for the whole server, and HttpRouter.serve builds its routes
-// privately, so it is provided to the served layer, never merged into the
-// routes. Add paths here instead of providing it again. The query string is
-// ignored, as in routing.
-const layerUntracedRequests = Layer.succeed(HttpMiddleware.TracerDisabledWhen)((request) => {
+// predicate for the whole server and the last layer to provide it wins, so
+// makeRoutesLayer provides this one last. Add paths here instead of providing
+// TracerDisabledWhen again; server.test.ts fails if a later layer replaces it.
+// The query string is ignored, as in routing.
+export const untracedRequestsLayer = Layer.succeed(HttpMiddleware.TracerDisabledWhen)((request) => {
   const queryIndex = request.url.indexOf("?");
-  const path = queryIndex === -1 ? request.url : request.url.slice(0, queryIndex);
-  // Webhook URLs carry their secret token in the path, so they never reach a trace.
-  return UNTRACED_REQUEST_PATHS.has(path) || path.startsWith(`${WEBHOOK_ROUTE_PREFIX}/`);
+  return UNTRACED_REQUEST_PATHS.has(
+    queryIndex === -1 ? request.url : request.url.slice(0, queryIndex),
+  );
 });
 
-export const withUntracedRequests = Layer.provide(layerUntracedRequests);
-
-export const layerAssetRoute = HttpRouter.add(
+export const assetRouteLayer = HttpRouter.add(
   "GET",
   `${ASSET_ROUTE_PREFIX}/*`,
   Effect.gen(function* () {
@@ -413,12 +408,6 @@ export const layerAssetRoute = HttpRouter.add(
     );
     if (!asset) {
       return HttpServerResponse.text("Not Found", { status: 404 });
-    }
-    if (asset.kind === "bytes") {
-      return HttpServerResponse.uint8Array(asset.bytes, {
-        contentType: asset.mimeType,
-        headers: { "cache-control": "private, max-age=3600", "x-content-type-options": "nosniff" },
-      });
     }
     if (asset.kind === "github-media") {
       return yield* githubMediaResponse(asset, request.headers).pipe(
@@ -444,7 +433,7 @@ export const layerAssetRoute = HttpRouter.add(
   }),
 );
 
-export const layerAttachmentUploadRoute = HttpRouter.add(
+export const attachmentUploadRouteLayer = HttpRouter.add(
   "POST",
   `${ATTACHMENT_UPLOAD_ROUTE_PREFIX}/*`,
   Effect.gen(function* () {
@@ -672,7 +661,7 @@ const handleStaticAndDevRequest = Effect.fn("handleStaticAndDevRequest")(
 );
 
 // Read the installed build's manifest once. Unknown files use revalidation.
-export const layerStaticAndDevRoute = Layer.unwrap(
+export const staticAndDevRouteLayer = Layer.unwrap(
   loadImmutableBuildAssets.pipe(
     Effect.map((assets) => HttpRouter.add("GET", "*", handleStaticAndDevRequest(assets))),
   ),

@@ -265,7 +265,6 @@ export interface Container extends Resource<
  * ```
  *
  * @resource
- * @product Container
  */
 export const Container = Resource<Container>("Docker.Container");
 

@@ -73,10 +73,7 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:diagnostics", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // Out-of-band cleanup of healthchecks leaked by previous failed runs —
@@ -181,10 +178,7 @@ test.provider(
 
       yield* expectGone(accountId, replaced.healthcheckId);
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:diagnostics", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 // Canonical `list()` test (account collection): deploy a real healthcheck,
@@ -224,8 +218,5 @@ test.provider(
       yield* stack.destroy();
       yield* expectGone(accountId, deployed.healthcheckId);
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:diagnostics", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

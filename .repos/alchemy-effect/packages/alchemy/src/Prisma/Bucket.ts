@@ -100,7 +100,6 @@ export interface Bucket extends Resource<
  * ```
  *
  * @resource
- * @product Bucket
  */
 export const Bucket = Resource<Bucket>("Prisma.Bucket");
 

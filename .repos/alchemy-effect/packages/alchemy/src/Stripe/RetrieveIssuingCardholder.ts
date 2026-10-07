@@ -24,7 +24,6 @@ export interface RetrieveIssuingCardholderRequest extends Omit<
  * ```
  *
  * @binding
- * @product Issuing
  */
 export interface RetrieveIssuingCardholder extends Binding.Service<
   RetrieveIssuingCardholder,

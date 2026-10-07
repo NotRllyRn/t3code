@@ -10,7 +10,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { MinimumLogLevel } from "effect/References";
 import * as Schedule from "effect/Schedule";
-import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClient from "effect/unstable/http/HttpClient";
 import Api from "./fixtures/app/api.ts";
 import {
   Marker,
@@ -195,17 +195,5 @@ test(
     expect(body.ok).toEqual(true);
     expect(body.name).toEqual(SECRET_NAME);
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:fly",
-      "provider:fly:app",
-      "provider:fly:ipassignment",
-      "provider:fly:machine",
-      "provider:fly:secret",
-      "provider:fly:service",
-      "provider:fly:volume",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

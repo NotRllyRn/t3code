@@ -129,14 +129,5 @@ test.provider.skipIf(!process.env.AWS_TEST_SLOW)(
         }),
       );
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:dsql",
-      "provider:aws:iam",
-      "provider:aws:kinesis",
-      "live",
-    ],
-    timeout: 600_000,
-  },
+  { timeout: 600_000 },
 );

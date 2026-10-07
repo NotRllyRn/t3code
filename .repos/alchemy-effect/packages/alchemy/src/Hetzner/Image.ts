@@ -1,4 +1,4 @@
-import * as Hetzner from "@distilled.cloud/hetzner";
+import { Services } from "@distilled.cloud/hetzner";
 import type {
   GetImageResponseImage,
   ListImagesResponseImagesItem,
@@ -197,7 +197,6 @@ export type Image = Resource<
  * ```
  *
  * @resource
- * @product Server
  */
 export const Image = Resource<Image>("Hetzner.Image");
 
@@ -308,13 +307,13 @@ const toDescription = (
   });
 
 const getById = (id: number) =>
-  Hetzner.images.getImage({ id }).pipe(
+  Services.images.getImage({ id }).pipe(
     Effect.map(({ image }) => image),
     Effect.catchTag("NotFound", () => Effect.succeed(undefined)),
   );
 
 const getByLabels = (labels: Record<string, string>) =>
-  Hetzner.images
+  Services.images
     .listImages({
       type: ["snapshot", "backup"],
       label_selector: labelSelector(labels),
@@ -365,7 +364,7 @@ const waitUntilAvailable = (imageId: number) =>
   );
 
 const waitUntilGone = (imageId: number) =>
-  Hetzner.images.getImage({ id: imageId }).pipe(
+  Services.images.getImage({ id: imageId }).pipe(
     Effect.map(() => false),
     Effect.catchTag("NotFound", () => Effect.succeed(true)),
     Effect.repeat({
@@ -382,7 +381,7 @@ const serverIdOf = (value: unknown): number | undefined => {
 };
 
 const disableProtection = (id: number) =>
-  Hetzner.imageActions
+  Services.imageActions
     .changeImageProtection({ id, delete: false })
     .pipe(Effect.flatMap(({ action }) => waitForAction(action)));
 
@@ -397,7 +396,7 @@ export const ImageProvider = () =>
       "osFlavor",
     ],
     list: Effect.fn(function* () {
-      const items = yield* Hetzner.images.listImages
+      const items = yield* Services.images.listImages
         .items({
           type: ["snapshot", "backup"],
           label_selector: alchemyStackSelector,
@@ -462,7 +461,7 @@ export const ImageProvider = () =>
         if (desiredServerId === undefined) {
           return yield* new ImageServerRequired({ description });
         }
-        const created = yield* Hetzner.serverActions.createServerImage({
+        const created = yield* Services.serverActions.createServerImage({
           id: desiredServerId,
           description,
           type: desiredType,
@@ -494,7 +493,7 @@ export const ImageProvider = () =>
         current.type === "backup" && desiredType === "snapshot";
       const descriptionChanged = current.description !== description;
       if (descriptionChanged || labelsChanged || convertToSnapshot) {
-        const updated = yield* Hetzner.images.updateImage({
+        const updated = yield* Services.images.updateImage({
           id: current.id,
           description: descriptionChanged ? description : undefined,
           type: convertToSnapshot ? "snapshot" : undefined,
@@ -504,7 +503,7 @@ export const ImageProvider = () =>
       }
 
       if (current.protection.delete !== desiredProtection) {
-        const { action } = yield* Hetzner.imageActions.changeImageProtection({
+        const { action } = yield* Services.imageActions.changeImageProtection({
           id: current.id,
           delete: desiredProtection,
         });
@@ -522,7 +521,7 @@ export const ImageProvider = () =>
         yield* disableProtection(current.id);
       }
 
-      yield* Hetzner.images.deleteImage({ id: current.id }).pipe(
+      yield* Services.images.deleteImage({ id: current.id }).pipe(
         Effect.catchTag("NotFound", () => Effect.void),
         Effect.retry({
           while: retryable,

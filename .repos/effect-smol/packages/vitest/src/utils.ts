@@ -39,11 +39,7 @@ export function fail(message: string) {
  * @since 4.0.0
  */
 export function deepStrictEqual<A>(actual: A, expected: A, message?: string, ..._: Array<never>) {
-  if (message !== undefined) {
-    assert.deepStrictEqual(actual, expected, message)
-  } else {
-    assert.deepStrictEqual(actual, expected)
-  }
+  assert.deepStrictEqual(actual, expected, message as string)
 }
 
 /**
@@ -53,11 +49,7 @@ export function deepStrictEqual<A>(actual: A, expected: A, message?: string, ...
  * @since 4.0.0
  */
 export function notDeepStrictEqual<A>(actual: A, expected: A, message?: string, ..._: Array<never>) {
-  if (message !== undefined) {
-    assert.notDeepStrictEqual(actual, expected, message)
-  } else {
-    assert.notDeepStrictEqual(actual, expected)
-  }
+  assert.notDeepStrictEqual(actual, expected, message as string)
 }
 
 /**

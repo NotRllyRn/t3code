@@ -40,7 +40,6 @@ test.provider(
         error._tag,
       );
     }),
-  { tags: ["provider:aws", "provider:aws:securitylake", "live"] },
 );
 
 test.provider(
@@ -56,7 +55,6 @@ test.provider(
         expect(result.failure._tag).toBe("AccessDeniedException");
       }
     }),
-  { tags: ["provider:aws", "provider:aws:securitylake", "live"] },
 );
 
 test.provider(
@@ -82,7 +80,6 @@ test.provider(
         ]).toContain(result.failure._tag);
       }
     }),
-  { tags: ["provider:aws", "provider:aws:securitylake", "live"] },
 );
 
 test.provider(
@@ -100,7 +97,6 @@ test.provider(
         "UnauthorizedException",
       ]).toContain(error._tag);
     }),
-  { tags: ["provider:aws", "provider:aws:securitylake", "live"] },
 );
 
 // ---------------------------------------------------------------------------
@@ -297,13 +293,5 @@ test.provider.skipIf(!process.env.AWS_TEST_SECURITYLAKE)(
       expect(goneSubscriber._tag).toBe("ResourceNotFoundException");
       yield* assertDataLakeGone;
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:iam",
-      "provider:aws:securitylake",
-      "live",
-    ],
-    timeout: 1_200_000,
-  },
+  { timeout: 1_200_000 },
 );

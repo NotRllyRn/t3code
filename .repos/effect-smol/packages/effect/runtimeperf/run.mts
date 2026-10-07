@@ -18,11 +18,7 @@ import {
   relativeToRepo,
   reportPath,
   resolveDefaults,
-  runPath,
-  scenarioBatchSize,
   selectFixtures,
-  statsPath,
-  utilsPath,
   workerPath,
   writeJson
 } from "./utils.mts"
@@ -35,7 +31,7 @@ Options:
   --warmup-time <ms>
   --tier <0-3>
   --family <name>
-  --implementation <effect|effect-jit|effect-aot|fast-check-v4|valibot|zod4|zod4-jitless|zod4-validate|zod4-compiled>
+  --implementation <effect|fast-check-v4|valibot|zod4>
 `
 
 const rotate = (items, offset) => items.map((_, index) => items[(index + offset) % items.length])
@@ -56,12 +52,12 @@ const main = () => {
 
   for (const [scenario, group] of groups) {
     const calibrations = new Map(group.map((fixture) => [fixture, calibrateFixture(fixture, defaults)]))
-    const batchSize = scenarioBatchSize(group, calibrations)
     const byTarget = new Map(group.map((fixture) => [fixture.target, []]))
 
     for (let round = 0; round < defaults.rounds; round++) {
       for (const fixture of rotate(group, round % group.length)) {
-        const measurement = measureFixture(fixture, defaults, batchSize)
+        const calibration = calibrations.get(fixture)
+        const measurement = measureFixture(fixture, defaults, calibration.batchSize)
         byTarget.get(fixture.target).push(measurement)
         executionOrder.push({ scenario, round: round + 1, target: fixture.target })
       }
@@ -72,7 +68,7 @@ const main = () => {
       const measurements = byTarget.get(fixture.target)
       results.push({
         fixture,
-        batchSize,
+        batchSize: calibration.batchSize,
         calibration,
         measurements,
         aggregate: aggregateMeasurements(measurements)
@@ -85,7 +81,7 @@ const main = () => {
     const effect = group.find((result) => result.fixture.implementation === "effect")
     if (!effect) continue
     for (const candidate of group) {
-      if (candidate.fixture.implementation === "effect") continue
+      if (candidate === effect) continue
       crossLibrary.push({
         scenario,
         implementation: candidate.fixture.implementation,
@@ -120,14 +116,16 @@ const main = () => {
       cpu: os.cpus()[0]?.model ?? "unknown"
     },
     libraries: libraryVersions(),
+    crossLibraryDecodeApis: {
+      effect: "SchemaParser.decodeUnknownExit (SchemaIssue)",
+      valibot: "safeParser",
+      zod4: "safeParse ({ jitless: true })"
+    },
     artifactMode: "repository",
     git: currentGitState(),
     coverage: coverageSummary(selected),
     hashes: {
       config: hashFile(configPath),
-      run: hashFile(runPath),
-      stats: hashFile(statsPath),
-      utils: hashFile(utilsPath),
       worker: hashFile(workerPath),
       fixtures: Object.fromEntries(
         [...new Set(selected.map((fixture) => fixture.fixturePath))]
@@ -142,12 +140,11 @@ const main = () => {
   writeJson(path, report)
   const comparisons = new Map(crossLibrary.map((item) => [`${item.scenario}/${item.implementation}`, item]))
   printTable(
-    ["scenario", "family", "implementation", "ns/op", "mad", "vs Effect"],
+    ["scenario", "implementation", "ns/op", "mad", "vs Effect"],
     results.map((result) => {
       const comparison = comparisons.get(`${result.fixture.scenario}/${result.fixture.implementation}`)
       return [
         result.fixture.scenario,
-        result.fixture.family,
         result.fixture.implementation,
         formatNs(result.aggregate.median),
         formatNs(result.aggregate.mad),

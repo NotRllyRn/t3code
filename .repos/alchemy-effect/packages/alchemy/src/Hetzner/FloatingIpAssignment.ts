@@ -1,4 +1,4 @@
-import * as Hetzner from "@distilled.cloud/hetzner";
+import { Services } from "@distilled.cloud/hetzner";
 import type { GetFloatingIpResponseFloatingIp } from "@distilled.cloud/hetzner/floating_ips";
 import * as Data from "effect/Data";
 import * as Duration from "effect/Duration";
@@ -110,7 +110,6 @@ export type FloatingIpAssignment = Resource<
  * ```
  *
  * @resource
- * @product IP Address
  */
 export const FloatingIpAssignment = Resource<FloatingIpAssignment>(
   "Hetzner.FloatingIpAssignment",
@@ -145,13 +144,13 @@ const toAttrs = (
 };
 
 const getById = (id: number) =>
-  Hetzner.floatingIps.getFloatingIp({ id }).pipe(
+  Services.floatingIps.getFloatingIp({ id }).pipe(
     Effect.map(({ floating_ip }) => floating_ip),
     Effect.catchTag("NotFound", () => Effect.succeed(undefined)),
   );
 
 const refresh = (id: number) =>
-  Hetzner.floatingIps.getFloatingIp({ id }).pipe(
+  Services.floatingIps.getFloatingIp({ id }).pipe(
     Effect.map(({ floating_ip }) => floating_ip),
     Effect.retry({
       while: (e) => e._tag === "NotFound",
@@ -174,7 +173,7 @@ const observeAssignment = (floatingIpId: number, serverId: number) =>
 const unassignIfNeeded = (ip: CloudFloatingIp) =>
   Effect.gen(function* () {
     if (ip.server === null) return ip;
-    const { action } = yield* Hetzner.floatingIpActions.unassignFloatingIp({
+    const { action } = yield* Services.floatingIpActions.unassignFloatingIp({
       id: ip.id,
     });
     yield* waitForAction(action);
@@ -184,7 +183,7 @@ const unassignIfNeeded = (ip: CloudFloatingIp) =>
 const assignTo = (ip: CloudFloatingIp, serverId: number) =>
   Effect.gen(function* () {
     if (ip.server === serverId) return ip;
-    const { action } = yield* Hetzner.floatingIpActions.assignFloatingIp({
+    const { action } = yield* Services.floatingIpActions.assignFloatingIp({
       id: ip.id,
       server: serverId,
     });
@@ -197,7 +196,7 @@ export const FloatingIpAssignmentProvider = () =>
     stables: ["floatingIpId", "serverId"],
     nuke: { dependsOn: ["Hetzner.FloatingIp", "Hetzner.Server"] },
     list: Effect.fn(function* () {
-      const items = yield* Hetzner.floatingIps.listFloatingIps
+      const items = yield* Services.floatingIps.listFloatingIps
         .items({ label_selector: alchemyStackSelector, per_page: 50 })
         .pipe(
           Stream.runCollect,

@@ -95,10 +95,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertBucketDeleted(bucket.vectorBucketName);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:s3vectors", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test.provider(
@@ -152,10 +149,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertBucketDeleted("alchemy-test-vectors-a");
     }),
-  {
-    tags: ["provider:aws", "provider:aws:s3vectors", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test.provider(
@@ -218,10 +212,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertBucketDeleted(bucketName);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:s3vectors", "live"],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );
 
 test.provider(
@@ -270,8 +261,5 @@ test.provider(
       yield* assertBucketDeleted(bucket.vectorBucketName);
       yield* stack.destroy();
     }),
-  {
-    tags: ["provider:aws", "provider:aws:s3vectors", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

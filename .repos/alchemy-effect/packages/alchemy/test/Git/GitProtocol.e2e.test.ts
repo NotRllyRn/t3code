@@ -17,10 +17,10 @@ import * as Path from "effect/Path";
 import { MinimumLogLevel } from "effect/References";
 import * as Schedule from "effect/Schedule";
 import * as Stream from "effect/Stream";
-import * as HttpClient from "effect/http/HttpClient";
-import * as HttpClientRequest from "effect/http/HttpClientRequest";
-import * as HttpApiClient from "effect/http-api/HttpApiClient";
-import * as ChildProcess from "effect/process/ChildProcess";
+import * as HttpClient from "effect/unstable/http/HttpClient";
+import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
+import * as HttpApiClient from "effect/unstable/httpapi/HttpApiClient";
+import * as ChildProcess from "effect/unstable/process/ChildProcess";
 import { GitApi, type Oid } from "@/Git/Api.ts";
 import { makeTestStack, TEST_SECRET } from "./fixtures/stack.ts";
 
@@ -308,15 +308,7 @@ test(
     expect(file.status).toBe(200);
     expect(yield* file.text).toBe("nested\n");
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // ── steps 3 + 4: clone-back + fsck, incremental fetch ───────────────────────
@@ -363,15 +355,7 @@ test(
     expect((yield* mustGit(b, "rev-parse", "HEAD")).stdout).toBe(headA);
     expect(yield* fs.readFileString(path.join(b, "file.txt"))).toBe("v3\n");
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // ── step 5: CAS, force push, concurrent CAS race, --atomic ──────────────────
@@ -449,15 +433,7 @@ test(
       false,
     );
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // ── step 6: concurrent push serialization ───────────────────────────────────
@@ -508,15 +484,7 @@ test(
     yield* retryGit(tmp, "clone", remote, "check");
     yield* mustGit(path.join(tmp, "check"), "fsck", "--strict");
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // ── step 7: branch + annotated tag lifecycle ────────────────────────────────
@@ -578,15 +546,7 @@ test(
     const refs = yield* admin.refs.list({ params, query: {} });
     expect(refs.refs.map((r) => r.name)).toEqual(["refs/heads/main"]);
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // ── step 8: shallow clone + deepen ──────────────────────────────────────────
@@ -636,15 +596,7 @@ test(
       .stdout;
     expect(deepened).toBe("2");
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // ── step 9: large blob through R2 ───────────────────────────────────────────
@@ -680,15 +632,7 @@ test.skipIf(!!process.env.FAST)(
       0,
     );
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // ── step 10: big-ish push (deep delta chains) ───────────────────────────────
@@ -738,15 +682,7 @@ test.skipIf(!!process.env.FAST)(
       "500",
     );
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // ── step 11: readOnly ───────────────────────────────────────────────────────
@@ -787,15 +723,7 @@ test(
     yield* admin.repos.update({ params, payload: { readOnly: false } });
     yield* mustGit(work, "push", "origin", "main");
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // ── step 12: auth matrix ────────────────────────────────────────────────────
@@ -831,15 +759,7 @@ test(
 
     // token embedded in the remote URL: read scope clones, cannot push
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // ── step 13: fork + import ──────────────────────────────────────────────────
@@ -936,15 +856,7 @@ test.skipIf(!!process.env.FAST)(
 
     yield* purgeRepo(url, "e2e", "proto-fork-dst");
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test.skipIf(!!process.env.FAST)(
@@ -999,15 +911,7 @@ test.skipIf(!!process.env.FAST)(
 
     yield* purgeRepo(url, "e2e", "proto-import");
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 // step 14 (cleanup pin) is the afterAll destroy above; out-of-band distilled

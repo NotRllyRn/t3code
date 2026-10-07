@@ -191,5 +191,5 @@ test.provider(
       const after = yield* getBudget(accountId);
       expect(after).toBeUndefined();
     }),
-  { tags: ["provider:aws", "provider:aws:budgets", "live"], timeout: 180_000 },
+  { timeout: 180_000 },
 );

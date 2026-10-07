@@ -27,7 +27,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:omics", "live"] },
 );
 
 // Ungated probes for the `analytics-` HealthOmics endpoint (annotation/variant
@@ -44,7 +43,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:omics", "live"] },
 );
 
 test.provider(
@@ -56,7 +54,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:omics", "live"] },
 );
 
 const assertReferenceStoreGone = (id: string) =>
@@ -113,7 +110,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertReferenceStoreGone(store.referenceStoreId);
     }),
-  { tags: ["provider:aws", "provider:aws:omics", "live"], timeout: 180_000 },
+  { timeout: 180_000 },
 );
 
 const assertSequenceStoreGone = (id: string) =>
@@ -165,7 +162,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertSequenceStoreGone(store.sequenceStoreId);
     }),
-  { tags: ["provider:aws", "provider:aws:omics", "live"], timeout: 180_000 },
+  { timeout: 180_000 },
 );
 
 const assertRunGroupGone = (id: string) =>
@@ -229,7 +226,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertRunGroupGone(runGroupId);
     }),
-  { tags: ["provider:aws", "provider:aws:omics", "live"], timeout: 180_000 },
+  { timeout: 180_000 },
 );
 
 // ---------------------------------------------------------------------------
@@ -385,7 +382,7 @@ test.provider.skipIf(!process.env.AWS_TEST_OMICS)(
       yield* stack.destroy();
       yield* assertWorkflowGone(workflow.workflowId);
     }),
-  { tags: ["provider:aws", "provider:aws:omics", "live"], timeout: 240_000 },
+  { timeout: 240_000 },
 );
 
 const assertAnnotationStoreGone = (name: string) =>
@@ -437,7 +434,7 @@ test.provider.skipIf(!process.env.AWS_TEST_OMICS)(
       yield* stack.destroy();
       yield* assertAnnotationStoreGone(store.name);
     }),
-  { tags: ["provider:aws", "provider:aws:omics", "live"], timeout: 240_000 },
+  { timeout: 240_000 },
 );
 
 const assertVariantStoreGone = (name: string) =>
@@ -489,5 +486,5 @@ test.provider.skipIf(
       yield* stack.destroy();
       yield* assertVariantStoreGone(store.name);
     }),
-  { tags: ["provider:aws", "provider:aws:omics", "live"], timeout: 240_000 },
+  { timeout: 240_000 },
 );

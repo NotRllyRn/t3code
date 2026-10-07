@@ -91,8 +91,6 @@ export type Worker = (
   tails?: Array<ServiceDesignator>;
   streamingTails?: Array<ServiceDesignator>;
   containerEngine?: Worker_ContainerEngine;
-  accessBlobHeader?: string;
-  accessBindingService?: ServiceDesignator;
 };
 
 export type Worker_DurableObjectStorage =
@@ -110,6 +108,7 @@ export type Worker_Module = {
   | { wasm?: Uint8Array }
   | { json?: string }
   | { pythonModule?: string }
+  | { pythonRequirement?: string }
 );
 
 export type Worker_Binding = {
@@ -125,6 +124,7 @@ export type Worker_Binding = {
   | { durableObjectNamespace?: Worker_Binding_DurableObjectNamespaceDesignator }
   | { kvNamespace?: ServiceDesignator }
   | { r2Bucket?: ServiceDesignator }
+  | { r2Admin?: ServiceDesignator }
   | { wrapped?: Worker_Binding_WrappedBinding }
   | { queue?: ServiceDesignator }
   | { fromEnvironment?: string }
@@ -152,6 +152,7 @@ export type Worker_Binding_Type =
   | { durableObjectNamespace: Void }
   | { kvNamespace?: Void }
   | { r2Bucket?: Void }
+  | { r2Admin?: Void }
   | { queue?: Void }
   | { analyticsEngine?: Void }
   | { hyperdrive?: Void }
@@ -214,20 +215,10 @@ export interface Worker_Binding_MemoryCacheLimits {
  */
 export interface Worker_DurableObjectNamespace_ContainerOptions {
   /**
-   * Default image when start() does not select an image or snapshot.
-   * Docker uses the "latest" tag when none is specified.
+   * Image name to be used to create the container using supported provider.
+   * By default, we pull the "latest" tag of this image.
    */
-  imageName?: string;
-  images?: Array<{ name: string; image: string }>;
-  privileges?: {
-    capabilities?: Array<string>;
-    devices?: Array<{
-      pathOnHost: string;
-      pathInContainer: string;
-      cgroupPermissions: string;
-    }>;
-    securityOpt?: Array<string>;
-  };
+  imageName: string;
 }
 
 export type Worker_DurableObjectNamespace = {

@@ -190,7 +190,6 @@ export type BillingMeter = Resource<
  * ```
  *
  * @resource
- * @product Billing
  */
 export const BillingMeter = Resource<BillingMeter>("Stripe.BillingMeter");
 

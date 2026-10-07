@@ -28,7 +28,7 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
-import type * as vite from "vite";
+import * as vite from "vite";
 import {
   selectVocsTargetInput,
   type VocsTarget,
@@ -39,7 +39,6 @@ type ReactPluginModule = typeof import("@vitejs/plugin-react");
 type VocsViteModule = typeof import("vocs/vite");
 
 interface VocsProjectModules {
-  readonly bundler: typeof vite;
   readonly react: ReactPluginModule;
   readonly vite: VocsViteModule;
 }
@@ -215,7 +214,7 @@ const setPreviewServerGlobal = (
 ): void => {
   (globalThis as Record<string, unknown>)[PREVIEW_SERVER_GLOBAL] =
     async (): Promise<WakuPreviewServer> => {
-      const server = await project.bundler.preview({
+      const server = await vite.preview({
         configFile: false,
         root,
         ...sharedViteConfig(),
@@ -303,7 +302,6 @@ export const make = (
       const loadProject = (root: string) =>
         Effect.all(
           {
-            bundler: FrameworkCore.loadProjectModule<typeof vite>(root, "vite"),
             react: FrameworkCore.loadProjectModule<ReactPluginModule>(
               root,
               "@vitejs/plugin-react",
@@ -377,11 +375,11 @@ export const make = (
             selectEntry: (chunk) => chunk.name === WAKU_SERVER_ENTRY_MODULE,
           }).pipe(Effect.provideService(FileSystem.FileSystem, fs));
           const previewPort = yield* FrameworkCore.resolveViteDevPort(
-            project.bundler.version,
+            vite.version,
           );
           yield* Effect.tryPromise({
             try: async () => {
-              const builder = await project.bundler.createBuilder(
+              const builder = await vite.createBuilder(
                 {
                   configFile: false,
                   root,
@@ -443,7 +441,7 @@ export const make = (
           const server = yield* Effect.acquireRelease(
             Effect.tryPromise({
               try: async () => {
-                const server = await project.bundler.createServer({
+                const server = await vite.createServer({
                   configFile: false,
                   root,
                   ...sharedViteConfig(),

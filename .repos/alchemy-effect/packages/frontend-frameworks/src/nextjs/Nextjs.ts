@@ -19,7 +19,7 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 import type * as Scope from "effect/Scope";
-import * as FetchHttpClient from "effect/http/FetchHttpClient";
+import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 import * as NodeNet from "node:net";
 import * as NodePath from "node:path";
 import * as Bundle from "./Bundle.ts";
@@ -55,15 +55,14 @@ export interface NextjsFrameworkOptions {
   readonly nextjs?:
     | {
         /**
-         * Optional explicit OpenNext config for direct framework consumers.
-         * Otherwise load `open-next.config.ts` when present, or generate defaults.
+         * Path of the OpenNext config, relative to the project root.
+         * @default "open-next.config.ts"
          */
         readonly configPath?: string | undefined;
-        /** Resource-selected cache adapters. Defaults to the read-only static-assets cache. */
-        readonly cache?: "static-assets" | "kv" | undefined;
         /**
          * The command the OpenNext pipeline runs to build the Next.js app.
-         * Takes precedence over an explicitly supplied OpenNext config.
+         * A `buildCommand` set in the project's `open-next.config.ts` takes
+         * precedence over this option.
          * @default "npx next build"
          */
         readonly buildCommand?: string | undefined;
@@ -140,8 +139,7 @@ export const makeRunnerConfig = (
   options?: NextjsFrameworkOptions,
 ): Runner.RunnerConfig => ({
   appDir: root,
-  configPath: options?.nextjs?.configPath,
-  cache: options?.nextjs?.cache ?? "static-assets",
+  configPath: options?.nextjs?.configPath ?? "open-next.config.ts",
   compatibilityDate:
     options?.vite?.compatibilityDate ?? DEFAULT_COMPATIBILITY_DATE,
   skipNextBuild: options?.nextjs?.skipNextBuild ?? false,
@@ -314,10 +312,10 @@ export const make = (
           path.resolve(override ?? options?.root ?? process.cwd()),
         );
 
-      const paths = (root: string, openNextDirectory: string) => ({
-        openNextDirectory,
-        clientDirectory: path.join(openNextDirectory, "assets"),
-        cacheDirectory: path.join(openNextDirectory, "cache"),
+      const paths = (root: string) => ({
+        openNextDirectory: path.resolve(root, ".open-next"),
+        clientDirectory: path.resolve(root, ".open-next", "assets"),
+        cacheDirectory: path.resolve(root, ".open-next", "cache"),
         distDirectory: path.resolve(root, "dist"),
         workerDirectory: path.resolve(root, "dist", "worker"),
       });
@@ -326,16 +324,13 @@ export const make = (
         buildOptions?: FrameworkCore.FrameworkBuildOptions,
       ) {
         const root = yield* resolveRoot(buildOptions?.root);
+        const p = paths(root);
+
         // 1. The OpenNext build pipeline (spawns `next build` internally).
-        const buildPaths = yield* Runner.runOpenNextBuild(
-          makeRunnerConfig(root, options),
-        ).pipe(
+        yield* Runner.runOpenNextBuild(makeRunnerConfig(root, options)).pipe(
           Effect.mapError((error) => fail(error.message)(error.cause)),
           Effect.provide(spawnerLayer),
-          Effect.provideService(FileSystem.FileSystem, fs),
-          Effect.provideService(Path.Path, path),
         );
-        const p = paths(root, buildPaths.openNextDirectory);
 
         // 1.5. Edge-runtime routes/pages are not supported by
         // @opennextjs/cloudflare (it shims `next/dist/compiled/edge-runtime`
@@ -343,7 +338,7 @@ export const make = (
         // the exact route list instead of shipping a mystery 500 — the same
         // code runs fine on Workers under the node runtime.
         const manifestPath = path.join(
-          buildPaths.appBuildOutputPath,
+          root,
           ".next",
           "server",
           "middleware-manifest.json",

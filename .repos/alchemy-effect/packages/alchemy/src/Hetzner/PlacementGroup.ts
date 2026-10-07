@@ -1,4 +1,4 @@
-import * as Hetzner from "@distilled.cloud/hetzner";
+import { Services } from "@distilled.cloud/hetzner";
 import type { GetPlacementGroupResponsePlacementGroup } from "@distilled.cloud/hetzner/placement_groups";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
@@ -112,7 +112,6 @@ export type PlacementGroup = Resource<
  * ```
  *
  * @resource
- * @product Server
  */
 export const PlacementGroup = Resource<PlacementGroup>(
   "Hetzner.PlacementGroup",
@@ -147,13 +146,13 @@ const toAttrs = (group: GetPlacementGroupResponsePlacementGroup) => ({
 });
 
 const getById = (id: number) =>
-  Hetzner.placementGroups.getPlacementGroup({ id }).pipe(
+  Services.placementGroups.getPlacementGroup({ id }).pipe(
     Effect.map(({ placement_group }) => placement_group),
     Effect.catchTag("NotFound", () => Effect.succeed(undefined)),
   );
 
 const findByName = (name: string) =>
-  Hetzner.placementGroups
+  Services.placementGroups
     .listPlacementGroups({ name, per_page: 50 })
     .pipe(
       Effect.map(({ placement_groups }) =>
@@ -165,7 +164,7 @@ const findByAlchemyLabels = (id: string) =>
   Effect.gen(function* () {
     const internal = yield* createInternalLabels(id);
     const { placement_groups } =
-      yield* Hetzner.placementGroups.listPlacementGroups({
+      yield* Services.placementGroups.listPlacementGroups({
         label_selector: labelSelector(internal),
         per_page: 50,
       });
@@ -198,7 +197,7 @@ const observe = Effect.fn(function* (input: {
  * Bounded to 10 attempts at 1s spacing.
  */
 export const waitUntilPlacementGroupGone = (id: number) =>
-  Hetzner.placementGroups.getPlacementGroup({ id }).pipe(
+  Services.placementGroups.getPlacementGroup({ id }).pipe(
     Effect.as("found" as const),
     Effect.catchTag("NotFound", () => Effect.succeed("gone" as const)),
     Effect.repeat({
@@ -236,7 +235,7 @@ export const PlacementGroupProvider = () =>
     }),
 
     list: () =>
-      Hetzner.placementGroups.listPlacementGroups
+      Services.placementGroups.listPlacementGroups
         .items({ label_selector: alchemyStackSelector, per_page: 50 })
         .pipe(
           Stream.runCollect,
@@ -258,7 +257,7 @@ export const PlacementGroupProvider = () =>
       });
 
       if (current === undefined) {
-        const created = yield* Hetzner.placementGroups
+        const created = yield* Services.placementGroups
           .createPlacementGroup({
             name,
             type,
@@ -281,7 +280,7 @@ export const PlacementGroupProvider = () =>
       const nameChanged = current.name !== name;
       const labelsChanged = upsert.length > 0 || removed.length > 0;
       if (nameChanged || labelsChanged) {
-        const updated = yield* Hetzner.placementGroups.updatePlacementGroup({
+        const updated = yield* Services.placementGroups.updatePlacementGroup({
           id: current.id,
           name: nameChanged ? name : undefined,
           labels: labelsChanged ? desired : undefined,
@@ -293,7 +292,7 @@ export const PlacementGroupProvider = () =>
     }),
 
     delete: Effect.fn(function* ({ output }) {
-      yield* Hetzner.placementGroups
+      yield* Services.placementGroups
         .deletePlacementGroup({ id: output.id })
         .pipe(Effect.catchTag("NotFound", () => Effect.void));
     }),

@@ -27,7 +27,6 @@ test.provider(
       );
       expect(error._tag).toBe("NoSuchConfigurationRecorderException");
     }),
-  { tags: ["provider:aws", "provider:aws:config", "live"] },
 );
 
 test.provider(
@@ -41,7 +40,6 @@ test.provider(
       );
       expect(error._tag).toBe("NoSuchDeliveryChannelException");
     }),
-  { tags: ["provider:aws", "provider:aws:config", "live"] },
 );
 
 // AWS allows only ONE customer managed configuration recorder and ONE
@@ -205,14 +203,5 @@ test.provider.skipIf(!process.env.AWS_TEST_CONFIG_RECORDER)(
       Effect.ensuring(stack.destroy().pipe(Effect.orDie).pipe(Effect.orDie)),
       testLease.use,
     ),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:config",
-      "provider:aws:iam",
-      "provider:aws:s3",
-      "live",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

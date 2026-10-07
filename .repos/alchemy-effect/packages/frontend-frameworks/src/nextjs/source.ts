@@ -39,7 +39,6 @@ import * as NodeCrypto from "node:crypto";
 import { createRequire } from "node:module";
 import { runBuildChild } from "../core/BuildChild.ts";
 import * as Nextjs from "./Nextjs.ts";
-import * as Runner from "./Runner.ts";
 
 const packageVersion: string = createRequire(import.meta.url)(
   "../../package.json",
@@ -99,7 +98,6 @@ export interface SourceBuildOutput {
 
 /** The subset of alchemy's `SourceContext` this provider consumes. */
 export interface SourceContext {
-  readonly dotAlchemy?: string;
   readonly id: string;
   readonly workerName: string;
   readonly compatibility: {
@@ -117,6 +115,7 @@ type WorkerWiring = Omit<
 /** The subset of alchemy's `DevContext` this provider consumes. */
 export interface DevContext extends SourceContext {
   readonly worker: {
+    readonly name: string;
     readonly bindings: NonNullable<WorkerWiring["bindings"]>;
     readonly durableObjectNamespaces: NonNullable<
       WorkerWiring["durableObjectNamespaces"]
@@ -135,11 +134,7 @@ export interface DevContext extends SourceContext {
   readonly runtimeContext: unknown;
 }
 
-export type SourceDevHandle = {
-  readonly mode: "server";
-  readonly url: URL;
-  readonly serviceBinding?: "http";
-};
+export type SourceDevHandle = { readonly mode: "server"; readonly url: URL };
 
 export type SourceError = SourceProviderError | PlatformError;
 
@@ -197,13 +192,11 @@ export interface NextjsSourceOptions {
   readonly root?: string | undefined;
   /** Rebuild-scope configuration (which files bust the build memo). */
   readonly memo?: NextjsMemoOptions | undefined;
-  /** Optional explicit config; otherwise discover `open-next.config.ts`, falling back to generated defaults. */
+  /** Path of the OpenNext config, relative to the project root. @default "open-next.config.ts" */
   readonly configPath?: string | undefined;
-  /** Resource-selected cache adapters. Defaults to the read-only static-assets cache. */
-  readonly cache?: "static-assets" | "kv" | undefined;
   /**
-   * The command the OpenNext pipeline runs to build the Next.js app.
-   * Takes precedence over an explicitly supplied OpenNext config.
+   * The command the OpenNext pipeline runs to build the Next.js app. A
+   * `buildCommand` in the project's `open-next.config.ts` takes precedence.
    * @default "npx next build"
    */
   readonly buildCommand?: string | undefined;
@@ -314,14 +307,9 @@ const ALWAYS_IGNORED_FILES = new Set([".DS_Store"]);
 const listProjectFiles = Effect.fn(function* (
   root: string,
   prune: ReadonlySet<string>,
-  dotAlchemy?: string,
 ) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const runtimeDirectory =
-    dotAlchemy === undefined
-      ? undefined
-      : path.resolve(process.cwd(), dotAlchemy);
   const out: Array<string> = [];
   const walk = (relative: string): Effect.Effect<void, PlatformError, never> =>
     Effect.gen(function* () {
@@ -329,19 +317,6 @@ const listProjectFiles = Effect.fn(function* (
       const entries = yield* fs.readDirectory(absolute);
       for (const entry of entries) {
         const rel = relative === "" ? entry : `${relative}/${entry}`;
-        if (runtimeDirectory !== undefined) {
-          const runtimeRelative = path.relative(
-            runtimeDirectory,
-            path.join(root, rel),
-          );
-          if (
-            runtimeRelative === "" ||
-            (!path.isAbsolute(runtimeRelative) &&
-              runtimeRelative !== ".." &&
-              !runtimeRelative.startsWith(`..${path.sep}`))
-          )
-            continue;
-        }
         const info = yield* fs.stat(path.join(root, rel));
         if (info.type === "Directory") {
           if (!prune.has(entry)) {
@@ -383,17 +358,12 @@ const findUp = Effect.fn(function* (start: string, filenames: Array<string>) {
 const hashInputTree = Effect.fn(function* (
   root: string,
   options: NextjsSourceOptions,
-  dotAlchemy?: string,
 ) {
   const fs = yield* FileSystem.FileSystem;
   const memo = options.memo ?? {};
   const include = (memo.include ?? ["**/*"]).map(globToRegExp);
   const exclude = (memo.exclude ?? []).map(globToRegExp);
-  const files = (yield* listProjectFiles(
-    root,
-    ALWAYS_PRUNED,
-    dotAlchemy,
-  )).filter(
+  const files = (yield* listProjectFiles(root, ALWAYS_PRUNED)).filter(
     (file) =>
       include.some((re) => re.test(file)) &&
       !exclude.some((re) => re.test(file)),
@@ -426,27 +396,11 @@ const hashInputTree = Effect.fn(function* (
         .pipe(Effect.flatMap(sha256Hex));
     }
   }
-  const configPath = yield* Runner.resolveConfigPath({
-    appDir: root,
-    configPath: options.configPath,
-  }).pipe(Effect.mapError(frameworkError));
-  const configHash =
-    configPath === undefined
-      ? undefined
-      : yield* fs.readFile(configPath).pipe(Effect.flatMap(sha256Hex));
   return yield* sha256Hex(
     stableStringify({
       version: packageVersion,
-      config: {
-        path:
-          configPath === undefined
-            ? undefined
-            : path.relative(root, configPath).replaceAll("\\", "/"),
-        hash: configHash,
-      },
       options: {
         configPath: options.configPath,
-        cache: options.cache,
         buildCommand: options.buildCommand,
         skipNextBuild: options.skipNextBuild,
         minify: options.minify,
@@ -562,9 +516,9 @@ const assetsConfigOf = (
     ? (ctx.assets as Record<string, unknown>)
     : undefined;
 
-const frameworkError = (cause: {
-  readonly message: string;
-}): SourceProviderError =>
+const frameworkError = (
+  cause: FrameworkCore.FrameworkError,
+): SourceProviderError =>
   new SourceProviderError({
     provider: PROVIDER,
     message: cause.message,
@@ -598,7 +552,6 @@ export interface NextjsBuildChildConfig {
   readonly compatibilityDate: string;
   readonly compatibilityFlags: Array<string>;
   readonly configPath: string | undefined;
-  readonly cache: "static-assets" | "kv" | undefined;
   readonly buildCommand: string | undefined;
   readonly skipNextBuild: boolean | undefined;
   readonly minify: boolean | undefined;
@@ -615,7 +568,6 @@ export const buildInChild = (config: NextjsBuildChildConfig) =>
       },
       nextjs: {
         configPath: config.configPath,
-        cache: config.cache,
         buildCommand: config.buildCommand,
         skipNextBuild: config.skipNextBuild,
         minify: config.minify,
@@ -636,7 +588,6 @@ const makeProvider = (options: NextjsSourceOptions): SourceProvider => {
     },
     nextjs: {
       configPath: options.configPath,
-      cache: options.cache,
       buildCommand: options.buildCommand,
       skipNextBuild: options.skipNextBuild,
       minify: options.minify,
@@ -666,7 +617,6 @@ const makeProvider = (options: NextjsSourceOptions): SourceProvider => {
           compatibilityDate: ctx.compatibility.date,
           compatibilityFlags: ctx.compatibility.flags,
           configPath: options.configPath,
-          cache: options.cache,
           buildCommand: options.buildCommand,
           skipNextBuild: options.skipNextBuild,
           minify: options.minify,
@@ -694,7 +644,7 @@ const makeProvider = (options: NextjsSourceOptions): SourceProvider => {
         output.clientDirectory !== undefined
           ? readClientAssets(output.clientDirectory, assetsConfigOf(ctx))
           : Effect.succeed(undefined),
-        hashInputTree(root, options, ctx.dotAlchemy),
+        hashInputTree(root, options),
       ]);
       return {
         bundle: { files, hash: bundleHash },
@@ -710,9 +660,9 @@ const makeProvider = (options: NextjsSourceOptions): SourceProvider => {
 
     // Rebuild-free: the input-tree hash is the change signal (like the vite
     // source). `previous` is never consulted — state can be stale/foreign.
-    hash: Effect.fn(function* (ctx, _previous) {
+    hash: Effect.fn(function* (_ctx, _previous) {
       const root = yield* resolveRoot();
-      return { input: yield* hashInputTree(root, options, ctx.dotAlchemy) };
+      return { input: yield* hashInputTree(root, options) };
     }),
 
     // Default ("preview"): always build on dev start (OpenNext memoizes
@@ -736,7 +686,7 @@ const makeProvider = (options: NextjsSourceOptions): SourceProvider => {
           compatibilityDate: ctx.compatibility.date,
           compatibilityFlags: ctx.compatibility.flags,
           worker: {
-            name: ctx.workerName,
+            name: ctx.worker.name,
             bindings: ctx.worker.bindings,
             durableObjectNamespaces: ctx.worker.durableObjectNamespaces,
             hyperdrives: ctx.worker.hyperdrives,
@@ -751,7 +701,6 @@ const makeProvider = (options: NextjsSourceOptions): SourceProvider => {
       return {
         mode: "server",
         url: new URL(server.url),
-        serviceBinding: options.dev?.mode === "hmr" ? "http" : undefined,
       } satisfies SourceDevHandle;
     }),
   };

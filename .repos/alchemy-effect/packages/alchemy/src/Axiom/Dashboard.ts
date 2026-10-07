@@ -115,7 +115,6 @@ export type Dashboard = Resource<
  * ```
  *
  * @resource
- * @product Dashboard
  */
 export const Dashboard = Resource<Dashboard>("Axiom.Dashboard");
 

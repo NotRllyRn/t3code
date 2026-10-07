@@ -45,8 +45,5 @@ test.provider(
         false,
       );
     }),
-  {
-    tags: ["provider:aws", "provider:aws:cloudwatch", "live"],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

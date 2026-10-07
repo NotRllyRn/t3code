@@ -102,7 +102,7 @@ test.provider(
         expect(err._tag).toBe("TaskNotFound");
       }
     }),
-  { tags: ["provider:aws", "provider:aws:datasync", "live"], timeout: 60_000 },
+  { timeout: 60_000 },
 );
 
 test.provider(
@@ -140,16 +140,7 @@ test.provider(
       const gone = yield* waitUntilTaskGone(arn);
       expect(gone).toBe(true);
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:datasync",
-      "provider:aws:iam",
-      "provider:aws:s3",
-      "live",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );
 
 // A live BASIC-mode task execution has 1–4 minutes of launch/prepare
@@ -211,14 +202,5 @@ test.provider.skipIf(!process.env.AWS_TEST_SLOW)(
       const gone = yield* waitUntilTaskGone(created.task.taskArn);
       expect(gone).toBe(true);
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:datasync",
-      "provider:aws:iam",
-      "provider:aws:s3",
-      "live",
-    ],
-    timeout: 900_000,
-  },
+  { timeout: 900_000 },
 );

@@ -43,7 +43,7 @@ import type { MySQL } from "./MySQL.ts";
  * ```
  *
  * @binding
- * @product MySQL
+ * @product Railway
  * @category Storage & Databases
  */
 export interface ConnectMySQL extends Binding.Service<

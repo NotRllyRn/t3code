@@ -126,7 +126,6 @@ export type EntitlementsFeature = Resource<
  * ```
  *
  * @resource
- * @product Entitlements
  */
 export const EntitlementsFeature = Resource<EntitlementsFeature>(
   "Stripe.EntitlementsFeature",

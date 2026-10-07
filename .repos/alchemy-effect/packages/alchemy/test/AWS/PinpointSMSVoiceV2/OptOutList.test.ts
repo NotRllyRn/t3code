@@ -21,10 +21,7 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  {
-    tags: ["provider:aws", "provider:aws:pinpointsmsvoicev2", "live"],
-    timeout: 60_000,
-  },
+  { timeout: 60_000 },
 );
 
 const getOptOutList = (name: string) =>
@@ -104,8 +101,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertOptOutListGone(created.optOutListName);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:pinpointsmsvoicev2", "live"],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

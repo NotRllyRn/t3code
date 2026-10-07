@@ -132,15 +132,5 @@ test.provider.skipIf(!!process.env.FAST)(
         );
       expect(namespaceGone).toBe(true);
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:cloudmap",
-      "provider:aws:ec2",
-      "provider:aws:ecs",
-      "provider:aws:efs",
-      "live",
-    ],
-    timeout: 600_000,
-  },
+  { timeout: 600_000 },
 );

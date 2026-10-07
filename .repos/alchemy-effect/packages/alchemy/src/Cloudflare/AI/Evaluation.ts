@@ -176,16 +176,10 @@ export const EvaluationProvider = () =>
       const gatewayId =
         output?.gatewayId ?? (olds?.gatewayId as string | undefined);
       if (gatewayId === undefined) return undefined;
-      const known = {
-        datasetIds:
-          output?.datasetIds ??
-          (olds?.datasetIds as string[] | undefined) ??
-          [],
-        evaluationTypeIds:
-          output?.evaluationTypeIds ??
-          (olds?.evaluationTypeIds as string[] | undefined) ??
-          [],
-      };
+      const knownTypeIds =
+        output?.evaluationTypeIds ??
+        (olds?.evaluationTypeIds as string[] | undefined) ??
+        [];
 
       if (output?.evaluationId) {
         const observed = yield* getEvaluation(
@@ -193,14 +187,16 @@ export const EvaluationProvider = () =>
           gatewayId,
           output.evaluationId,
         );
-        return observed ? toAttributes(observed, acct, known) : undefined;
+        return observed
+          ? toAttributes(observed, acct, knownTypeIds)
+          : undefined;
       }
       // Cold read — recover from lost state by matching the deterministic
       // physical name. Names are not unique on Cloudflare's side; an exact
       // match on our generated/explicit name is the best identity we have.
       const name = yield* createEvaluationName(id, olds?.name);
       const match = yield* findByName(acct, gatewayId, name);
-      return match ? toAttributes(match, acct, known) : undefined;
+      return match ? toAttributes(match, acct, knownTypeIds) : undefined;
     }),
     reconcile: Effect.fn(function* ({ id, news, output }) {
       const { accountId } = yield* yield* CloudflareEnvironment;
@@ -224,10 +220,11 @@ export const EvaluationProvider = () =>
       if (observed) {
         // Evaluations are immutable; diff routes every prop change to a
         // replacement, so an observed evaluation is already converged.
-        return toAttributes(observed, accountId, {
-          datasetIds: output?.datasetIds ?? datasetIds,
-          evaluationTypeIds: output?.evaluationTypeIds ?? evaluationTypeIds,
-        });
+        return toAttributes(
+          observed,
+          accountId,
+          output?.evaluationTypeIds ?? evaluationTypeIds,
+        );
       }
 
       // Ensure — greenfield (or out-of-band delete). Cloudflare enforces
@@ -253,10 +250,7 @@ export const EvaluationProvider = () =>
             ),
           ),
         );
-      return toAttributes(created, accountId, {
-        datasetIds,
-        evaluationTypeIds,
-      });
+      return toAttributes(created, accountId, evaluationTypeIds);
     }),
     delete: Effect.fn(function* ({ output }) {
       yield* aiGateway
@@ -298,10 +292,7 @@ export const EvaluationProvider = () =>
             Effect.map((chunk) =>
               Array.from(chunk).flatMap((page) =>
                 (page.result ?? []).map((evaluation) =>
-                  toAttributes(evaluation, accountId, {
-                    datasetIds: [],
-                    evaluationTypeIds: [],
-                  }),
+                  toAttributes(evaluation, accountId, []),
                 ),
               ),
             ),
@@ -354,24 +345,19 @@ const toAttributes = (
     | aiGateway.CreateEvaluationResponse
     | aiGateway.ListEvaluationsResponse["result"][number],
   accountId: string,
-  known: { datasetIds: string[]; evaluationTypeIds: string[] },
+  knownTypeIds: string[],
 ): EvaluationAttributes => ({
   evaluationId: evaluation.id,
   accountId,
   gatewayId: evaluation.gatewayId,
   name: evaluation.name,
-  // The API does not always echo the datasets back (the create response
-  // returns none), so fall back to what we asked for.
-  datasetIds:
-    evaluation.datasets.length > 0
-      ? evaluation.datasets.map((d) => d.id)
-      : known.datasetIds,
+  datasetIds: evaluation.datasets.map((d) => d.id),
   // The API only echoes evaluation type ids back once results exist, so
   // prefer the observed result types and fall back to what we asked for.
   evaluationTypeIds:
     evaluation.results.length > 0
       ? [...new Set(evaluation.results.map((r) => r.evaluationTypeId))]
-      : known.evaluationTypeIds,
+      : knownTypeIds,
   processed: evaluation.processed,
   totalLogs: evaluation.totalLogs,
   createdAt: evaluation.createdAt,

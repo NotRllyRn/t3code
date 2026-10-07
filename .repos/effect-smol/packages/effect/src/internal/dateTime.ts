@@ -374,9 +374,8 @@ const formatOptions: Intl.DateTimeFormatOptions = {
 
 const zoneMakeIntl = (format: Intl.DateTimeFormat): DateTime.TimeZone.Named => {
   const zoneId = format.resolvedOptions().timeZone
-  const cached = validZoneCache.get(zoneId)
-  if (cached !== undefined) {
-    return cached
+  if (validZoneCache.has(zoneId)) {
+    return validZoneCache.get(zoneId)!
   }
   const zone = Object.create(ProtoTimeZoneNamed)
   zone.id = zoneId
@@ -387,19 +386,16 @@ const zoneMakeIntl = (format: Intl.DateTimeFormat): DateTime.TimeZone.Named => {
 
 /** @internal */
 export const zoneMakeNamedUnsafe = (zoneId: string): DateTime.TimeZone.Named => {
-  const cached = validZoneCache.get(zoneId)
-  if (cached !== undefined) {
-    return cached
+  if (validZoneCache.has(zoneId)) {
+    return validZoneCache.get(zoneId)!
   }
   try {
-    const zone = zoneMakeIntl(
+    return zoneMakeIntl(
       new Intl.DateTimeFormat("en-US", {
         ...formatOptions,
         timeZone: zoneId
       })
     )
-    validZoneCache.set(zoneId, zone)
-    return zone
   } catch {
     throw new IllegalArgumentError(`Invalid time zone: ${zoneId}`)
   }
@@ -575,9 +571,7 @@ export const toDate = (self: DateTime.DateTime): Date => {
     Number(parts[3].value),
     Number(parts[4].value),
     Number(parts[5].value),
-    parts[6]?.type === "fractionalSecond"
-      ? Number(parts[6].value)
-      : ((self.epochMilliseconds % 1000) + 1000) % 1000
+    Number(parts[6].value)
   )
   self.adjustedEpochMilliseconds = date.getTime()
   return date

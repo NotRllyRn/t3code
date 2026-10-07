@@ -50,7 +50,7 @@ const withoutProcessStage = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     );
   });
 
-describe("--stage flag", { tags: ["unit", "local"] }, () => {
+describe("--stage flag", () => {
   test.effect("yields an omitted flag as undefined", () =>
     Effect.gen(function* () {
       const [, selected] = yield* stage.parse({ arguments: [], flags: {} });
@@ -72,7 +72,7 @@ describe("--stage flag", { tags: ["unit", "local"] }, () => {
 const provideStageTest = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   effect.pipe(Effect.scoped, withoutProcessStage, Effect.provide(TestEnv));
 
-describe("ALCHEMY_STAGE", { tags: ["unit", "local"] }, () => {
+describe("ALCHEMY_STAGE", () => {
   test.effect(
     "overrides the user default from --env-file / .env",
     () =>
@@ -154,7 +154,7 @@ describe("ALCHEMY_STAGE", { tags: ["unit", "local"] }, () => {
   );
 });
 
-describe("default stages", { tags: ["unit", "local"] }, () => {
+describe("default stages", () => {
   test.effect(
     "deploy/destroy default to live_${USER}",
     () =>

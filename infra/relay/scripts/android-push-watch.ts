@@ -3,14 +3,14 @@ import * as NodeFSP from "node:fs/promises";
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeSocket from "@effect/platform-node/NodeSocket";
 import {
-  ORCHESTRATION_V2_WS_METHODS,
+  ORCHESTRATION_WS_METHODS,
   WS_METHODS,
   WsRpcGroup,
   type OrchestrationProjectShell,
-  type OrchestrationV2ThreadShell,
+  type OrchestrationThreadShell,
 } from "@t3tools/contracts";
 import type { RelayAgentActivityState } from "@t3tools/contracts/relay";
-import { projectThreadAwarenessV2 } from "@t3tools/shared/agentAwareness";
+import { projectThreadAwareness } from "@t3tools/shared/agentAwareness";
 import * as Cause from "effect/Cause";
 import * as Option from "effect/Option";
 import * as Clock from "effect/Clock";
@@ -19,10 +19,10 @@ import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
-import * as FetchHttpClient from "effect/http/FetchHttpClient";
-import * as RpcClient from "effect/rpc/RpcClient";
-import * as RpcSerialization from "effect/rpc/RpcSerialization";
-import * as Socket from "effect/socket/Socket";
+import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
+import * as RpcClient from "effect/unstable/rpc/RpcClient";
+import * as RpcSerialization from "effect/unstable/rpc/RpcSerialization";
+import * as Socket from "effect/unstable/socket/Socket";
 
 import * as RelayConfiguration from "../src/Config.ts";
 import { androidActivityData, fitFcmData } from "../src/agentActivity/fcmPayloads.ts";
@@ -86,7 +86,7 @@ const main = Effect.gen(function* () {
   const connection = yield* readFile(connectionPath).pipe(
     Effect.flatMap(Schema.decodeUnknownEffect(Schema.fromJsonString(Connection))),
   );
-  const layerSocketConstructor = Layer.succeed(
+  const socketConstructor = Layer.succeed(
     Socket.WebSocketConstructor,
     // Socket.makeWebSocket only ever passes its `protocols` option here.
     (url, protocols) =>
@@ -94,13 +94,11 @@ const main = Effect.gen(function* () {
         headers: { authorization: `Bearer ${connection.bearerToken}` },
       }) as unknown as globalThis.WebSocket,
   );
-  const layerProtocol = RpcClient.layerProtocolSocket().pipe(
-    Layer.provide(
-      Socket.layerWebSocket(connection.wsUrl).pipe(Layer.provide(layerSocketConstructor)),
-    ),
+  const protocol = RpcClient.layerProtocolSocket().pipe(
+    Layer.provide(Socket.layerWebSocket(connection.wsUrl).pipe(Layer.provide(socketConstructor))),
     Layer.provide(RpcSerialization.layerJson),
   );
-  const layerFcm = FcmClient.layer.pipe(
+  const fcm = FcmClient.layer.pipe(
     Layer.provide(
       FcmAssertionSigner.layer.pipe(
         Layer.provide(Layer.succeed(WebCrypto.WebCrypto, { subtle: globalThis.crypto.subtle })),
@@ -130,11 +128,11 @@ const main = Effect.gen(function* () {
     const sender = yield* FcmClient.FcmClient;
     const config = yield* rpc[WS_METHODS.serverGetConfig]({});
     const projects = new Map<string, OrchestrationProjectShell>();
-    const threads = new Map<string, OrchestrationV2ThreadShell>();
+    const threads = new Map<string, OrchestrationThreadShell>();
     let states = new Map<string, RelayAgentActivityState>();
     let previouslyActive = false;
     yield* Effect.logInfo("Watching this paired environment for Android push verification.");
-    yield* rpc[ORCHESTRATION_V2_WS_METHODS.subscribeShell]({}).pipe(
+    yield* rpc[ORCHESTRATION_WS_METHODS.subscribeShell]({}).pipe(
       Stream.runForEach(
         Effect.fnUntraced(function* (item) {
           switch (item.kind) {
@@ -146,16 +144,16 @@ const main = Effect.gen(function* () {
               for (const project of item.snapshot.projects) projects.set(project.id, project);
               for (const thread of item.snapshot.threads) threads.set(thread.id, thread);
               break;
-            case "project.updated":
+            case "project-upserted":
               projects.set(item.project.id, item.project);
               break;
-            case "project.removed":
+            case "project-removed":
               projects.delete(item.projectId);
               break;
-            case "thread.updated":
+            case "thread-upserted":
               threads.set(item.thread.id, item.thread);
               break;
-            case "thread.removed":
+            case "thread-removed":
               threads.delete(item.threadId);
               break;
           }
@@ -163,14 +161,14 @@ const main = Effect.gen(function* () {
           for (const thread of threads.values()) {
             const project = projects.get(thread.projectId);
             if (!project || thread.archivedAt) continue;
-            const state = projectThreadAwarenessV2({
+            const state = projectThreadAwareness({
               environmentId: config.environment.environmentId,
               project,
               thread,
             });
             if (state) next.set(thread.id, state);
           }
-          const state = item.kind === "thread.updated" ? next.get(item.thread.id) : undefined;
+          const state = item.kind === "thread-upserted" ? next.get(item.thread.id) : undefined;
           const previous = state ? states.get(state.threadId) : undefined;
           // A fresh subscription restores ongoing work without announcing old completions.
           const now = yield* Clock.currentTimeMillis;
@@ -208,7 +206,7 @@ const main = Effect.gen(function* () {
         }),
       ),
     );
-  }).pipe(Effect.provide(Layer.mergeAll(layerProtocol, layerFcm)));
+  }).pipe(Effect.provide(Layer.mergeAll(protocol, fcm)));
 });
 
 NodeRuntime.runMain(

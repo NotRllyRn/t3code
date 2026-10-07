@@ -135,7 +135,6 @@ export interface ConnectClient {
  * unavailable inside a container.)
  *
  * @binding
- * @product Postgres
  */
 export interface Connect extends Binding.Service<
   Connect,

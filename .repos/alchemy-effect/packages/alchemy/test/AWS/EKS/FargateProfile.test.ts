@@ -24,33 +24,29 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:eks", "live"] },
 );
 
 // Ungated `list()` probe: enumerates every cluster, lists each cluster's Fargate
 // profiles, then hydrates each via `describeFargateProfile`. Returns `[]` in a
 // clean account/region, otherwise a well-formed array of full FargateProfile
 // Attributes. Proves the enumeration wiring compiles and runs live.
-test.provider(
-  "list returns a well-formed array of Fargate profiles",
-  (stack) =>
-    Effect.gen(function* () {
-      yield* stack.destroy();
+test.provider("list returns a well-formed array of Fargate profiles", (stack) =>
+  Effect.gen(function* () {
+    yield* stack.destroy();
 
-      const provider = yield* Provider.findProvider(FargateProfile);
-      const all = yield* provider.list();
+    const provider = yield* Provider.findProvider(FargateProfile);
+    const all = yield* provider.list();
 
-      expect(Array.isArray(all)).toBe(true);
-      for (const profile of all) {
-        expect(typeof profile.fargateProfileArn).toBe("string");
-        expect(typeof profile.fargateProfileName).toBe("string");
-        expect(typeof profile.clusterName).toBe("string");
-        expect(typeof profile.podExecutionRoleArn).toBe("string");
-        expect(Array.isArray(profile.subnets)).toBe(true);
-        expect(Array.isArray(profile.selectors)).toBe(true);
-      }
-    }),
-  { tags: ["provider:aws", "provider:aws:eks", "live"] },
+    expect(Array.isArray(all)).toBe(true);
+    for (const profile of all) {
+      expect(typeof profile.fargateProfileArn).toBe("string");
+      expect(typeof profile.fargateProfileName).toBe("string");
+      expect(typeof profile.clusterName).toBe("string");
+      expect(typeof profile.podExecutionRoleArn).toBe("string");
+      expect(Array.isArray(profile.subnets)).toBe(true);
+      expect(Array.isArray(profile.selectors)).toBe(true);
+    }
+  }),
 );
 
 // Full deploy lifecycle. Gate behind a pre-existing cluster supplied via
@@ -98,5 +94,5 @@ test.provider.skipIf(!process.env.AWS_TEST_EKS_CLUSTER)(
         );
       expect(gone).toBe(true);
     }),
-  { tags: ["provider:aws", "provider:aws:eks", "live"], timeout: 900_000 },
+  { timeout: 900_000 },
 );

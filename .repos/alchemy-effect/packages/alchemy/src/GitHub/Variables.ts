@@ -49,7 +49,6 @@ export interface VariablesProps {
  * ```
  *
  * @resource
- * @product Actions
  */
 export const Variables = ({
   owner,

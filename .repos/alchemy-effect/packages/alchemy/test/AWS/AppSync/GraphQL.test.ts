@@ -5,8 +5,8 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as Schedule from "effect/Schedule";
-import * as HttpClient from "effect/http/HttpClient";
-import * as HttpClientRequest from "effect/http/HttpClientRequest";
+import * as HttpClient from "effect/unstable/http/HttpClient";
+import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
 import { fileURLToPath } from "node:url";
 
 const { test } = Test.make({ providers: AWS.providers() });
@@ -190,13 +190,5 @@ test.provider(
 
       yield* stack.destroy();
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:appsync",
-      "provider:aws:lambda",
-      "live",
-    ],
-    timeout: 600_000,
-  },
+  { timeout: 600_000 },
 );

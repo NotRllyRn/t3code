@@ -8,7 +8,6 @@ import { UpdateTerminalReader } from "./UpdateTerminalReader.ts";
  * Function or Worker Effect.
  *
  * @layer
- * @product Terminal
  * @provides Stripe.UpdateTerminalReader
  */
 export const UpdateTerminalReaderHttp = Layer.effect(

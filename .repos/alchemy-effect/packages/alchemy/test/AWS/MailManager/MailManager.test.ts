@@ -31,24 +31,20 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:mailmanager", "live"] },
 );
 
 // Mail Manager deletes are natively idempotent — deleting a nonexistent
 // (well-formed) id SUCCEEDS rather than failing ResourceNotFoundException,
 // which is why deleteRuleSet's error union carries no not-found tag and the
 // providers' delete paths need no catch. This probe pins that behavior.
-test.provider(
-  "deleteRuleSet on a nonexistent id succeeds (idempotent)",
-  () =>
-    Effect.gen(function* () {
-      yield* mm.deleteRuleSet({ RuleSetId: "rs-00000000000000000000000000" });
-      yield* mm.deleteTrafficPolicy({
-        TrafficPolicyId: "tp-00000000000000000000000000",
-      });
-      expect(true).toBe(true);
-    }),
-  { tags: ["provider:aws", "provider:aws:mailmanager", "live"] },
+test.provider("deleteRuleSet on a nonexistent id succeeds (idempotent)", () =>
+  Effect.gen(function* () {
+    yield* mm.deleteRuleSet({ RuleSetId: "rs-00000000000000000000000000" });
+    yield* mm.deleteTrafficPolicy({
+      TrafficPolicyId: "tp-00000000000000000000000000",
+    });
+    expect(true).toBe(true);
+  }),
 );
 
 // Rule sets and traffic policies are free, provision instantly, and need no
@@ -235,10 +231,7 @@ test.provider(
       );
       expect(relayError._tag).toBe("ResourceNotFoundException");
     }),
-  {
-    tags: ["provider:aws", "provider:aws:mailmanager", "live"],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );
 
 // Address lists and archives are free and provision instantly — full
@@ -358,10 +351,7 @@ test.provider(
 
       yield* stack.destroy();
     }),
-  {
-    tags: ["provider:aws", "provider:aws:mailmanager", "live"],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );
 
 // Ingress points provision an SMTP endpoint asynchronously (~1-2 min each
@@ -464,10 +454,7 @@ test.provider.skipIf(!process.env.AWS_TEST_MAILMANAGER)(
       yield* stack.destroy();
       yield* assertIngressPointGone(updated.ingress.ingressPointId);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:mailmanager", "live"],
-    timeout: 600_000,
-  },
+  { timeout: 600_000 },
 );
 
 // Add On subscriptions accept third-party terms of use and ADDITIONAL
@@ -526,8 +513,5 @@ test.provider.skipIf(!process.env.AWS_TEST_MAILMANAGER_ADDONS)(
       );
       expect(subscriptionError._tag).toBe("ResourceNotFoundException");
     }),
-  {
-    tags: ["provider:aws", "provider:aws:mailmanager", "live"],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

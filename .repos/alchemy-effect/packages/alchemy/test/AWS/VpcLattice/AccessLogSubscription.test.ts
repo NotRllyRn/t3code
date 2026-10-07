@@ -80,13 +80,5 @@ test.provider(
         );
       expect(gone).toBe(true);
     }).pipe(Effect.ensuring(Effect.ignore(stack.destroy()))),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:logs",
-      "provider:aws:vpclattice",
-      "live",
-    ],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );

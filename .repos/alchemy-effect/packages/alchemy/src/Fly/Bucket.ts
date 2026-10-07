@@ -13,7 +13,6 @@ import * as Provider from "../Provider.ts";
 import { Resource } from "../Resource.ts";
 import { createInternalTags } from "../Tags.ts";
 import { resolveOrgSlug } from "./Environment.ts";
-import { TigrisCredentialsMissing } from "./Errors.ts";
 import { createFlyAppName, matchesAlchemyPhysicalName } from "./Metadata.ts";
 import type { Providers } from "./Providers.ts";
 
@@ -209,7 +208,7 @@ export type Bucket = Resource<
  *
  * **Example:** Put an object from a Service
  * ```typescript
- * import * as HttpServerResponse from "effect/http/HttpServerResponse";
+ * import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
  *
  * export default class Api extends Fly.Service<Api>()(
  *   "Api",
@@ -246,7 +245,6 @@ export type Bucket = Resource<
  * ```
  *
  * @resource
- * @product Bucket
  */
 export const Bucket = Resource<Bucket>("Fly.Bucket");
 
@@ -779,80 +777,25 @@ export const BucketProvider = () =>
     }),
   });
 
-class BucketSecretVersionMissing extends Data.TaggedError(
-  "Fly.BucketSecretVersionMissing",
-)<{ appName: string }> {}
-
-const bucketSecretVersion = (
-  appName: string,
-  response: machines.AppSecretsUpdateResp | machines.SetAppSecretResponse,
-) => {
-  const version = response.version ?? response.Version;
-  return version !== undefined && Number.isSafeInteger(version) && version >= 0
-    ? Effect.succeed(version)
-    : Effect.fail(new BucketSecretVersionMissing({ appName }));
-};
-
-const requireBucketSecrets = Effect.fn(function* (
-  appName: string,
-  values: Record<string, string>,
-) {
-  const required = [
-    "BUCKET_NAME",
-    "AWS_ACCESS_KEY_ID",
-    "AWS_SECRET_ACCESS_KEY",
-    "AWS_ENDPOINT_URL_S3",
-  ];
-  if (required.some((key) => !values[key]?.trim())) {
-    return yield* new TigrisCredentialsMissing({
-      name: values.BUCKET_NAME || appName,
-    });
-  }
-});
-
 const putSecretValues = (appName: string, values: Record<string, string>) =>
   Effect.gen(function* () {
-    yield* requireBucketSecrets(appName, values);
-    return yield* machines
-      .updateSecrets({
+    if (Object.keys(values).length === 0) return;
+    const updated = yield* Effect.result(
+      machines.updateSecrets({
         app_name: appName,
         values,
-      })
-      .pipe(
-        Effect.flatMap((response) => bucketSecretVersion(appName, response)),
-        Effect.catchTag("NotFound", () =>
-          Effect.gen(function* () {
-            const versions: number[] = [];
-            for (const [secretName, value] of Object.entries(values)) {
-              const version = yield* machines
-                .createSecret({
-                  app_name: appName,
-                  secret_name: secretName,
-                  value,
-                })
-                .pipe(
-                  Effect.flatMap((response) =>
-                    bucketSecretVersion(appName, response),
-                  ),
-                  Effect.catchTag("Conflict", () =>
-                    machines
-                      .updateSecrets({
-                        app_name: appName,
-                        values: { [secretName]: value },
-                      })
-                      .pipe(
-                        Effect.flatMap((response) =>
-                          bucketSecretVersion(appName, response),
-                        ),
-                      ),
-                  ),
-                );
-              versions.push(version);
-            }
-            return Math.max(...versions);
-          }),
-        ),
-      );
+      }),
+    );
+    if (Result.isSuccess(updated)) return;
+    for (const [secretName, value] of Object.entries(values)) {
+      yield* machines
+        .createSecret({
+          app_name: appName,
+          secret_name: secretName,
+          value,
+        })
+        .pipe(Effect.catchTag("Conflict", () => Effect.void));
+    }
   });
 
 const envValuesOf = (addOn: ObservedAddOn): Record<string, string> => {
@@ -925,49 +868,25 @@ const secretsFromBoundEnv = (
  * Looks up the add-on by id/name (retrying while Tigris is still
  * provisioning) and also copies any already-evaluated `AWS_*` /
  * `BUCKET_NAME` values from binding env — GraphQL `environment` is often
- * empty after create. A missing add-on may use bound values only when the
- * bucket name, credential pair, and S3 endpoint are complete. Partial values
- * are never written. Region is optional, as in the Tigris bindings.
- * Without an attachment, only an explicit `BUCKET_NAME` requests this mode;
- * ordinary AWS region or credential settings do not imply a Bucket.
- * Returns the highest accepted secret-version floor, or `undefined` when
- * no Bucket was requested; this is not a vault snapshot.
+ * empty after create.
  */
 export const attachBucketSecrets = Effect.fn(function* (
   appName: string,
-  attached: readonly {
-    name: string;
-    id?: string;
-    /** Credentials from the bound Bucket's attributes. */
-    values?: Record<string, string>;
-  }[],
+  attached: readonly { name: string; id?: string }[],
   boundEnv: Record<string, string> = {},
 ) {
-  if (appName.length === 0) return undefined;
-  if (attached.length === 0 && boundEnv.BUCKET_NAME === undefined) {
-    return undefined;
-  }
+  if (appName.length === 0) return;
   const fromEnv = secretsFromBoundEnv(boundEnv);
   if (attached.length === 0) {
-    return yield* putSecretValues(appName, fromEnv);
+    if (Object.keys(fromEnv).length > 0) {
+      yield* putSecretValues(appName, fromEnv);
+    }
+    return;
   }
-  const versions: number[] = [];
   for (const item of attached) {
     const name = item.name;
     const id = item.id;
-    const fallbackValues: Record<string, string> = {
-      ...fromEnv,
-      ...item.values,
-    };
-    if (
-      fallbackValues.AWS_ENDPOINT_URL === undefined &&
-      fallbackValues.AWS_ENDPOINT_URL_S3 !== undefined
-    ) {
-      fallbackValues.AWS_ENDPOINT_URL = fallbackValues.AWS_ENDPOINT_URL_S3;
-    }
-    if (fallbackValues.BUCKET_NAME === undefined && name.length > 0) {
-      fallbackValues.BUCKET_NAME = name;
-    }
+    if (name.length === 0 && (id === undefined || id.length === 0)) continue;
     const row = yield* findAttachedBucket({ id, name }).pipe(
       Effect.retry({
         while: (error) => error._tag === "Fly.BucketPending",
@@ -975,16 +894,18 @@ export const attachBucketSecrets = Effect.fn(function* (
         schedule: backoff,
       }),
       Effect.catchTag("Fly.BucketPending", () =>
-        requireBucketSecrets(appName, fallbackValues).pipe(
-          Effect.as(undefined),
+        findAttachedBucket({ id, name }).pipe(
+          Effect.catchTag("Fly.BucketPending", () => Effect.succeed(undefined)),
         ),
       ),
     );
     const values = {
-      ...fallbackValues,
+      ...fromEnv,
       ...(row === undefined ? {} : envValuesOf(row)),
     };
-    versions.push(yield* putSecretValues(appName, values));
+    if (values.BUCKET_NAME === undefined && name.length > 0) {
+      values.BUCKET_NAME = name;
+    }
+    yield* putSecretValues(appName, values);
   }
-  return versions.length > 0 ? Math.max(...versions) : undefined;
 });

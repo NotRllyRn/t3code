@@ -98,13 +98,6 @@ export interface AstroProps<
   assets?: AssetsConfig;
 }
 
-// These options are inspected while constructing the Worker. Resolve them in
-// the outer props Effect; pass-through properties can remain deferred Inputs.
-type AstroInput<Bindings extends WorkerBindingProps> = InputProps<
-  AstroProps<Bindings>,
-  "sessionKVBindingName" | "astro" | "env"
->;
-
 /**
  * A Cloudflare Worker deployed from an [Astro](https://astro.build)
  * project.
@@ -255,8 +248,8 @@ export const Astro: {
     <const Bindings extends WorkerBindingProps = {}, Req = never>(
       id: string,
       propsEff?:
-        | AstroInput<Bindings>
-        | Effect.Effect<AstroInput<Bindings>, never, Req>,
+        | InputProps<AstroProps<Bindings>>
+        | Effect.Effect<InputProps<AstroProps<Bindings>>, never, Req>,
     ): Effect.Effect<Self, never, Req | Providers> & {
       new (): Worker<{
         [
@@ -268,8 +261,8 @@ export const Astro: {
   <const Bindings extends WorkerBindingProps = {}, Req = never>(
     id: string,
     propsEff?:
-      | AstroInput<Bindings>
-      | Effect.Effect<AstroInput<Bindings>, never, Req>,
+      | InputProps<AstroProps<Bindings>>
+      | Effect.Effect<InputProps<AstroProps<Bindings>>, never, Req>,
   ): Effect.Effect<
     Worker<{
       [
@@ -279,28 +272,18 @@ export const Astro: {
     never,
     Req | Providers
   >;
-} = (<const Bindings extends WorkerBindingProps = {}, Req = never>(
-  id?: string,
-  propsEff?:
-    | AstroInput<Bindings>
-    | Effect.Effect<AstroInput<Bindings>, never, Req>,
-) =>
+} = ((id?: any, propsEff?: any) =>
   id === undefined
-    ? <const Bindings extends WorkerBindingProps = {}, Req = never>(
-        id: string,
-        propsEff?:
-          | AstroInput<Bindings>
-          | Effect.Effect<AstroInput<Bindings>, never, Req>,
-      ) => effectClass(Astro(id, propsEff))
+    ? (id: string, propsEff: any) => effectClass(Astro(id, propsEff))
     : Worker(
         id,
         Effect.gen(function* () {
-          const props =
+          const props: any =
             (Effect.isEffect(propsEff) ? yield* propsEff : propsEff) ?? {};
           const session = props.sessionKVBindingName;
           const sessionBindingName =
             typeof session === "string" ? session : "SESSION";
-          let env: WorkerBindingProps | undefined = props.env;
+          let env = props.env;
           // Auto-provision the KV namespace backing Astro's session API
           // unless the user opted out (`sessionKVBindingName: false`) or
           // already bound their own namespace under the session name.

@@ -234,13 +234,5 @@ test.provider(
         yield* getProtection(replaced.branch, replacementRepo),
       ).toBeUndefined();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:github",
-      "provider:github:branchprotection",
-      "provider:github:repository",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

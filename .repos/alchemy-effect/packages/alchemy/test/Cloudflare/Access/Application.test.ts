@@ -134,14 +134,6 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:access",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-  },
 );
 
 test.provider(
@@ -181,72 +173,61 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  { tags: ["provider:cloudflare", "provider:cloudflare:access", "live"] },
 );
 
-test.provider(
-  "list enumerates the deployed access application",
-  (stack) =>
-    Effect.gen(function* () {
-      yield* stack.destroy();
+test.provider("list enumerates the deployed access application", (stack) =>
+  Effect.gen(function* () {
+    yield* stack.destroy();
 
-      const domain = `alchemy-test-list-app.${zoneName}`;
-      const app = yield* stack.deploy(
-        Effect.gen(function* () {
-          yield* Cloudflare.Zone.Zone("TestZone", {
-            name: zoneName,
-          }).pipe(AdoptPolicy.adopt(true));
-          const policy = yield* Cloudflare.Access.Policy("ListAllowDomain", {
-            name: "Allow example.com",
-            decision: "allow",
-            include: [{ emailDomain: { domain: "example.com" } }],
-          });
-          return yield* Cloudflare.Access.Application("ListApp", {
-            type: "self_hosted",
-            domain,
-            sessionDuration: "24h",
-            policies: [policy.policyId],
-          });
-        }),
-      );
+    const domain = `alchemy-test-list-app.${zoneName}`;
+    const app = yield* stack.deploy(
+      Effect.gen(function* () {
+        yield* Cloudflare.Zone.Zone("TestZone", {
+          name: zoneName,
+        }).pipe(AdoptPolicy.adopt(true));
+        const policy = yield* Cloudflare.Access.Policy("ListAllowDomain", {
+          name: "Allow example.com",
+          decision: "allow",
+          include: [{ emailDomain: { domain: "example.com" } }],
+        });
+        return yield* Cloudflare.Access.Application("ListApp", {
+          type: "self_hosted",
+          domain,
+          sessionDuration: "24h",
+          policies: [policy.policyId],
+        });
+      }),
+    );
 
-      const provider = yield* Provider.findProvider(
-        Cloudflare.Access.Application,
-      );
+    const provider = yield* Provider.findProvider(
+      Cloudflare.Access.Application,
+    );
 
-      // `list()` enumerates every Access application in the account. The
-      // provider already rides out the transient enumeration failures internally
-      // (the typed `AccessReferenceNotFound` from a sibling app mid-teardown
-      // still referencing a deleted policy, plus throttling 403s), so here we
-      // only poll until our own freshly created app becomes visible.
-      const all = yield* provider.list().pipe(
-        Effect.flatMap((rows) =>
-          rows.some((a) => a.applicationId === app.applicationId)
-            ? Effect.succeed(rows)
-            : Effect.fail({ _tag: "AppNotListed" as const }),
-        ),
-        Effect.retry({
-          while: (e) => e._tag === "AppNotListed",
-          schedule: Schedule.spaced("2 seconds"),
-          times: 15,
-        }),
-      );
+    // `list()` enumerates every Access application in the account. The
+    // provider already rides out the transient enumeration failures internally
+    // (the typed `AccessReferenceNotFound` from a sibling app mid-teardown
+    // still referencing a deleted policy, plus throttling 403s), so here we
+    // only poll until our own freshly created app becomes visible.
+    const all = yield* provider.list().pipe(
+      Effect.flatMap((rows) =>
+        rows.some((a) => a.applicationId === app.applicationId)
+          ? Effect.succeed(rows)
+          : Effect.fail({ _tag: "AppNotListed" as const }),
+      ),
+      Effect.retry({
+        while: (e) => e._tag === "AppNotListed",
+        schedule: Schedule.spaced("2 seconds"),
+        times: 15,
+      }),
+    );
 
-      const match = all.find((a) => a.applicationId === app.applicationId);
-      expect(match).toBeDefined();
-      expect(match?.type).toEqual("self_hosted");
-      expect(match?.aud.length).toBeGreaterThan(0);
+    const match = all.find((a) => a.applicationId === app.applicationId);
+    expect(match).toBeDefined();
+    expect(match?.type).toEqual("self_hosted");
+    expect(match?.aud.length).toBeGreaterThan(0);
 
-      yield* stack.destroy();
-    }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:access",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-  },
+    yield* stack.destroy();
+  }).pipe(logLevel),
 );
 
 test.provider(
@@ -365,14 +346,6 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:access",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-  },
 );
 
 // Regression test for the cold-recovery `read` fallback: after state loss
@@ -444,14 +417,6 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:access",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-  },
 );
 
 /** Structural view of live application policies for inline-policy asserts. */
@@ -591,13 +556,5 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:access",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );

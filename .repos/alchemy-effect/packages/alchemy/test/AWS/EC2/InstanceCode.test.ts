@@ -69,5 +69,5 @@ test.provider.skipIf(!!process.env.FAST)(
       yield* assertInstanceTerminated(instance.instanceId);
       yield* assertVpcGone(vpc.vpcId);
     }),
-  { tags: ["provider:aws", "provider:aws:ec2", "live"], timeout: 600_000 },
+  { timeout: 600_000 },
 );

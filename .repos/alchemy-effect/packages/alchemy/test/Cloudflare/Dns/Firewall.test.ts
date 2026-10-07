@@ -79,7 +79,6 @@ test.provider.skipIf(entitled)(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  { tags: ["provider:cloudflare", "provider:cloudflare:dns", "live"] },
 );
 
 test.provider.skipIf(!entitled)(
@@ -116,10 +115,7 @@ test.provider.skipIf(!entitled)(
 
       yield* expectGone(accountId, cluster.dnsFirewallId);
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:dns", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider.skipIf(!entitled)(
@@ -192,10 +188,7 @@ test.provider.skipIf(!entitled)(
 
       yield* expectGone(accountId, renamed.dnsFirewallId);
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:dns", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // Canonical `list()` test (account collection): the enumeration endpoint
@@ -216,7 +209,6 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  { tags: ["provider:cloudflare", "provider:cloudflare:dns", "live"] },
 );
 
 // Entitled accounts: deploy a real cluster and assert it appears in the
@@ -244,8 +236,5 @@ test.provider.skipIf(!entitled)(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:dns", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

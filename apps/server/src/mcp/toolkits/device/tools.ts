@@ -1,5 +1,4 @@
 import {
-  OrchestratorMcpFailure,
   DeviceToolCloseInput,
   DeviceToolError,
   DeviceToolListResult,
@@ -11,21 +10,13 @@ import {
 import * as Schema from "effect/Schema";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
-import * as ServerConfig from "../../../config.ts";
-import { Tool, Toolkit } from "effect/ai";
+import { ServerConfig } from "../../../config.ts";
+import { Tool, Toolkit } from "effect/unstable/ai";
 
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
 import * as DeviceService from "../../../device/DeviceService.ts";
-import * as ThreadManagementService from "../../../orchestration-v2/ThreadManagementService.ts";
 
-const dependencies = [
-  McpInvocationContext.McpInvocationContext,
-  ThreadManagementService.ThreadManagementService,
-  DeviceService.DeviceService,
-];
-
-/** What a device tool fails with, including the access gate's refusal. */
-const DeviceToolFailure = Schema.Union([DeviceToolError, OrchestratorMcpFailure]);
+const dependencies = [McpInvocationContext.McpInvocationContext, DeviceService.DeviceService];
 
 /**
  * Deliberately a small surface: lifecycle, visibility for the user, and one
@@ -45,7 +36,7 @@ const DeviceListTool = Tool.make("device_list", {
     ),
   }),
   success: DeviceToolListResult,
-  failure: DeviceToolFailure,
+  failure: DeviceToolError,
   dependencies,
 })
   .annotate(Tool.Title, "List devices")
@@ -59,8 +50,8 @@ const DeviceOpenTool = Tool.make("device_open", {
     "Open a simulator or emulator for this thread: boots it if needed, starts its live stream, and shows it in the user's Device panel so they can watch. Returns the agent-device CLI invocation pinned to the device; drive the device with that CLI afterwards.",
   parameters: DeviceToolOpenInput,
   success: DeviceToolOpenResult,
-  failure: DeviceToolFailure,
-  dependencies: [...dependencies, FileSystem.FileSystem, Path.Path, ServerConfig.ServerConfig],
+  failure: DeviceToolError,
+  dependencies: [...dependencies, FileSystem.FileSystem, Path.Path, ServerConfig],
 })
   .annotate(Tool.Title, "Open device")
   .annotate(Tool.Readonly, false)
@@ -73,7 +64,7 @@ export const DeviceScreenshotTool = Tool.make("device_screenshot", {
     "Capture the current screen of an open device as a PNG image. Use it to see what the user sees; for taps and text use the agent-device CLI.",
   parameters: DeviceToolTargetInput,
   success: DeviceToolScreenshotResult,
-  failure: DeviceToolFailure,
+  failure: DeviceToolError,
   dependencies,
 })
   .annotate(Tool.Title, "Screenshot device")
@@ -89,7 +80,7 @@ const DeviceCloseTool = Tool.make("device_close", {
   success: Schema.Record(Schema.String, Schema.Never).annotate({
     description: "The device was closed.",
   }),
-  failure: DeviceToolFailure,
+  failure: DeviceToolError,
   dependencies,
 })
   .annotate(Tool.Title, "Close device")

@@ -1,13 +1,13 @@
 import * as Layer from "effect/Layer";
 import * as ManagedRuntime from "effect/ManagedRuntime";
-import * as Socket from "effect/socket/Socket";
+import * as Socket from "effect/unstable/socket/Socket";
 
-import { layerRemoteHttpClient } from "@t3tools/client-runtime/rpc";
+import { remoteHttpClientLayer } from "@t3tools/client-runtime/rpc";
 
-import * as Dpop from "../features/cloud/dpop";
-import * as ManagedRelayLayer from "../features/cloud/managedRelayLayer";
+import { cryptoLayer } from "../features/cloud/dpop";
+import { managedRelayClientLayer } from "../features/cloud/managedRelayLayer";
 import { resolveCloudPublicConfig } from "../features/cloud/publicConfig";
-import * as Tracing from "../features/observability/tracing";
+import { tracingLayer } from "../features/observability/tracing";
 import * as Persistence from "../persistence/layer";
 import { disposeOnFoundationReplace, type FoundationHotModule } from "./foundation-fast-refresh";
 
@@ -17,32 +17,32 @@ function configuredRelayUrl(): string {
   return resolveCloudPublicConfig().relay.url ?? "http://relay.invalid";
 }
 
-const layerHttpClient = layerRemoteHttpClient(fetch);
+const httpClientLayer = remoteHttpClientLayer(fetch);
 
 type RuntimeLayerSource =
-  | ReturnType<typeof ManagedRelayLayer.layer>
+  | ReturnType<typeof managedRelayClientLayer>
   | typeof Socket.layerWebSocketConstructorGlobal
-  | typeof Dpop.layer
-  | typeof layerHttpClient
+  | typeof cryptoLayer
+  | typeof httpClientLayer
   | typeof Persistence.layer
-  | typeof Tracing.layer;
+  | typeof tracingLayer;
 
-const layerRuntime = Layer.merge(
-  ManagedRelayLayer.layer(configuredRelayUrl()),
+const runtimeLayer = Layer.merge(
+  managedRelayClientLayer(configuredRelayUrl()),
   Socket.layerWebSocketConstructorGlobal,
 ).pipe(
-  Layer.provideMerge(Dpop.layer),
-  Layer.provideMerge(layerHttpClient),
-  Layer.provideMerge(Tracing.layer.pipe(Layer.provide(layerHttpClient))),
+  Layer.provideMerge(cryptoLayer),
+  Layer.provideMerge(httpClientLayer),
+  Layer.provideMerge(tracingLayer.pipe(Layer.provide(httpClientLayer))),
   Layer.provideMerge(Persistence.layer),
 );
 
 export const runtime: ManagedRuntime.ManagedRuntime<
   Layer.Success<RuntimeLayerSource>,
   Layer.Error<RuntimeLayerSource>
-> = ManagedRuntime.make(layerRuntime);
+> = ManagedRuntime.make(runtimeLayer);
 
-export const layer: Layer.Layer<
+export const runtimeContextLayer: Layer.Layer<
   Layer.Success<RuntimeLayerSource>,
   Layer.Error<RuntimeLayerSource>
 > = Layer.effectContext(runtime.contextEffect);

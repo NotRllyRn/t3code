@@ -82,14 +82,6 @@ test.provider.skipIf(entitled)(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:logscontrol",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-  },
 );
 
 test.provider.skipIf(!entitled)(
@@ -144,15 +136,7 @@ test.provider.skipIf(!entitled)(
       const restored = yield* getFlag(zoneId);
       expect(restored).toEqual(false);
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:logscontrol",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // Canonical `list()` test (zone-scoped singleton): there is no account-wide
@@ -163,22 +147,19 @@ test.provider.skipIf(!entitled)(
 // array (typically empty) rather than throwing. This ungated case asserts that
 // the typed-skip path keeps `list()` total; the entitled case below asserts
 // the standing test zone is actually enumerated.
-test.provider(
-  "list enumerates the retention flag across all zones",
-  (stack) =>
-    Effect.gen(function* () {
-      const provider = yield* Provider.findProvider(
-        Cloudflare.LogsControl.LogsRetentionFlag,
-      );
-      const all = yield* provider.list();
+test.provider("list enumerates the retention flag across all zones", (stack) =>
+  Effect.gen(function* () {
+    const provider = yield* Provider.findProvider(
+      Cloudflare.LogsControl.LogsRetentionFlag,
+    );
+    const all = yield* provider.list();
 
-      expect(Array.isArray(all)).toBe(true);
+    expect(Array.isArray(all)).toBe(true);
 
-      // `stack` is unused here (the singleton always exists on every zone),
-      // but keep the destroy bookend so the harness state stays clean.
-      yield* stack.destroy();
-    }).pipe(logLevel),
-  { tags: ["provider:cloudflare", "provider:cloudflare:logscontrol", "live"] },
+    // `stack` is unused here (the singleton always exists on every zone),
+    // but keep the destroy bookend so the harness state stays clean.
+    yield* stack.destroy();
+  }).pipe(logLevel),
 );
 
 test.provider.skipIf(!entitled)(
@@ -197,13 +178,5 @@ test.provider.skipIf(!entitled)(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:logscontrol",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

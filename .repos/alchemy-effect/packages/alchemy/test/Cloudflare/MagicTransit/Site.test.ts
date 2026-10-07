@@ -76,10 +76,7 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:magictransit", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // Canonical `list()` test (account collection): Magic WAN sites are
@@ -121,10 +118,7 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:magictransit", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test.provider.skipIf(!entitled)(
@@ -212,8 +206,5 @@ test.provider.skipIf(!entitled)(
 
       yield* expectGone(accountId, site.siteId);
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:magictransit", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

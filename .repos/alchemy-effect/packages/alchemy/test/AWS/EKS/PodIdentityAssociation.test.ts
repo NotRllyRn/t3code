@@ -33,7 +33,6 @@ test.provider(
         expect(typeof association.roleArn).toBe("string");
       }
     }),
-  { tags: ["provider:aws", "provider:aws:eks", "live"] },
 );
 
 // Full deploy test: an EKS cluster takes ~10+ minutes to provision, which is far
@@ -70,5 +69,5 @@ test.provider.skipIf(!process.env.AWS_TEST_EKS_CLUSTER)(
 
       yield* stack.destroy();
     }),
-  { tags: ["provider:aws", "provider:aws:eks", "live"], timeout: 600_000 },
+  { timeout: 600_000 },
 );

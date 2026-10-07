@@ -91,8 +91,5 @@ test.provider(
       );
       expect(gone).toBeUndefined();
     }),
-  {
-    tags: ["provider:aws", "provider:aws:verifiedpermissions", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

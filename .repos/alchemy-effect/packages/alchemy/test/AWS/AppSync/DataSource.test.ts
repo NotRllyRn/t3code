@@ -114,14 +114,5 @@ test.provider(
       );
       expect(apiGone).toBe(true);
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:appsync",
-      "provider:aws:dynamodb",
-      "provider:aws:iam",
-      "live",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

@@ -19,7 +19,7 @@ import * as Latch from "effect/Latch"
 import * as Layer from "effect/Layer"
 import * as Redacted from "effect/Redacted"
 import * as Scope from "effect/Scope"
-import * as Socket from "effect/socket/Socket"
+import * as Socket from "effect/unstable/socket/Socket"
 import { Buffer } from "node:buffer"
 import * as Net from "node:net"
 import type { Duplex } from "node:stream"
@@ -28,7 +28,6 @@ import * as Tls from "node:tls"
 const isDeno = "Deno" in globalThis
 
 /**
- * @stability unstable
  * @category re-exports
  * @since 4.0.0
  */
@@ -47,9 +46,9 @@ export class NetSocket extends Context.Service<NetSocket, Net.Socket>()(
 
 const readAvailable = (
   conn: Duplex
-): Arr.NonEmptyReadonlyArray<Uint8Array | string> | undefined => {
+): Arr.NonEmptyReadonlyArray<Uint8Array | string> | null => {
   const first = conn.read() as Uint8Array | string | null
-  if (first === null) return undefined
+  if (first === null) return null
   const second = conn.read() as Uint8Array | string | null
   if (second === null) return [first]
   const out: [Uint8Array | string, ...Array<Uint8Array | string>] = [first, second]
@@ -181,83 +180,51 @@ export const fromDuplex = <RO>(
 
       let error: Socket.SocketError | undefined
       let waiter: ReadResume | undefined
-      // Bytes consumed by read() while the parked pull was interrupted.
-      let pending: Arr.NonEmptyReadonlyArray<Uint8Array | string> | undefined
-      let reading = false
-      let closed = false
       let upgradeAvailable = true
 
-      // The only place a waiter is resumed, so delivery order has one owner:
-      // retained bytes first, then freshly read bytes, then the error.
-      function drain() {
-        if (waiter === undefined || reading) return
-        let chunk = pending
-        pending = undefined
-        if (chunk === undefined && !closed) {
-          // A data listener can interrupt and replace the pull synchronously.
-          // The replacement must wait for this read to preserve byte order.
-          reading = true
-          try {
-            chunk = readAvailable(conn)
-          } finally {
-            reading = false
-          }
+      function fail(err: Socket.SocketError) {
+        if (error === undefined) error = err
+        if (waiter !== undefined) {
+          const resume = waiter
+          waiter = undefined
+          resume(Effect.fail(error!))
         }
-        // A close during read() discards the bytes it consumed.
-        if (closed) chunk = undefined
-        if (waiter === undefined) {
-          pending = chunk
-          return
-        }
-        const result = chunk !== undefined
-          ? Effect.succeed(chunk)
-          : error !== undefined
-          ? Effect.fail(error)
-          : undefined
-        if (result === undefined) return
+      }
+      function onReadable() {
+        if (waiter === undefined) return
+        const chunk = readAvailable(conn)
+        if (chunk === null) return
         const resume = waiter
         waiter = undefined
-        resume(result)
-      }
-      // Normal EOF: already consumed bytes are still delivered before the error.
-      function end(err: Socket.SocketError) {
-        error ??= err
-        drain()
-      }
-      // Teardown or failure: consumed bytes are discarded.
-      function close(err: Socket.SocketError) {
-        error ??= err
-        closed = true
-        pending = undefined
-        drain()
+        resume(Effect.succeed(chunk))
       }
       function onEnd() {
-        end(new Socket.SocketError({ reason: new Socket.SocketCloseError({ code: 1000 }) }))
+        fail(new Socket.SocketError({ reason: new Socket.SocketCloseError({ code: 1000 }) }))
       }
       function onError(cause: Error) {
-        close(
+        fail(
           new Socket.SocketError({
             reason: new Socket.SocketReadError({ cause })
           })
         )
       }
       function onClose(hadError: boolean) {
-        const err = new Socket.SocketError({
-          reason: new Socket.SocketCloseError({ code: hadError ? 1006 : 1000 })
-        })
-        if (hadError) close(err)
-        else end(err)
+        fail(
+          new Socket.SocketError({
+            reason: new Socket.SocketCloseError({ code: hadError ? 1006 : 1000 })
+          })
+        )
       }
 
       function attachReadListeners(conn: Duplex) {
-        conn.on("readable", drain)
+        conn.on("readable", onReadable)
         conn.on("end", onEnd)
         conn.on("error", onError)
         conn.on("close", onClose)
       }
 
       function detachReadListeners(conn: Duplex) {
-        conn.off("readable", drain)
+        conn.off("readable", onReadable)
         conn.off("end", onEnd)
         conn.off("error", onError)
         conn.off("close", onClose)
@@ -271,7 +238,7 @@ export const fromDuplex = <RO>(
         scope,
         Effect.sync(() => {
           // resume a pull blocked in another fiber before detaching
-          close(
+          fail(
             new Socket.SocketError({
               reason: new Socket.SocketCloseError({ code: 1006 })
             })
@@ -286,13 +253,15 @@ export const fromDuplex = <RO>(
       currentSocket = conn
       latch.openUnsafe()
 
-      const pull = Effect.callback<Arr.NonEmptyReadonlyArray<Uint8Array | string>, Socket.SocketError>((resume) => {
-        waiter = resume
-        drain()
-        // Resumed synchronously: nothing to cancel.
-        if (waiter !== resume) return
-        return Effect.sync(() => {
-          if (waiter === resume) waiter = undefined
+      const pull = Effect.suspend(() => {
+        const chunk = readAvailable(conn)
+        if (chunk !== null) return Effect.succeed(chunk)
+        if (error !== undefined) return Effect.fail(error)
+        return Effect.callback<Arr.NonEmptyReadonlyArray<Uint8Array | string>, Socket.SocketError>((resume) => {
+          waiter = resume
+          return Effect.sync(() => {
+            if (waiter === resume) waiter = undefined
+          })
         })
       })
 
@@ -382,7 +351,7 @@ export const fromDuplex = <RO>(
               const upgradeError = new Socket.SocketError({
                 reason: new Socket.SocketUpgradeError({ cause })
               })
-              close(upgradeError)
+              fail(upgradeError)
               resume(Effect.fail(upgradeError))
             }
             function onUpgradeClose() {
@@ -395,7 +364,7 @@ export const fromDuplex = <RO>(
 
             return Effect.sync(() => {
               cleanup()
-              close(
+              fail(
                 new Socket.SocketError({
                   reason: new Socket.SocketCloseError({ code: 1006 })
                 })

@@ -160,8 +160,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertStoreDeleted(store.policyStoreId);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:verifiedpermissions", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

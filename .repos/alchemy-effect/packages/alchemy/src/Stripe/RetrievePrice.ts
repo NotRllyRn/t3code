@@ -21,7 +21,6 @@ export interface RetrievePriceRequest extends Omit<GetPriceRequest, "price"> {}
  * ```
  *
  * @binding
- * @product Product
  */
 export interface RetrievePrice extends Binding.Service<
   RetrievePrice,

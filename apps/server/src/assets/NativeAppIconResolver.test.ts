@@ -4,7 +4,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Sink from "effect/Sink";
 import * as Stream from "effect/Stream";
-import { ChildProcessSpawner } from "effect/process";
+import { ChildProcessSpawner } from "effect/unstable/process";
 import { HostProcessPlatform } from "@t3tools/shared/hostProcess";
 
 import * as ServerConfig from "../config.ts";
@@ -39,15 +39,15 @@ describe("resolveNativeAppIcon", () => {
         return emptyProcessHandle();
       }),
     );
-    const layerConfig = ServerConfig.ServerConfig.layerTest(process.cwd(), {
+    const configLayer = ServerConfig.ServerConfig.layerTest(process.cwd(), {
       prefix: "t3-native-app-icon-test-",
     });
-    const layerDependencies = Layer.mergeAll(
-      layerConfig,
+    const dependencies = Layer.mergeAll(
+      configLayer,
       Layer.succeed(HostProcessPlatform, "darwin"),
       Layer.succeed(ChildProcessSpawner.ChildProcessSpawner, spawner),
     ).pipe(Layer.provideMerge(NodeServices.layer));
-    const layerTest = NativeAppIconResolver.layer.pipe(Layer.provide(layerDependencies));
+    const testLayer = NativeAppIconResolver.layer.pipe(Layer.provide(dependencies));
     const app = { _tag: "display-name", displayName: "Review * App" } as const;
 
     return Effect.gen(function* () {
@@ -70,6 +70,6 @@ describe("resolveNativeAppIcon", () => {
       expect(commands).toHaveLength(257);
       expect(yield* resolver.resolve(app)).toBeNull();
       expect(commands).toHaveLength(258);
-    }).pipe(Effect.provide(layerTest));
+    }).pipe(Effect.provide(testLayer));
   });
 });

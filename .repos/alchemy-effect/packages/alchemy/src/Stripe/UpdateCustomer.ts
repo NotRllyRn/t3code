@@ -24,7 +24,6 @@ export interface UpdateCustomerRequest extends Omit<
  * ```
  *
  * @binding
- * @product Customer
  */
 export interface UpdateCustomer extends Binding.Service<
   UpdateCustomer,

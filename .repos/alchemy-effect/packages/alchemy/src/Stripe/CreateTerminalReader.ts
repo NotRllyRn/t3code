@@ -23,7 +23,6 @@ import type { RuntimeContext } from "../RuntimeContext.ts";
  * ```
  *
  * @binding
- * @product Terminal
  */
 export interface CreateTerminalReader extends Binding.Service<
   CreateTerminalReader,

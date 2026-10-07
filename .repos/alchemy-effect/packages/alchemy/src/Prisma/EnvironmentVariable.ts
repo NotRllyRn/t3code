@@ -136,7 +136,6 @@ export interface EnvironmentVariable extends Resource<
  * ```
  *
  * @resource
- * @product Compute
  */
 export const EnvironmentVariable = Resource<EnvironmentVariable>(
   "Prisma.EnvironmentVariable",

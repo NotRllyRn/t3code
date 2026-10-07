@@ -48,13 +48,6 @@ export interface SvelteKitProps<
   assets?: AssetsConfig;
 }
 
-// These options are inspected while constructing the Worker. Resolve them in
-// the outer props Effect; pass-through properties can remain deferred Inputs.
-type SvelteKitInput<Bindings extends WorkerBindingProps> = InputProps<
-  SvelteKitProps<Bindings>,
-  "assets"
->;
-
 /**
  * A Cloudflare Worker deployed from a SvelteKit project.
  *
@@ -178,8 +171,8 @@ export const SvelteKit: {
     <const Bindings extends WorkerBindingProps = {}, Req = never>(
       id: string,
       propsEff?:
-        | SvelteKitInput<Bindings>
-        | Effect.Effect<SvelteKitInput<Bindings>, never, Req>,
+        | InputProps<SvelteKitProps<Bindings>>
+        | Effect.Effect<InputProps<SvelteKitProps<Bindings>>, never, Req>,
     ): Effect.Effect<Self, never, Req | Providers> & {
       new (): Worker<{
         [
@@ -191,8 +184,8 @@ export const SvelteKit: {
   <const Bindings extends WorkerBindingProps = {}, Req = never>(
     id: string,
     propsEff?:
-      | SvelteKitInput<Bindings>
-      | Effect.Effect<SvelteKitInput<Bindings>, never, Req>,
+      | InputProps<SvelteKitProps<Bindings>>
+      | Effect.Effect<InputProps<SvelteKitProps<Bindings>>, never, Req>,
   ): Effect.Effect<
     Worker<{
       [
@@ -202,19 +195,9 @@ export const SvelteKit: {
     never,
     Req | Providers
   >;
-} = (<const Bindings extends WorkerBindingProps = {}, Req = never>(
-  id?: string,
-  propsEff?:
-    | SvelteKitInput<Bindings>
-    | Effect.Effect<SvelteKitInput<Bindings>, never, Req>,
-) =>
+} = ((id?: any, propsEff?: any) =>
   id === undefined
-    ? <const Bindings extends WorkerBindingProps = {}, Req = never>(
-        id: string,
-        propsEff?:
-          | SvelteKitInput<Bindings>
-          | Effect.Effect<SvelteKitInput<Bindings>, never, Req>,
-      ) => effectClass(SvelteKit(id, propsEff))
+    ? (id: string, propsEff: any) => effectClass(SvelteKit(id, propsEff))
     : Worker(
         id,
         Effect.map(

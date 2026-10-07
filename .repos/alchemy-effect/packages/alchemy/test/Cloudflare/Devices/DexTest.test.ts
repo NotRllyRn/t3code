@@ -49,10 +49,7 @@ test.provider.skipIf(entitled)(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:devices", "live"],
-    timeout: 90_000,
-  },
+  { timeout: 90_000 },
 );
 
 test.provider.skipIf(!entitled)(
@@ -118,10 +115,7 @@ test.provider.skipIf(!entitled)(
         .pipe(Effect.flip);
       expect(gone._tag).toEqual("DexTestNotFound");
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:devices", "live"],
-    timeout: 90_000,
-  },
+  { timeout: 90_000 },
 );
 
 // Canonical `list()` test (account-scoped collection). The lifecycle requires
@@ -160,10 +154,7 @@ test.provider.skipIf(!entitled)(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:devices", "live"],
-    timeout: 90_000,
-  },
+  { timeout: 90_000 },
 );
 
 test.provider.skipIf(entitled)(
@@ -181,8 +172,5 @@ test.provider.skipIf(entitled)(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:devices", "live"],
-    timeout: 90_000,
-  },
+  { timeout: 90_000 },
 );

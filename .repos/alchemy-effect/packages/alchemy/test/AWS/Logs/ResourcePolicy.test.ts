@@ -94,8 +94,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertPolicyDeleted(POLICY_NAME);
     }).pipe(Effect.onError(() => stack.destroy().pipe(Effect.ignore))),
-  {
-    tags: ["provider:aws", "provider:aws:iam", "provider:aws:logs", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

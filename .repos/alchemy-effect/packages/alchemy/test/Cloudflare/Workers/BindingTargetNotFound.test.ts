@@ -47,8 +47,5 @@ test.provider(
 
       yield* stack.destroy();
     }),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:worker", "live"],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

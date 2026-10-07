@@ -25,10 +25,10 @@ import * as Path from "effect/Path";
 import { MinimumLogLevel } from "effect/References";
 import * as Schedule from "effect/Schedule";
 import * as Stream from "effect/Stream";
-import * as HttpClient from "effect/http/HttpClient";
-import * as HttpClientRequest from "effect/http/HttpClientRequest";
-import * as HttpApiClient from "effect/http-api/HttpApiClient";
-import * as ChildProcess from "effect/process/ChildProcess";
+import * as HttpClient from "effect/unstable/http/HttpClient";
+import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
+import * as HttpApiClient from "effect/unstable/httpapi/HttpApiClient";
+import * as ChildProcess from "effect/unstable/process/ChildProcess";
 import { GitApi } from "@/Git/Api.ts";
 import { verifyPackResponse } from "./harness/pack.ts";
 import { makeTestStack, TEST_SECRET } from "./fixtures/stack.ts";
@@ -282,15 +282,7 @@ test.skipIf(skipBench)(
 
     yield* mustSh(tmp, `cd warm && git fsck --strict`);
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 900_000,
-  },
+  { timeout: 900_000 },
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -333,15 +325,7 @@ test.skipIf(skipBench)(
         `~${((clones * blobKiB) / 1024 / (ms / 1000)).toFixed(1)} MiB/s`,
     );
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 900_000,
-  },
+  { timeout: 900_000 },
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -410,15 +394,7 @@ test.skipIf(skipBench)(
       (_, ms) => `${(ms / 1000).toFixed(2)}s (${perSecond(branches, ms)})`,
     );
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 900_000,
-  },
+  { timeout: 900_000 },
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -478,15 +454,7 @@ test.skipIf(skipBench)(
       { concurrency: 5 },
     );
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 900_000,
-  },
+  { timeout: 900_000 },
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -550,15 +518,7 @@ test.skipIf(skipBench)(
     );
     yield* mustSh(tmp, `cd packed && git fsck --strict`);
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 900_000,
-  },
+  { timeout: 900_000 },
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -665,15 +625,7 @@ test.skipIf(skipBench)(
       );
     }
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 900_000,
-  },
+  { timeout: 900_000 },
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -770,15 +722,7 @@ test.skipIf(skipBench)(
     yield* mustSh(tmp, `rm -rf verify && git clone -q '${repo.remote}' verify`);
     yield* mustSh(tmp, `cd verify && git fsck --strict`);
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 900_000,
-  },
+  { timeout: 900_000 },
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -853,15 +797,7 @@ test.skipIf(skipBench)(
     );
     yield* Fiber.join(heavy);
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 900_000,
-  },
+  { timeout: 900_000 },
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -967,15 +903,7 @@ test.skipIf(skipBench)(
       throughput,
     );
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 900_000,
-  },
+  { timeout: 900_000 },
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1099,15 +1027,7 @@ test.skipIf(skipBench)(
       },
     );
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 1_200_000,
-  },
+  { timeout: 1_200_000 },
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1230,15 +1150,7 @@ test.skipIf(skipBench)(
       `rm -rf anon && git clone -q '${parsed.protocol}//${parsed.host}/bench/pubread.git' anon && cd anon && git fsck --strict`,
     );
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 900_000,
-  },
+  { timeout: 900_000 },
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1337,13 +1249,5 @@ test.skipIf(skipBench)(
     yield* mustSh(tmp, `rm -rf verify && git clone -q '${repo.remote}' verify`);
     yield* mustSh(tmp, `cd verify && git fsck --strict`);
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 900_000,
-  },
+  { timeout: 900_000 },
 );

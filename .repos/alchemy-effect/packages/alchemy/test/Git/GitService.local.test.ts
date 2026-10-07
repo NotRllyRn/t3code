@@ -30,10 +30,10 @@ import { MinimumLogLevel } from "effect/References";
 import * as Result from "effect/Result";
 import * as Schedule from "effect/Schedule";
 import * as Stream from "effect/Stream";
-import * as HttpClient from "effect/http/HttpClient";
-import * as HttpClientRequest from "effect/http/HttpClientRequest";
-import * as HttpApiClient from "effect/http-api/HttpApiClient";
-import * as ChildProcess from "effect/process/ChildProcess";
+import * as HttpClient from "effect/unstable/http/HttpClient";
+import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
+import * as HttpApiClient from "effect/unstable/httpapi/HttpApiClient";
+import * as ChildProcess from "effect/unstable/process/ChildProcess";
 import type { Oid } from "@/Git/Api.ts";
 import {
   encodeCommit,
@@ -349,15 +349,7 @@ test(
       ),
     ).toBe(false);
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "local",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test(
@@ -554,15 +546,7 @@ test(
     expect(rawFile.status).toBe(200);
     expect(yield* rawFile.text).toBe("hello local, v2\n");
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "local",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test(
@@ -588,15 +572,7 @@ test(
     );
     expect(gone.deleted).toBe(true);
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "local",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -666,15 +642,7 @@ test(
     const lsRemote = (yield* mustGit(work, "ls-remote", "origin")).stdout;
     expect(lsRemote).toContain(`${head}\trefs/heads/main`);
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "local",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test(
@@ -721,15 +689,7 @@ test(
     expect((yield* mustGit(b, "rev-parse", "HEAD")).stdout).toBe(headA);
     expect(yield* fs.readFileString(path.join(b, "file.txt"))).toBe("v3\n");
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "local",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test(
@@ -811,15 +771,7 @@ test(
       "RefNotFound",
     );
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "local",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test(
@@ -866,15 +818,7 @@ test(
     });
     expect(mainRef.oid).toBe(head);
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "local",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test(
@@ -920,15 +864,7 @@ test(
     yield* mustGit(seed, "commit", "-m", "c2");
     yield* mustGit(seed, "push", "origin", "main");
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "local",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1010,15 +946,7 @@ test(
       "after\n",
     );
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "local",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test(
@@ -1086,15 +1014,7 @@ test(
     );
     yield* mustGit(path.join(tmp, "single"), "fsck", "--strict");
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "local",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test(
@@ -1152,15 +1072,7 @@ test(
     expect(text).toBe("0008NAK\n");
     expect(new TextDecoder().decode(bytes.subarray(8, 12))).toBe("PACK");
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "local",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test(
@@ -1247,15 +1159,7 @@ test(
     yield* mustGit(tmp, "clone", repo.remote, "again");
     yield* mustGit(path.join(tmp, "again"), "fsck", "--strict");
   }),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "local",
-    ],
-    timeout: 90_000,
-  },
+  { timeout: 90_000 },
 );
 
 test(
@@ -1334,15 +1238,7 @@ test(
       .stdout;
     expect(logSpliced).toBe(logWork);
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "local",
-    ],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1454,15 +1350,7 @@ test(
     );
     expect(Result.isFailure(privateClone)).toBe(true);
   }),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "local",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1545,15 +1433,7 @@ test(
       "WrongObjectType",
     );
   }),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "local",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test(
@@ -1636,15 +1516,7 @@ test(
       "NoMergeBase",
     );
   }),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "local",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test(
@@ -1720,15 +1592,7 @@ test(
     expect(c.behindBy).toBe(0);
     expect(c.mergeBase).toBe(d.parent);
   }),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "local",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1877,15 +1741,7 @@ test(
     expect(edited.body).toBeNull();
     expect(edited.updatedAt).toBeGreaterThanOrEqual(edited.createdAt);
   }),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "local",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test(
@@ -2007,15 +1863,7 @@ test(
       "NothingToMerge",
     );
   }),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "local",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test(
@@ -2139,15 +1987,7 @@ test(
     });
     expect(mainAfter.oid).toBe(mainBefore);
   }),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "local",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test(
@@ -2237,15 +2077,7 @@ test(
 
     // a read-scoped token reads but cannot write → typed 403
   }),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "local",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -2371,15 +2203,7 @@ test(
     expect(missing.status).toBe(404);
     expect(missing.json.message).toBe("Not Found");
   }),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "local",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test(
@@ -2493,15 +2317,7 @@ test(
     });
     expect(badState.status).toBe(422);
   }),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "local",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -2622,13 +2438,5 @@ test(
     yield* mustGit(w, "commit", "--amend", "-m", "accepted content");
     yield* mustGit(w, "push", adminRemote, "HEAD:refs/heads/main");
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "local",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

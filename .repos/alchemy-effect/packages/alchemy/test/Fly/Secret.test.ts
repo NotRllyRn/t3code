@@ -113,16 +113,7 @@ test.provider(
       const appGone = yield* waitAppGone(created.app.appName);
       expect(appGone).toEqual("gone");
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:fly",
-      "provider:fly:app",
-      "provider:fly:machine",
-      "provider:fly:secret",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -184,16 +175,7 @@ test.provider(
       );
       expect(gone).toEqual("gone");
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:fly",
-      "provider:fly:app",
-      "provider:fly:machine",
-      "provider:fly:secret",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -231,14 +213,5 @@ test.provider(
       );
       expect(gone).toEqual("gone");
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:fly",
-      "provider:fly:app",
-      "provider:fly:machine",
-      "provider:fly:secret",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

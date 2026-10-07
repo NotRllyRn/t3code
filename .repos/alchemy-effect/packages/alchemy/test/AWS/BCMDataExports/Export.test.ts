@@ -26,7 +26,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:bcmdataexports", "live"] },
 );
 
 const bucketName = "alchemy-test-bcm-export-dest";
@@ -231,13 +230,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertExportGone(renamed.exportArn);
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:bcmdataexports",
-      "provider:aws:s3",
-      "live",
-    ],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );

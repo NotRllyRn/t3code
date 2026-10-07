@@ -7,7 +7,7 @@ import { expect } from "alchemy-test";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as Schedule from "effect/Schedule";
-import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClient from "effect/unstable/http/HttpClient";
 import BedrockKbTestFunctionLive, { BedrockKbTestFunction } from "./kb-handler";
 
 const { test } = Test.make({ providers: AWS.providers() });
@@ -122,10 +122,7 @@ test.provider.skipIf(gated)(
       yield* stack.destroy();
       yield* assertKbGone(result.knowledgeBaseId);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:bedrock", "provider:aws:s3", "live"],
-    timeout: 600_000,
-  },
+  { timeout: 600_000 },
 );
 
 // Runtime coverage for the KB-scoped bindings (document ingestion, ingestion
@@ -226,14 +223,5 @@ test.provider.skipIf(gated)(
 
       yield* stack.destroy();
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:bedrock",
-      "provider:aws:lambda",
-      "provider:aws:s3",
-      "live",
-    ],
-    timeout: 600_000,
-  },
+  { timeout: 600_000 },
 );

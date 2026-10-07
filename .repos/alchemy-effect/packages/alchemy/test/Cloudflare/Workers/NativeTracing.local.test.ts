@@ -58,16 +58,7 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:kv",
-      "provider:cloudflare:queue",
-      "provider:cloudflare:worker",
-      "local",
-    ],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test.provider(
@@ -89,16 +80,7 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:kv",
-      "provider:cloudflare:queue",
-      "provider:cloudflare:worker",
-      "local",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 const compositionTest = (order: "cf-last" | "otlp-last") =>
@@ -153,16 +135,7 @@ const compositionTest = (order: "cf-last" | "otlp-last") =>
 
         yield* stack.destroy();
       }).pipe(logLevel),
-    {
-      tags: [
-        "provider:cloudflare",
-        "provider:cloudflare:kv",
-        "provider:cloudflare:queue",
-        "provider:cloudflare:worker",
-        "local",
-      ],
-      timeout: 180_000,
-    },
+    { timeout: 180_000 },
   );
 
 compositionTest("cf-last");

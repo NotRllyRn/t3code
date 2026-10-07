@@ -116,15 +116,7 @@ test.provider(
       const archived = yield* waitUntilArchived(created.alert.id);
       expect(archived).toEqual("archived");
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:stripe",
-      "provider:stripe:alert",
-      "provider:stripe:billingmeter",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -191,15 +183,7 @@ test.provider(
       const gone = yield* waitUntilArchived(replaced.alert.id);
       expect(gone).toEqual("archived");
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:stripe",
-      "provider:stripe:alert",
-      "provider:stripe:billingmeter",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -245,13 +229,5 @@ test.provider(
         after.find((alert) => alert.id === deployed.alert.id),
       ).toBeUndefined();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:stripe",
-      "provider:stripe:alert",
-      "provider:stripe:billingmeter",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

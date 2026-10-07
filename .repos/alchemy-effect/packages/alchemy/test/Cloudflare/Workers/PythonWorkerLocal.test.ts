@@ -45,8 +45,5 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:worker", "local"],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

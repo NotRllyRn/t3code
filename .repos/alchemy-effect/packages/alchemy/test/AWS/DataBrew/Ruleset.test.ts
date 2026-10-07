@@ -108,8 +108,5 @@ test.provider(
       const gone = yield* getRuleset(created.ruleset.rulesetName);
       expect(gone).toBeUndefined();
     }),
-  {
-    tags: ["provider:aws", "provider:aws:databrew", "provider:aws:s3", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

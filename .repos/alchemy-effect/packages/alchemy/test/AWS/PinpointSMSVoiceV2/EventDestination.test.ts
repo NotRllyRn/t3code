@@ -111,13 +111,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertConfigSetGone(configSetName);
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:pinpointsmsvoicev2",
-      "provider:aws:sns",
-      "live",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

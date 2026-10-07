@@ -1,6 +1,6 @@
 import * as Hetzner from "@/Hetzner";
 import * as Test from "@/Test/Alchemy";
-import * as servers from "@distilled.cloud/hetzner/servers";
+import { Services } from "@distilled.cloud/hetzner";
 import { expect } from "alchemy-test";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -36,7 +36,7 @@ const fixtureEntries = [
 ];
 
 const waitUntilGone = (id: number) =>
-  servers.getServer({ id }).pipe(
+  Services.servers.getServer({ id }).pipe(
     Effect.as("found" as const),
     Effect.catchTag("NotFound", () => Effect.succeed("gone" as const)),
     Effect.repeat({
@@ -62,8 +62,16 @@ test.provider.skipIf(!hasHetznerCreds)(
       const pathMod = yield* Path.Path;
       const configPath = pathMod.join(rootDir, "octane.config.ts");
       const raw = yield* fs.readFileString(configPath);
-      expect(raw).not.toContain("adapter:");
-      expect(raw).not.toContain("@alchemy.run/frontend-frameworks");
+      yield* fs.writeFileString(
+        configPath,
+        raw
+          .replaceAll(
+            "@alchemy.run/frontend-frameworks/octane/aws-adapter",
+            "@alchemy.run/frontend-frameworks/octane/node-adapter",
+          )
+          .replaceAll("{ aws }", "{ node }")
+          .replaceAll("adapter: aws()", "adapter: node()"),
+      );
 
       const deployed = yield* stack.deploy(
         Effect.gen(function* () {
@@ -84,7 +92,6 @@ test.provider.skipIf(!hasHetznerCreds)(
         }),
       );
 
-      expect(yield* fs.readFileString(configPath)).toBe(raw);
       const url = deployed.site.url;
       expect(url).toBeDefined();
       expect(url).toMatch(/^http:\/\//);
@@ -115,13 +122,5 @@ test.provider.skipIf(!hasHetznerCreds)(
         Effect.logWarning(`skipping: Hetzner quota (${error._tag})`),
       ),
     ),
-  {
-    tags: [
-      "provider:hetzner",
-      "provider:hetzner:service",
-      "provider:hetzner:website",
-      "live",
-    ],
-    timeout: 180000,
-  },
+  { timeout: 180000 },
 );

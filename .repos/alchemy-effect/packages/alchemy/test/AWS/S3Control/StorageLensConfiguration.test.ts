@@ -53,7 +53,7 @@ test.provider(
         );
       expect(result).toBe("missing");
     }),
-  { tags: ["provider:aws", "provider:aws:s3control", "live"], timeout: 60_000 },
+  { timeout: 60_000 },
 );
 
 test.provider(
@@ -127,8 +127,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertConfigurationDeleted(lens.configId);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:s3control", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

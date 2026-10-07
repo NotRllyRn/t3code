@@ -227,11 +227,6 @@ const migrationEntries = (
       rename
     })
   }
-  for (const [id, annotation] of annotations) {
-    if (annotation.include === true && id.includes("#") && !entries.some((entry) => entry.id === id)) {
-      entries.push({ id, module: id.split("#")[0]!, rename: undefined })
-    }
-  }
   return entries.sort((left, right) => compareStrings(left.module, right.module) || compareStrings(left.id, right.id))
 }
 

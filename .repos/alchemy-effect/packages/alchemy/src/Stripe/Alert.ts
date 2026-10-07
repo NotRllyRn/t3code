@@ -191,7 +191,6 @@ export type Alert = Resource<
  * ```
  *
  * @resource
- * @product Billing
  */
 export const Alert = Resource<Alert>("Stripe.Alert");
 

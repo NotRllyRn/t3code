@@ -4,26 +4,21 @@ import * as CliKit from "@/Cli/CliKit/index.ts";
 import { Stack } from "@/Stack.ts";
 import { Stage } from "@/Stage.ts";
 import * as Stripe from "@/Stripe";
-import { Credentials } from "@/Stripe/Credentials.ts";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, it } from "alchemy-test";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Result from "effect/Result";
-import * as FetchHttpClient from "effect/http/FetchHttpClient";
+import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 import { v4 as uuidv4 } from "uuid";
 
 it.live(
-  "resolving Stripe credentials rejects an unknown explicit profile",
+  "building the Stripe provider layers rejects an unknown explicit profile",
   () =>
     Effect.gen(function* () {
       const result = yield* Effect.result(
-        Effect.sandbox(
-          Effect.gen(function* () {
-            return yield* yield* Credentials;
-          }).pipe(Effect.provide(Stripe.providers())),
-        ),
+        Effect.sandbox(Layer.build(Stripe.providers())),
       );
       expect(Result.isFailure(result)).toBe(true);
       if (Result.isFailure(result)) {
@@ -59,5 +54,4 @@ it.live(
       ),
       Effect.provide(CliKit.layer({ input: false })),
     ),
-  { tags: ["unit", "provider:stripe", "local"] },
 );

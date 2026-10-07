@@ -136,10 +136,7 @@ test.provider(
       const gone = yield* getRuleset(accountId, created.rulesetId);
       expect(gone).toBeUndefined();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:ruleset", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // Canonical `list()` test (account-scoped collection). `list()` enumerates the
@@ -220,8 +217,5 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:ruleset", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

@@ -227,7 +227,6 @@ export type ShippingRate = Resource<
  * ```
  *
  * @resource
- * @product Product
  */
 export const ShippingRate = Resource<ShippingRate>("Stripe.ShippingRate");
 

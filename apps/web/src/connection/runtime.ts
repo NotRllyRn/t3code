@@ -1,35 +1,36 @@
 import { Connection } from "@t3tools/client-runtime/connection";
-import { ShellSnapshotLoader } from "@t3tools/client-runtime/state/shell";
-import {
-  BoundedThreadSnapshotLoader,
-  ThreadHistoryController,
-} from "@t3tools/client-runtime/state/threads";
-import { PullRequestDiffLoader } from "@t3tools/client-runtime/state/pull-requests";
+import { shellSnapshotLoaderLayer } from "@t3tools/client-runtime/state/shell";
+import { threadSnapshotLoaderLayer } from "@t3tools/client-runtime/state/threads";
+import { pullRequestDiffLoaderLayer } from "@t3tools/client-runtime/state/pull-requests";
 import * as Layer from "effect/Layer";
-import { Atom } from "effect/reactivity";
+import { Atom } from "effect/unstable/reactivity";
 
-import * as Runtime from "../lib/runtime";
-import * as BackgroundActivityReporter from "../lib/backgroundActivityReporter";
-import * as ConnectionPlatform from "./platform";
+import { runtimeContextLayer } from "../lib/runtime";
+import {
+  backgroundActivityObserverLayer,
+  backgroundActivityReporterLayer,
+} from "../lib/backgroundActivityReporter";
+import { connectionPlatformLayer } from "./platform";
 
-const layerProvidedConnectionPlatform = ConnectionPlatform.layer.pipe(Layer.provide(Runtime.layer));
+const providedConnectionPlatformLayer = connectionPlatformLayer.pipe(
+  Layer.provide(runtimeContextLayer),
+);
 
-const layerSnapshotLoader = Layer.mergeAll(
-  BoundedThreadSnapshotLoader.layer,
-  ShellSnapshotLoader.layer,
-  ThreadHistoryController.layer,
-  PullRequestDiffLoader.layer,
+const snapshotLoaderLayer = Layer.mergeAll(
+  threadSnapshotLoaderLayer,
+  shellSnapshotLoaderLayer,
+  pullRequestDiffLoaderLayer,
 );
 
 type ConnectionLayerSource =
   | typeof Connection.layer
-  | typeof layerSnapshotLoader
-  | typeof Runtime.layer
-  | typeof ConnectionPlatform.layer
-  | typeof BackgroundActivityReporter.layerObserver
-  | typeof BackgroundActivityReporter.layer;
+  | typeof snapshotLoaderLayer
+  | typeof runtimeContextLayer
+  | typeof connectionPlatformLayer
+  | typeof backgroundActivityObserverLayer
+  | typeof backgroundActivityReporterLayer;
 
-const layerProvidedClientConnection = layerSnapshotLoader.pipe(
+const providedClientConnectionLayer = snapshotLoaderLayer.pipe(
   Layer.provideMerge(
     Connection.layerWithOptions({
       environmentThemes: true,
@@ -39,18 +40,18 @@ const layerProvidedClientConnection = layerSnapshotLoader.pipe(
   ),
   Layer.provideMerge(
     Layer.mergeAll(
-      Runtime.layer,
-      layerProvidedConnectionPlatform,
-      BackgroundActivityReporter.layerObserver,
+      runtimeContextLayer,
+      providedConnectionPlatformLayer,
+      backgroundActivityObserverLayer,
     ),
   ),
 );
 
-const layerConnection = BackgroundActivityReporter.layer.pipe(
-  Layer.provideMerge(layerProvidedClientConnection),
+const connectionLayer = backgroundActivityReporterLayer.pipe(
+  Layer.provideMerge(providedClientConnectionLayer),
 );
 
 export const connectionAtomRuntime: Atom.AtomRuntime<
   Layer.Success<ConnectionLayerSource>,
   Layer.Error<ConnectionLayerSource>
-> = Atom.runtime(layerConnection);
+> = Atom.runtime(connectionLayer);

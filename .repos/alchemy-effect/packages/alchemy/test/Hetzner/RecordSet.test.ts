@@ -1,8 +1,7 @@
-import * as zoneRrsets from "@distilled.cloud/hetzner/zone_rrsets";
 import * as Hetzner from "@/Hetzner";
 import * as Provider from "@/Provider";
 import * as Test from "@/Test/Alchemy";
-import * as zones from "@distilled.cloud/hetzner/zones";
+import { Services } from "@distilled.cloud/hetzner";
 import { expect } from "alchemy-test";
 import * as Effect from "effect/Effect";
 import { MinimumLogLevel } from "effect/References";
@@ -18,7 +17,7 @@ const logLevel = Effect.provideService(
 const hasHetznerCreds = !!process.env.HCLOUD_TOKEN;
 
 const waitUntilGone = (zoneId: number, name: string, type: string) =>
-  zoneRrsets
+  Services.zoneRrsets
     .getZoneRrset({
       id_or_name: String(zoneId),
       rr_name: name,
@@ -35,7 +34,7 @@ const waitUntilGone = (zoneId: number, name: string, type: string) =>
     );
 
 const waitUntilZoneGone = (zoneId: number) =>
-  zones.getZone({ id_or_name: String(zoneId) }).pipe(
+  Services.zones.getZone({ id_or_name: String(zoneId) }).pipe(
     Effect.as("found" as const),
     Effect.catchTag("NotFound", () => Effect.succeed("gone" as const)),
     Effect.repeat({
@@ -82,7 +81,7 @@ test.provider.skipIf(!hasHetznerCreds)(
       );
       expect(created.recordSet.records).toHaveLength(1);
 
-      const fetched = yield* zoneRrsets.getZoneRrset({
+      const fetched = yield* Services.zoneRrsets.getZoneRrset({
         id_or_name: String(created.zone.zoneId),
         rr_name: "www",
         rr_type: "A",
@@ -128,7 +127,7 @@ test.provider.skipIf(!hasHetznerCreds)(
         updated.recordSet.records.map((record) => record.value).sort(),
       ).toEqual(["192.0.2.1", "192.0.2.2"]);
 
-      const refetched = yield* zoneRrsets.getZoneRrset({
+      const refetched = yield* Services.zoneRrsets.getZoneRrset({
         id_or_name: String(updated.zone.zoneId),
         rr_name: "www",
         rr_type: "A",
@@ -148,16 +147,7 @@ test.provider.skipIf(!hasHetznerCreds)(
       const zoneGone = yield* waitUntilZoneGone(created.zone.zoneId);
       expect(zoneGone).toEqual("gone");
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:hetzner",
-      "provider:hetzner:recordset",
-      "provider:hetzner:service",
-      "provider:hetzner:zone",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider.skipIf(!hasHetznerCreds)(
@@ -205,7 +195,7 @@ test.provider.skipIf(!hasHetznerCreds)(
       expect(replaced.recordSet.id).not.toEqual(created.recordSet.id);
       expect(replaced.recordSet.zoneId).toEqual(created.zone.zoneId);
 
-      const fetched = yield* zoneRrsets.getZoneRrset({
+      const fetched = yield* Services.zoneRrsets.getZoneRrset({
         id_or_name: String(replaced.zone.zoneId),
         rr_name: "api",
         rr_type: "A",
@@ -225,16 +215,7 @@ test.provider.skipIf(!hasHetznerCreds)(
       const zoneGone = yield* waitUntilZoneGone(created.zone.zoneId);
       expect(zoneGone).toEqual("gone");
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:hetzner",
-      "provider:hetzner:recordset",
-      "provider:hetzner:service",
-      "provider:hetzner:zone",
-      "live",
-    ],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test.provider.skipIf(!hasHetznerCreds)(
@@ -278,14 +259,5 @@ test.provider.skipIf(!hasHetznerCreds)(
       const zoneGone = yield* waitUntilZoneGone(deployed.zone.zoneId);
       expect(zoneGone).toEqual("gone");
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:hetzner",
-      "provider:hetzner:recordset",
-      "provider:hetzner:service",
-      "provider:hetzner:zone",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

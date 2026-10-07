@@ -13,8 +13,8 @@
  * (`Workers/Sources/Vite.ts`):
  *
  * - `build()` runs the Octane Framework service (the project's own
- *   Vite plugins compile the client and server; Alchemy generates the
- *   `dist/server/worker.js` entry without requiring a hosting adapter) and
+ *   `vite build`, whose Octane plugin builds client + server and whose
+ *   Cloudflare adapter emits `dist/server/worker.js`, wrangler-free) and
  *   maps its `BuildOutput` onto the source contract: `serverModules`
  *   (entry first) → bundle files, `clientDirectory` (`dist/client`) →
  *   assets (manifest-hashed, honoring `.assetsignore` / `_headers` /
@@ -121,7 +121,6 @@ export interface SourceDevContext extends SourceContext {
 export interface SourceDevHandle {
   readonly mode: "server";
   readonly url: URL;
-  readonly serviceBinding?: "http";
 }
 
 /**
@@ -632,7 +631,6 @@ export const makeOctaneSource = (
       return {
         mode: "server",
         url: new URL(server.url),
-        serviceBinding: "http",
       } satisfies SourceDevHandle;
     }),
   };

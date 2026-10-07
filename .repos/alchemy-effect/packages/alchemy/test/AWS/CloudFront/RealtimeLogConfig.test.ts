@@ -117,16 +117,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertConfigGone(created.name);
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:cloudfront",
-      "provider:aws:iam",
-      "provider:aws:kinesis",
-      "live",
-    ],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test.provider(
@@ -188,14 +179,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertConfigGone("alchemy-test-rtlc-b");
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:cloudfront",
-      "provider:aws:iam",
-      "provider:aws:kinesis",
-      "live",
-    ],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

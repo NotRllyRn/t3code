@@ -191,8 +191,5 @@ test.provider.skipIf(!dockerAvailable)(
         );
       expect(gone).toBe(true);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:iam", "provider:aws:lambda", "local"],
-    timeout: 600_000,
-  },
+  { timeout: 600_000 },
 );

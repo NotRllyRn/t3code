@@ -10,7 +10,6 @@ export function middleware(request: NextRequest) {
   }
   const response = NextResponse.next();
   response.headers.set("x-fixture-middleware", "passed");
-  response.headers.set("x-config-priority", "middleware");
   return response;
 }
 

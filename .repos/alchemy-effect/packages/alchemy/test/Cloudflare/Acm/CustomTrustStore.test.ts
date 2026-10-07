@@ -92,14 +92,6 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:acm",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-  },
 );
 
 // Canonical `list()` test (zone-scoped collection): `list()` enumerates
@@ -124,7 +116,6 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  { tags: ["provider:cloudflare", "provider:cloudflare:acm", "live"] },
 );
 
 // On an entitled zone, `list()` must contain the deployed certificate.
@@ -158,10 +149,7 @@ test.provider.skipIf(!entitledZoneId)(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:acm", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider.skipIf(!entitledZoneId)(
@@ -224,8 +212,5 @@ test.provider.skipIf(!entitledZoneId)(
           gone.status === "deleted",
       ).toBe(true);
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:acm", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

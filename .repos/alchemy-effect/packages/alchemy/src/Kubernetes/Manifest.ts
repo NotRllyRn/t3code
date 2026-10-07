@@ -156,7 +156,6 @@ export interface Manifest extends Resource<
  * ```
  *
  * @resource
- * @product Manifest
  */
 export const Manifest = Resource<Manifest>("Kubernetes.Manifest", {
   aliases: ["AWS.EKS.Manifest"],

@@ -97,16 +97,7 @@ test.provider(
         .pipe(Effect.flip);
       expect(gone._tag).toEqual("OperationNotFound");
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:apishield",
-      "provider:cloudflare:schemavalidation",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // Canonical `list()` test (zone-scoped collection): there is no account-wide
@@ -158,14 +149,5 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:apishield",
-      "provider:cloudflare:schemavalidation",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

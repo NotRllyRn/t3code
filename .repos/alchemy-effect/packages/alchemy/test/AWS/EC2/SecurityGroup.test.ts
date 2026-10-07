@@ -25,35 +25,32 @@ const describeRules = (groupId: string) =>
     Filters: [{ Name: "group-id", Values: [groupId] }],
   }).pipe(Effect.map((result) => result.SecurityGroupRules ?? []));
 
-test.provider(
-  "list enumerates the deployed Security Group",
-  (stack) =>
-    Effect.gen(function* () {
-      yield* stack.destroy();
+test.provider("list enumerates the deployed Security Group", (stack) =>
+  Effect.gen(function* () {
+    yield* stack.destroy();
 
-      const { vpc, sg } = yield* stack.deploy(
-        Effect.gen(function* () {
-          const vpc = yield* Vpc("ListSgVpc", {
-            cidrBlock: "10.0.0.0/16",
-          });
-          const sg = yield* SecurityGroup("ListSg", {
-            vpcId: vpc.vpcId,
-          });
-          return { vpc, sg };
-        }),
-      );
+    const { vpc, sg } = yield* stack.deploy(
+      Effect.gen(function* () {
+        const vpc = yield* Vpc("ListSgVpc", {
+          cidrBlock: "10.0.0.0/16",
+        });
+        const sg = yield* SecurityGroup("ListSg", {
+          vpcId: vpc.vpcId,
+        });
+        return { vpc, sg };
+      }),
+    );
 
-      const provider = yield* Provider.findProvider(SecurityGroup);
-      const all = yield* provider.list();
+    const provider = yield* Provider.findProvider(SecurityGroup);
+    const all = yield* provider.list();
 
-      expect(all.some((x) => x.groupId === sg.groupId)).toBe(true);
+    expect(all.some((x) => x.groupId === sg.groupId)).toBe(true);
 
-      yield* stack.destroy();
+    yield* stack.destroy();
 
-      yield* assertSecurityGroupGone(sg.groupId);
-      yield* assertVpcGone(vpc.vpcId);
-    }).pipe(logLevel),
-  { tags: ["provider:aws", "provider:aws:ec2", "live"] },
+    yield* assertSecurityGroupGone(sg.groupId);
+    yield* assertVpcGone(vpc.vpcId);
+  }).pipe(logLevel),
 );
 
 test.provider(
@@ -247,7 +244,7 @@ test.provider(
       yield* assertSecurityGroupGone(updated.sg.groupId);
       yield* assertVpcGone(updated.vpc.vpcId);
     }).pipe(logLevel),
-  { tags: ["provider:aws", "provider:aws:ec2", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -303,7 +300,7 @@ test.provider(
       yield* assertSecurityGroupGone(sg.groupId);
       yield* assertVpcGone(vpc.vpcId);
     }),
-  { tags: ["provider:aws", "provider:aws:ec2", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );
 
 const securityGroupStack = (props: { egress?: [] }) =>
@@ -364,7 +361,7 @@ test.provider(
       yield* assertSecurityGroupGone(outboundDisabledAgain.sg.groupId);
       yield* assertVpcGone(outboundDisabledAgain.vpc.vpcId);
     }).pipe(logLevel),
-  { tags: ["provider:aws", "provider:aws:ec2", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -421,7 +418,7 @@ test.provider(
       yield* assertSecurityGroupGone(created.sg.groupId);
       yield* assertVpcGone(created.vpc.vpcId);
     }).pipe(logLevel),
-  { tags: ["provider:aws", "provider:aws:ec2", "live"], timeout: 120000 },
+  { timeout: 120000 },
 );
 
 test.provider(
@@ -478,7 +475,7 @@ test.provider(
       yield* assertSecurityGroupGone(created.sg.groupId);
       yield* assertVpcGone(created.vpc.vpcId);
     }).pipe(logLevel),
-  { tags: ["provider:aws", "provider:aws:ec2", "live"], timeout: 120000 },
+  { timeout: 120000 },
 );
 
 test.provider(
@@ -546,7 +543,7 @@ test.provider(
       yield* assertSecurityGroupGone(created.sg.groupId);
       yield* assertVpcGone(created.vpc.vpcId);
     }).pipe(logLevel),
-  { tags: ["provider:aws", "provider:aws:ec2", "live"], timeout: 120000 },
+  { timeout: 120000 },
 );
 
 test.provider(
@@ -606,7 +603,7 @@ test.provider(
       yield* assertSecurityGroupGone(created.sg.groupId);
       yield* assertVpcGone(created.vpc.vpcId);
     }).pipe(logLevel),
-  { tags: ["provider:aws", "provider:aws:ec2", "live"], timeout: 120000 },
+  { timeout: 120000 },
 );
 
 test.provider(
@@ -742,7 +739,7 @@ test.provider(
       yield* assertSecurityGroupGone(created.sg.groupId);
       yield* assertVpcGone(created.vpc.vpcId);
     }).pipe(logLevel),
-  { tags: ["provider:aws", "provider:aws:ec2", "live"], timeout: 120000 },
+  { timeout: 120000 },
 );
 
 test.provider(
@@ -791,7 +788,7 @@ test.provider(
       yield* assertSecurityGroupGone(repaired.sg.groupId);
       yield* assertVpcGone(repaired.vpc.vpcId);
     }).pipe(logLevel),
-  { tags: ["provider:aws", "provider:aws:ec2", "live"], timeout: 120000 },
+  { timeout: 120000 },
 );
 
 test.provider(
@@ -934,5 +931,5 @@ test.provider(
       yield* assertSecurityGroupGone(created.sg.groupId);
       yield* assertVpcGone(created.vpc.vpcId);
     }).pipe(logLevel),
-  { tags: ["provider:aws", "provider:aws:ec2", "live"], timeout: 120000 },
+  { timeout: 120000 },
 );

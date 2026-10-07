@@ -24,7 +24,6 @@ export interface RetrieveProductFeatureRequest extends Omit<
  * ```
  *
  * @binding
- * @product Product
  */
 export interface RetrieveProductFeature extends Binding.Service<
   RetrieveProductFeature,

@@ -25,7 +25,7 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:ivs", "live"], timeout: 60_000 },
+  { timeout: 60_000 },
 );
 
 const assertConfigGone = (arn: string) =>
@@ -111,8 +111,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertConfigGone(created.recordingConfigurationArn);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:ivs", "provider:aws:s3", "live"],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );

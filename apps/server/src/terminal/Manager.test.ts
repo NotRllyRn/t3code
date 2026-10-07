@@ -12,13 +12,13 @@ import {
   ServerSettingsError,
   TerminalProviderInstanceNotFoundError,
 } from "@t3tools/contracts";
-import { HostProcessPlatform, HostProcessArchitecture } from "@t3tools/shared/hostProcess";
+import { HostProcessPlatform } from "@t3tools/shared/hostProcess";
 import * as Data from "effect/Data";
 import * as Clock from "effect/Clock";
 import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
-import * as Base64Url from "effect/encoding/Base64Url";
+import * as Encoding from "effect/Encoding";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
 import * as FileSystem from "effect/FileSystem";
@@ -28,22 +28,19 @@ import * as PlatformError from "effect/PlatformError";
 import * as Path from "effect/Path";
 import * as Ref from "effect/Ref";
 import * as Schedule from "effect/Schedule";
-import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
-import { ChildProcessSpawner } from "effect/process";
+import { ChildProcessSpawner } from "effect/unstable/process";
 import { expect } from "vite-plus/test";
 
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import * as ServerConfig from "../config.ts";
-import * as SqlitePersistence from "../persistence/Sqlite.ts";
+import { SqlitePersistenceMemory } from "../persistence/Layers/Sqlite.ts";
 import * as ProcessRunner from "../processRunner.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as TerminalManager from "./Manager.ts";
 import * as PtyAdapter from "./PtyAdapter.ts";
-
-const encodeUnknownJson = Schema.encodeUnknownSync(Schema.fromJsonString(Schema.Unknown));
 
 class WaitForConditionError extends Data.TaggedError("WaitForConditionError")<{
   readonly message: string;
@@ -200,7 +197,7 @@ function restartInput(overrides: Partial<TerminalRestartInput> = {}): TerminalRe
 
 const historyLogPath = (logsDir: string, threadId = "thread-1") =>
   Effect.service(Path.Path).pipe(
-    Effect.map(({ join }) => join(logsDir, `terminal_${Base64Url.encode(threadId)}.log`)),
+    Effect.map(({ join }) => join(logsDir, `terminal_${Encoding.encodeBase64Url(threadId)}.log`)),
   );
 
 const multiTerminalHistoryLogPath = (
@@ -210,12 +207,12 @@ const multiTerminalHistoryLogPath = (
 ) =>
   Effect.service(Path.Path).pipe(
     Effect.map(({ join }) => {
-      const threadPart = `terminal_${Base64Url.encode(threadId)}`;
+      const threadPart = `terminal_${Encoding.encodeBase64Url(threadId)}`;
       return join(
         logsDir,
         terminalId === DEFAULT_TERMINAL_ID
           ? `${threadPart}.log`
-          : `${threadPart}_${Base64Url.encode(terminalId)}.log`,
+          : `${threadPart}_${Encoding.encodeBase64Url(terminalId)}.log`,
       );
     }),
   );
@@ -240,8 +237,6 @@ interface CreateManagerOptions {
   resolveProviderInstanceEnvironment?: Parameters<
     typeof TerminalManager.makeWithOptions
   >[0]["resolveProviderInstanceEnvironment"];
-  managedBinaryCacheDir?: string;
-  managedBinaryToolsDir?: string;
 }
 
 interface ManagerFixture {
@@ -290,12 +285,6 @@ const createManager = (
         ...(options.resolveProviderInstanceEnvironment !== undefined
           ? { resolveProviderInstanceEnvironment: options.resolveProviderInstanceEnvironment }
           : {}),
-        ...(options.managedBinaryCacheDir === undefined
-          ? {}
-          : {
-              managedBinaryCacheDir: options.managedBinaryCacheDir,
-              managedBinaryToolsDir: options.managedBinaryToolsDir,
-            }),
       });
       const eventsRef = yield* Ref.make<ReadonlyArray<TerminalEvent>>([]);
       const unsubscribe = yield* manager.subscribe((event) =>
@@ -314,7 +303,7 @@ const createManager = (
     }),
   );
 
-const layerWithHostPlatform = (platform: NodeJS.Platform) =>
+const withHostPlatform = (platform: NodeJS.Platform) =>
   Layer.succeed(HostProcessPlatform, platform);
 
 // Apply the existing line policy, then find the longest code-point-aligned byte tail.
@@ -1153,7 +1142,7 @@ it.layer(
         subprocessPollIntervalMs: 20,
       }).pipe(
         Effect.provideService(ProcessRunner.ProcessRunner, processRunner),
-        Effect.provide(layerWithHostPlatform("linux")),
+        Effect.provide(withHostPlatform("linux")),
       );
 
       yield* manager.open(openInput());
@@ -1214,7 +1203,7 @@ it.layer(
         subprocessPollIntervalMs: 20,
       }).pipe(
         Effect.provideService(ProcessRunner.ProcessRunner, processRunner),
-        Effect.provide(layerWithHostPlatform("linux")),
+        Effect.provide(withHostPlatform("linux")),
       );
 
       yield* manager.open(openInput());
@@ -1259,7 +1248,7 @@ it.layer(
           snapshotCalls += 1;
           return [{ pid: 100, ppid: 9000, name: "ping.exe" }];
         }),
-      }).pipe(Effect.provide(layerWithHostPlatform("win32")));
+      }).pipe(Effect.provide(withHostPlatform("win32")));
 
       yield* manager.open(openInput());
       yield* waitFor(
@@ -1291,7 +1280,7 @@ it.layer(
           { pid: 301, ppid: 300, name: "sleep" },
           { pid: 9003, ppid: 1, name: "zsh" },
         ]),
-      }).pipe(Effect.provide(layerWithHostPlatform("linux")));
+      }).pipe(Effect.provide(withHostPlatform("linux")));
       yield* manager.open(openInput({ terminalId: "idle" }));
       yield* manager.open(openInput({ terminalId: "dev-server" }));
       yield* manager.open(openInput({ terminalId: "subshell" }));
@@ -1371,7 +1360,7 @@ it.layer(
         ),
       }).pipe(
         Effect.provideService(ProcessRunner.ProcessRunner, processRunner),
-        Effect.provide(layerWithHostPlatform("linux")),
+        Effect.provide(withHostPlatform("linux")),
       );
 
       yield* manager.open(openInput());
@@ -1461,9 +1450,8 @@ it.layer(
     }),
   );
 
-  it.effect.each(["current", "legacy"] as const)(
-    "reads only a Unicode-safe tail from oversized %s history",
-    (source) =>
+  for (const source of ["current", "legacy"] as const) {
+    it.effect(`reads only a Unicode-safe tail from oversized ${source} history`, () =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
@@ -1514,7 +1502,8 @@ it.layer(
         yield* manager.close({ threadId: "thread-1" });
         expect((yield* manager.open(openInput())).history).toBe("\uFEFFnewest\ré");
       }),
-  );
+    );
+  }
 
   it.effect("strips replay-unsafe terminal query and reply sequences from persisted history", () =>
     Effect.gen(function* () {
@@ -1869,7 +1858,7 @@ it.layer(
           PATH: "C:\\Windows\\System32",
           SystemRoot: "C:\\Windows",
         },
-      }).pipe(Effect.provide(layerWithHostPlatform("win32")));
+      }).pipe(Effect.provide(withHostPlatform("win32")));
 
       yield* manager.open(openInput());
 
@@ -1879,70 +1868,6 @@ it.layer(
           args: ["-NoLogo"],
         }),
       );
-    }),
-  );
-
-  it.effect("preserves Windows Path casing when appending managed ACP binaries", () =>
-    Effect.gen(function* () {
-      const fileSystem = yield* FileSystem.FileSystem;
-      const path = yield* Path.Path;
-      const cacheDir = yield* fileSystem.makeTempDirectoryScoped({
-        prefix: "t3-terminal-acp-path-",
-      });
-      const installBin = path.join(
-        cacheDir,
-        "tools",
-        "example-agent",
-        "1.2.3",
-        "windows-x86_64",
-        "bin",
-      );
-      yield* fileSystem.makeDirectory(installBin, { recursive: true });
-      yield* fileSystem.makeDirectory(path.join(cacheDir, "acp-registry"), { recursive: true });
-      yield* fileSystem.writeFileString(
-        path.join(cacheDir, "acp-registry", "registry.json"),
-        encodeUnknownJson({
-          version: "1.0.0",
-          agents: [
-            {
-              id: "example-agent",
-              name: "Example Agent",
-              version: "1.2.3",
-              description: "ACP Registry test agent",
-              distribution: {
-                binary: {
-                  "windows-x86_64": {
-                    archive: "https://registry.test/example-agent.zip",
-                    cmd: "bin/example-agent.exe",
-                  },
-                },
-              },
-            },
-          ],
-        }),
-      );
-      const { manager, ptyAdapter } = yield* createManager(5, {
-        managedBinaryCacheDir: cacheDir,
-        managedBinaryToolsDir: path.join(cacheDir, "tools"),
-        env: {
-          ComSpec: "C:\\Windows\\System32\\cmd.exe",
-          Path: "C:\\Windows\\System32",
-          SystemRoot: "C:\\Windows",
-        },
-      }).pipe(
-        Effect.provide(
-          Layer.merge(
-            layerWithHostPlatform("win32"),
-            Layer.succeed(HostProcessArchitecture, "x64"),
-          ),
-        ),
-      );
-
-      yield* manager.open(openInput());
-
-      const spawnEnv = ptyAdapter.spawnInputs[0]?.env;
-      expect(spawnEnv?.PATH).toBeUndefined();
-      expect(spawnEnv?.Path).toBe(`C:\\Windows\\System32;${installBin}`);
     }),
   );
 
@@ -1957,7 +1882,7 @@ it.layer(
           PATH: "C:\\Windows\\System32",
           SystemRoot: "C:\\Windows",
         },
-      }).pipe(Effect.provide(layerWithHostPlatform("win32")));
+      }).pipe(Effect.provide(withHostPlatform("win32")));
       ptyAdapter.spawnFailures.push(
         new Error("spawn custom-shell.exe ENOENT"),
         new Error("spawn pwsh.exe ENOENT"),
@@ -1983,15 +1908,14 @@ it.layer(
           [undefined, undefined, "truecolor"],
           ["", undefined, "truecolor"],
           ["24bit", undefined, "24bit"],
-          ["24bit", "", ""],
-          [undefined, "", ""],
+          ["24bit", "", "truecolor"],
           ["24bit", "custom", "custom"],
         ] as const) {
           const env = Object.freeze({ COLORTERM: parentColor });
           const { manager, ptyAdapter } = yield* createManager(5, {
             shellResolver: () => "/bin/sh",
             env,
-          }).pipe(Effect.provide(layerWithHostPlatform(platform)));
+          }).pipe(Effect.provide(withHostPlatform(platform)));
           yield* manager.open(
             openInput({ env: runtimeColor === undefined ? {} : { COLORTERM: runtimeColor } }),
           );
@@ -2200,8 +2124,6 @@ it.layer(
         ready: Effect.void,
         getSettings: Effect.fail(settingsError),
         updateSettings: () => Effect.fail(settingsError),
-        updateProviderInstance: () => Effect.fail(settingsError),
-        withSettingsSnapshot: () => Effect.fail(settingsError),
         streamChanges: Stream.empty,
         subscribeChanges: Effect.succeed(Stream.empty),
       });
@@ -2450,7 +2372,7 @@ it.layer(
       Effect.provide(
         ServerSettings.layer.pipe(
           Layer.provide(ServerSecretStore.layer),
-          Layer.provide(SqlitePersistence.layerMemory),
+          Layer.provide(SqlitePersistenceMemory),
           Layer.provide(
             ServerConfig.layerTest(process.cwd(), { prefix: "t3code-terminal-provider-restart-" }),
           ),

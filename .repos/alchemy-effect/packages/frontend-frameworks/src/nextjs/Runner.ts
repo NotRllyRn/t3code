@@ -1,12 +1,9 @@
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
-import * as FileSystem from "effect/FileSystem";
-import * as Path from "effect/Path";
-import * as Schema from "effect/Schema";
 import type { PlatformError } from "effect/PlatformError";
 import * as Stream from "effect/Stream";
-import * as ChildProcess from "effect/process/ChildProcess";
-import type * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
+import * as ChildProcess from "effect/unstable/process/ChildProcess";
+import type * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
 import { fileURLToPath } from "node:url";
 
 export class RunnerError extends Data.TaggedError<"RunnerError">(
@@ -21,12 +18,10 @@ export class RunnerError extends Data.TaggedError<"RunnerError">(
  * Mirrors the shape the runner script parses.
  */
 export interface RunnerConfig {
-  /** The Next.js application root. */
+  /** The Next.js app root (the directory containing `open-next.config.ts`). */
   readonly appDir: string;
-  /** Explicit config relative to `appDir`; otherwise discover `open-next.config.ts`. */
+  /** Path of the OpenNext config, relative to `appDir`. @default "open-next.config.ts" */
   readonly configPath?: string | undefined;
-  /** Resource-selected cache configuration when no native config file is present. */
-  readonly cache?: "static-assets" | "kv" | undefined;
   /** `compatibility_date` of the in-memory wrangler-config stand-in. */
   readonly compatibilityDate: string;
   /** Skip the internal `next build` (reuse an existing `.next`). @default false */
@@ -42,37 +37,6 @@ export interface RunnerConfig {
    */
   readonly buildCommand?: string | undefined;
 }
-
-const BuildPaths = Schema.Struct({
-  openNextDirectory: Schema.String,
-  appBuildOutputPath: Schema.String,
-});
-
-/** Discover the same default filename as the native Cloudflare OpenNext CLI. */
-export const resolveConfigPath = Effect.fn(function* (
-  config: Pick<RunnerConfig, "appDir" | "configPath">,
-) {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const candidate = path.resolve(
-    config.appDir,
-    config.configPath ?? "open-next.config.ts",
-  );
-  if (yield* fs.exists(candidate)) {
-    if ((yield* fs.stat(candidate)).type !== "File") {
-      return yield* new RunnerError({
-        message: `OpenNext config is not a file: ${candidate}`,
-      });
-    }
-    return candidate;
-  }
-  if (config.configPath !== undefined) {
-    return yield* new RunnerError({
-      message: `OpenNext config file not found: ${candidate}`,
-    });
-  }
-  return undefined;
-});
 
 /** Absolute path of the runner script in the package's `nextjs` directory. */
 export const runnerPath = (): string =>
@@ -92,40 +56,14 @@ export const runnerPath = (): string =>
  */
 export const runOpenNextBuild = (
   config: RunnerConfig,
-): Effect.Effect<
-  typeof BuildPaths.Type,
-  RunnerError,
-  ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem | Path.Path
-> =>
+): Effect.Effect<void, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.scoped(
     Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem;
-      const path = yield* Path.Path;
-      const configPath = yield* resolveConfigPath(config);
-      // The parent owns cleanup even if OpenNext calls process.exit in the child.
-      const directory = yield* fs.makeTempDirectoryScoped({
-        prefix: "alchemy-nextjs-config-",
-      });
-      const outputPath = path.join(directory, "build-paths.json");
       const child = yield* ChildProcess.make(
         "node",
-        [
-          runnerPath(),
-          JSON.stringify({
-            ...config,
-            configPath,
-            generatedConfigPath:
-              configPath === undefined
-                ? path.join(directory, "open-next.config.mjs")
-                : undefined,
-            outputPath,
-          }),
-        ],
+        [runnerPath(), JSON.stringify(config)],
         {
           cwd: config.appDir,
-          // Keep upstream compiler scratch files inside the parent's scope too.
-          env: { TMPDIR: directory, TMP: directory, TEMP: directory },
-          extendEnv: true,
           stdin: "ignore",
           stdout: "pipe",
           stderr: "pipe",
@@ -168,22 +106,5 @@ export const runOpenNextBuild = (
           message: `The OpenNext build pipeline exited with code ${exitCode}`,
         });
       }
-      return yield* fs
-        .readFileString(outputPath)
-        .pipe(
-          Effect.flatMap(
-            Schema.decodeUnknownEffect(Schema.fromJsonString(BuildPaths)),
-          ),
-        );
-    }).pipe(
-      Effect.mapError((cause) =>
-        cause instanceof RunnerError
-          ? cause
-          : new RunnerError({
-              message:
-                "Failed to prepare or read the OpenNext build configuration",
-              cause,
-            }),
-      ),
-    ),
+    }),
   );

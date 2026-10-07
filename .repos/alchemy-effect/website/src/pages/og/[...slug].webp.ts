@@ -92,23 +92,28 @@ function renderWithLookahead(entry: Entry) {
 const MARKETING_PAGES: Record<string, Omit<Entry, "slug" | "kind">> = {
   index: {
     title: jsx("span", {
+      style: { fontWeight: 600 },
       children: [
-        "Reach for the ",
         jsx("span", {
-          style: { fontStyle: "italic", color: "#a8c47a" },
-          children: "better primitives.",
+          style: { fontStyle: "italic", color: "#3f5a2a" },
+          children: "Zero",
         }),
+        jsx("span", {
+          style: {
+            fontFamily: "'JetBrains Mono'",
+            fontSize: 64,
+            fontWeight: 400,
+            fontFeatureSettings: "'calt' 1",
+            letterSpacing: 0,
+          },
+          children: " -> ",
+        }),
+        "production.",
       ],
     }),
     description:
-      "Snap together cloud resources and let Alchemy take care of the wiring so you can focus on your product.",
-    eyebrow: "infrastructure as effects",
-  },
-  compare: {
-    title: "Alchemy vs SST, Pulumi & Terraform",
-    description:
-      "One TypeScript program for your infrastructure and the code that runs on it, with no wrapped engines underneath.",
-    eyebrow: "compare",
+      "TypeScript IaC on Effect. Stand up your whole cloud in one program, type-check the IAM, hot-reload it locally, run tests against the real cloud, preview every PR.",
+    eyebrow: "typescript · effect · infrastructure as code",
   },
   privacy: {
     title: "Privacy & Telemetry",

@@ -82,10 +82,7 @@ test.provider.skipIf(!magicTransit)(
         .pipe(Effect.flip);
       expect(error._tag).toEqual("SynProtectionFilterNotFound");
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:ddosprotection", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // Ungated: list() enumerates every filter in the ambient account. On the
@@ -107,10 +104,7 @@ test.provider(
         expect(typeof f.accountId).toBe("string");
       }
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:ddosprotection", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // Gated full lifecycle: on an entitled account, a deployed filter must appear
@@ -141,8 +135,5 @@ test.provider.skipIf(!magicTransit)(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:ddosprotection", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

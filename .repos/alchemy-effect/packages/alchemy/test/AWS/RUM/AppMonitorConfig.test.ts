@@ -167,5 +167,5 @@ test.provider(
       );
       expect(gone._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:rum", "live"], timeout: 240_000 },
+  { timeout: 240_000 },
 );

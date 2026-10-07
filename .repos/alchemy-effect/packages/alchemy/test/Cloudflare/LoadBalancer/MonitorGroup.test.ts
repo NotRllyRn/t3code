@@ -94,23 +94,19 @@ test.provider.skipIf(monitorGroupsEnabled)(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  { tags: ["provider:cloudflare", "provider:cloudflare:loadbalancer", "live"] },
 );
 
 // Ungated probe: monitor group enumeration is account-scoped and works
 // regardless of the Enterprise entitlement — a non-entitled account simply
 // has no groups, so `list()` returns an array (typically empty here).
-test.provider(
-  "list returns an array of monitor groups",
-  () =>
-    Effect.gen(function* () {
-      const provider = yield* Provider.findProvider(
-        Cloudflare.LoadBalancer.MonitorGroup,
-      );
-      const all = yield* provider.list();
-      expect(Array.isArray(all)).toBe(true);
-    }).pipe(logLevel),
-  { tags: ["provider:cloudflare", "provider:cloudflare:loadbalancer", "live"] },
+test.provider("list returns an array of monitor groups", () =>
+  Effect.gen(function* () {
+    const provider = yield* Provider.findProvider(
+      Cloudflare.LoadBalancer.MonitorGroup,
+    );
+    const all = yield* provider.list();
+    expect(Array.isArray(all)).toBe(true);
+  }).pipe(logLevel),
 );
 
 test.provider.skipIf(!monitorGroupsEnabled)(
@@ -145,10 +141,7 @@ test.provider.skipIf(!monitorGroupsEnabled)(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:loadbalancer", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider.skipIf(!monitorGroupsEnabled)(
@@ -219,8 +212,5 @@ test.provider.skipIf(!monitorGroupsEnabled)(
 
       yield* expectGone(accountId, initial.group.monitorGroupId);
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:loadbalancer", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

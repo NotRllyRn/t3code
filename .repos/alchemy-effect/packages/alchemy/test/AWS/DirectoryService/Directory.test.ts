@@ -28,7 +28,6 @@ test.provider(
       );
       expect(error._tag).toBe("EntityDoesNotExistException");
     }),
-  { tags: ["provider:aws", "provider:aws:directoryservice", "live"] },
 );
 
 test.provider(
@@ -43,7 +42,6 @@ test.provider(
       );
       expect(error._tag).toBe("EntityDoesNotExistException");
     }),
-  { tags: ["provider:aws", "provider:aws:directoryservice", "live"] },
 );
 
 test.provider(
@@ -55,7 +53,6 @@ test.provider(
       );
       expect(error._tag).toBe("EntityDoesNotExistException");
     }),
-  { tags: ["provider:aws", "provider:aws:directoryservice", "live"] },
 );
 
 test.provider(
@@ -70,7 +67,6 @@ test.provider(
       );
       expect(error._tag).toBe("EntityDoesNotExistException");
     }),
-  { tags: ["provider:aws", "provider:aws:directoryservice", "live"] },
 );
 
 // Resolve the default VPC and two default-for-AZ subnets in DIFFERENT AZs —
@@ -221,16 +217,7 @@ test.provider.skipIf(!process.env.AWS_TEST_DIRECTORY)(
       yield* assertDirectoryDeleting(directory.directoryId);
     }),
   // directory create (~10 min) + tag-sync deploy + delete initiation.
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:directoryservice",
-      "provider:aws:ec2",
-      "provider:aws:sns",
-      "live",
-    ],
-    timeout: 2_400_000,
-  },
+  { timeout: 2_400_000 },
 );
 
 // Conditional forwarders require an AWS Managed Microsoft AD directory
@@ -292,13 +279,5 @@ test.provider.skipIf(!process.env.AWS_TEST_DIRECTORY_MSAD)(
       yield* assertDirectoryDeleting(directory.directoryId);
     }),
   // Microsoft AD create (20-40 min) + forwarder sync + delete initiation.
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:directoryservice",
-      "provider:aws:ec2",
-      "live",
-    ],
-    timeout: 3_600_000,
-  },
+  { timeout: 3_600_000 },
 );

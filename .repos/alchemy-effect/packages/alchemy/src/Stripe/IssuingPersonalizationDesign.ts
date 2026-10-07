@@ -244,7 +244,6 @@ export type IssuingPersonalizationDesign = Resource<
  * ```
  *
  * @resource
- * @product Issuing
  */
 export const IssuingPersonalizationDesign =
   Resource<IssuingPersonalizationDesign>("Stripe.IssuingPersonalizationDesign");

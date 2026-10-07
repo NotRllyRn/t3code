@@ -20,7 +20,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:networkfirewall", "live"] },
 );
 
 // Deletion transitions through a DELETING status before the policy
@@ -104,10 +103,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertPolicyGone(policy.firewallPolicyArn);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:networkfirewall", "live"],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );
 
 test.provider(
@@ -150,8 +146,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertPolicyGone(second.policy.firewallPolicyArn);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:networkfirewall", "live"],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

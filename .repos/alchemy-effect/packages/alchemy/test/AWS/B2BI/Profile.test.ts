@@ -21,7 +21,6 @@ test.provider(
         error._tag,
       );
     }),
-  { tags: ["provider:aws", "provider:aws:b2bi", "live"] },
 );
 
 const assertProfileGone = (profileId: string) =>
@@ -115,5 +114,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertProfileGone(replaced.profileId);
     }),
-  { tags: ["provider:aws", "provider:aws:b2bi", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );

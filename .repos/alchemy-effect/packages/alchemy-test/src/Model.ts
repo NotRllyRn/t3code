@@ -6,7 +6,6 @@
  * runner then walks the tree and executes every test as an Effect.
  */
 import type * as Effect from "effect/Effect";
-import { mergeTags, type Tags } from "./Tags.ts";
 
 /** Execution mode attached to a suite or test at registration time. */
 export type Mode = "run" | "skip" | "only" | "todo";
@@ -41,10 +40,6 @@ export interface Hook {
 }
 
 export interface TestCase {
-  /** Deduplicated labels, including tags inherited from suites. */
-  readonly tags: ReadonlyArray<string>;
-  /** Inherited tags requiring explicit selection. */
-  readonly optInTags: ReadonlyArray<string>;
   readonly type: "test";
   readonly name: string;
   readonly mode: Mode;
@@ -65,10 +60,6 @@ export interface TestCase {
 }
 
 export interface Suite {
-  /** Deduplicated labels, including tags inherited from parent suites. */
-  readonly tags: ReadonlyArray<string>;
-  /** Inherited tags requiring explicit selection. */
-  readonly optInTags: ReadonlyArray<string>;
   readonly type: "suite";
   readonly name: string;
   mode: Mode;
@@ -92,11 +83,7 @@ export const makeSuite = (
   name: string,
   parent: Suite | undefined,
   mode: Mode = "run",
-  tags?: Tags,
-  optInTags?: Tags,
 ): Suite => ({
-  tags: mergeTags(parent?.tags ?? [], tags),
-  optInTags: mergeTags(parent?.optInTags ?? [], optInTags),
   type: "suite",
   name,
   mode,

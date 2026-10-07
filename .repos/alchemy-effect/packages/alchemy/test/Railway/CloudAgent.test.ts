@@ -1,5 +1,4 @@
-import { Query } from "@distilled.cloud/core/query";
-import { Railway as RailwayApi } from "@distilled.cloud/railway";
+import * as railway from "@distilled.cloud/railway";
 import * as Provider from "@/Provider";
 import * as Railway from "@/Railway";
 import { suitePartition } from "./suiteProject.ts";
@@ -22,19 +21,19 @@ const logLevel = Effect.provideService(
 // and pins that tag. When the token is entitled the same test continues
 // through the resource create+list+delete lifecycle.
 
-// `cloudAgents` declares no not-found error; a missing environment
-// surfaces as an empty list.
-const listLive = Query.fn((environmentId: string) =>
-  RailwayApi.cloudAgents({ environmentId, mine: true }).pipe(
-    Query.map((agent) => ({
-      id: agent.id,
-      name: agent.name,
-      status: agent.status,
-      environmentId: agent.environmentId,
-      projectId: agent.projectId,
-    })),
-  ),
-);
+const listLive = (environmentId: string) =>
+  railway
+    .cloudAgents(
+      { environmentId, mine: true },
+      {
+        id: true,
+        name: true,
+        status: true,
+        environmentId: true,
+        projectId: true,
+      },
+    )
+    .pipe(railway.catchTags(["RailwayNotFound"], () => Effect.succeed([])));
 
 const waitUntilAgentGone = (environmentId: string, cloudAgentId: string) =>
   listLive(environmentId).pipe(
@@ -52,16 +51,10 @@ const waitUntilAgentGone = (environmentId: string, cloudAgentId: string) =>
     }),
   );
 
-const deleteAgent = Query.fn((id: string) =>
-  RailwayApi.cloudAgentDelete({ id }),
-);
-
-const createCloudAgent = Query.fn(
-  (input: { environmentId: string; name: string }) => {
-    const agent = RailwayApi.cloudAgentCreate({ input });
-    return { id: agent.id };
-  },
-);
+const deleteAgent = (id: string) =>
+  railway
+    .deleteCloudAgent({ id })
+    .pipe(railway.catchTags(["RailwayNotFound"], () => Effect.void));
 
 test.provider(
   "create, list, and delete a cloud agent",
@@ -77,16 +70,22 @@ test.provider(
       );
 
       const probe = yield* Effect.result(
-        createCloudAgent({
-          environmentId: projectOnly.environment.environmentId,
-          name: projectOnly.project.name,
-        }),
+        railway.createCloudAgent(
+          {
+            input: {
+              environmentId: projectOnly.environment.environmentId,
+              name: projectOnly.project.name,
+            },
+          },
+          { id: true },
+        ),
       );
       if (Result.isFailure(probe)) {
         expect(
-          ["RailwayForbidden", "RailwayPlanLimitExceeded"].includes(
-            probe.failure._tag,
-          ),
+          railway.isErrorTag(probe.failure, [
+            "RailwayForbidden",
+            "RailwayPlanLimitExceeded",
+          ]),
         ).toEqual(true);
         yield* stack.destroy();
         return;
@@ -157,14 +156,5 @@ test.provider(
       );
       expect(agentGone).toEqual("gone");
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:railway",
-      "provider:railway:cloudagent",
-      "provider:railway:project",
-      "provider:railway:projectenvironment",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

@@ -29,8 +29,5 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:github", "provider:github:comment", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

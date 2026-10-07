@@ -324,9 +324,7 @@ export const deleteObject = Effect.fn(function* ({
       requestJson({
         transport,
         method: "DELETE",
-        // batch/v1 Jobs orphan their pods on DELETE unless a propagation
-        // policy is set; Background matches kubectl's default.
-        path: `${path}?propagationPolicy=Background`,
+        path,
       }),
     ),
     Effect.catchIf(

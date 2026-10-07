@@ -6,10 +6,8 @@ import {
   HostProcessIsExecutable,
   HostProcessPlatform,
 } from "@t3tools/shared/hostProcess";
-import * as Crypto from "effect/Crypto";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
-import * as Hex from "effect/encoding/Hex";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
 import * as FileSystem from "effect/FileSystem";
@@ -21,17 +19,18 @@ import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 import * as Sink from "effect/Sink";
 import * as Stream from "effect/Stream";
-import { HttpClient, HttpClientResponse } from "effect/http";
-import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
+import { HttpClient, HttpClientResponse } from "effect/unstable/http";
+import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
+import * as NodeCrypto from "node:crypto";
 
-import * as AntigravityInstallation from "./AntigravityInstallation.ts";
-import { ANTIGRAVITY_AUTH_BROWSER_MARKER } from "./antigravityAuthSupport.ts";
 import {
-  resolveAntigravityReleaseAsset,
-  type AntigravityReleaseAsset,
-} from "./antigravityRelease.ts";
-
-import antigravityInitialize from "../../../../packages/effect-acp/test/fixtures/antigravity-initialize.json" with { type: "json" };
+  makeAntigravityInstallation,
+  type AntigravityExecutable,
+  type AntigravityInstallation,
+  type AntigravityInstallationOptions,
+} from "./AntigravityInstallation.ts";
+import { ANTIGRAVITY_AUTH_BROWSER_MARKER } from "./antigravityAuthSupport.ts";
+import type { AntigravityReleaseAsset } from "./antigravityRelease.ts";
 
 const serverContents = "antigravity runtime\n";
 const harnessContents = "local harness\n";
@@ -71,15 +70,14 @@ const executableName = hostPlatform === "win32" ? "agy_acp_server.exe" : "agy_ac
 const harnessName =
   hostPlatform === "win32" ? "localharness_external.exe" : "localharness_external";
 
-const releaseAsset = Effect.fn("test.antigravityReleaseAsset")(function* (
+function releaseAsset(
   archive: Uint8Array = completeArchive,
   platform: NodeJS.Platform = hostPlatform,
 ) {
-  const crypto = yield* Crypto.Crypto;
   return {
     version: "fixture-new",
     url: "https://dl.google.com/antigravity-test.zip",
-    sha256: Hex.encode(yield* crypto.digest("SHA-256", archive).pipe(Effect.orDie)),
+    sha256: NodeCrypto.createHash("sha256").update(archive).digest("hex"),
     archiveBytes: archive.byteLength,
     executable: {
       name: platform === "win32" ? "agy_acp_server.exe" : "agy_acp_server.par",
@@ -90,7 +88,7 @@ const releaseAsset = Effect.fn("test.antigravityReleaseAsset")(function* (
       bytes: Buffer.byteLength(harnessContents),
     },
   } satisfies AntigravityReleaseAsset;
-});
+}
 
 const writeRelease = Effect.fn("test.writeAntigravityRelease")(function* (
   managedDirectory: string,
@@ -135,7 +133,7 @@ interface HarnessOptions {
   readonly path?: string;
   readonly previous?: boolean;
   readonly fileSystem?: FileSystem.FileSystem;
-  readonly validate?: AntigravityInstallation.AntigravityInstallationOptions["validate"];
+  readonly validate?: AntigravityInstallationOptions["validate"];
   readonly useDefaultValidation?: boolean;
 }
 
@@ -148,22 +146,18 @@ const makeHarness = Effect.fn("test.makeAntigravityInstallation")(function* (
     options.baseDir ?? (yield* fs.makeTempDirectoryScoped({ prefix: "t3-agy-test-" }));
   const platform = options.platform ?? hostPlatform;
   const archive = options.archive ?? completeArchive;
-  const asset =
-    options.asset === undefined ? yield* releaseAsset(archive, platform) : options.asset;
+  const asset = options.asset === undefined ? releaseAsset(archive, platform) : options.asset;
   const managedDirectory = path.join(baseDir, "tools", "antigravity-acp", `${platform}-x64`);
   if (options.previous) {
     yield* writeRelease(managedDirectory, {
-      ...(yield* releaseAsset(archive, platform)),
+      ...releaseAsset(archive, platform),
       sha256: previousReleaseId,
       version: previousVersion,
     });
   }
   const stagingReleased = yield* Deferred.make<void>();
   const requests: string[] = [];
-  const validations: Array<{
-    executable: AntigravityInstallation.AntigravityExecutable;
-    version: string;
-  }> = [];
+  const validations: Array<{ executable: AntigravityExecutable; version: string }> = [];
   const installationFs = options.fileSystem ?? fs;
   const trackedFs = FileSystem.FileSystem.of({
     ...installationFs,
@@ -176,13 +170,13 @@ const makeHarness = Effect.fn("test.makeAntigravityInstallation")(function* (
           )
         : installationFs.makeTempDirectoryScoped(settings),
   });
-  const installation = yield* AntigravityInstallation.makeAntigravityInstallation({
+  const installation = yield* makeAntigravityInstallation({
     baseDir,
     releaseAsset: asset,
     ...(options.useDefaultValidation
       ? {}
       : {
-          validate: (executable: AntigravityInstallation.AntigravityExecutable, version: string) =>
+          validate: (executable: AntigravityExecutable, version: string) =>
             Effect.sync(() => validations.push({ executable, version })).pipe(
               Effect.andThen(options.validate?.(executable, version) ?? Effect.void),
             ),
@@ -226,7 +220,7 @@ const makeHarness = Effect.fn("test.makeAntigravityInstallation")(function* (
   return { installation, fs, path, baseDir, requests, validations, stagingReleased };
 });
 
-const terminalState = (installation: AntigravityInstallation.AntigravityInstallation["Service"]) =>
+const terminalState = (installation: AntigravityInstallation["Service"]) =>
   installation.changes.pipe(
     Stream.filter((state) => ["succeeded", "failed", "cancelled"].includes(state.phase)),
     Stream.runHead,
@@ -234,7 +228,7 @@ const terminalState = (installation: AntigravityInstallation.AntigravityInstalla
   );
 
 const expectPreviousRelease = Effect.fn("test.expectPreviousAntigravityRelease")(function* (
-  installation: AntigravityInstallation.AntigravityInstallation["Service"],
+  installation: AntigravityInstallation["Service"],
 ) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -304,33 +298,18 @@ it.layer(NodeServices.layer)("Antigravity installation", (it) => {
       expect(yield* fs.readFileString(selected.executablePath)).toBe(serverContents);
       expect(yield* fs.readFileString(selected.harnessPath)).toBe(harnessContents);
       expect(yield* fs.readDirectory(path.join(installation.managedDirectory, "versions"))).toEqual(
-        expect.arrayContaining([previousReleaseId, (yield* releaseAsset()).sha256]),
+        expect.arrayContaining([previousReleaseId, releaseAsset().sha256]),
       );
-      expect(requests).toEqual([(yield* releaseAsset()).url]);
+      expect(requests).toEqual([releaseAsset().url]);
     }),
   );
 
   it.effect.each([
     {
-      name: "the expected release with protocol 1",
-      protocolVersion: 1,
+      name: "the expected release",
       agentName: "antigravity-acp",
       version: "fixture-new",
       valid: true,
-    },
-    {
-      name: "the expected release with protocol 2 and legacy fields",
-      protocolVersion: 2,
-      agentName: "antigravity-acp",
-      version: "fixture-new",
-      valid: true,
-    },
-    {
-      name: "an unsupported protocol version",
-      protocolVersion: 3,
-      agentName: "antigravity-acp",
-      version: "fixture-new",
-      valid: false,
     },
     { name: "a different agent", agentName: "other-agent", version: "fixture-new", valid: false },
     {
@@ -403,9 +382,14 @@ it.layer(NodeServices.layer)("Antigravity installation", (it) => {
                       ...(request.method === "initialize"
                         ? {
                             result: {
-                              ...antigravityInitialize,
-                              protocolVersion: testCase.protocolVersion ?? 2,
+                              protocolVersion: 1,
                               agentInfo: { name: testCase.agentName, version: testCase.version },
+                              agentCapabilities: {
+                                loadSession: true,
+                                sessionCapabilities: { resume: {} },
+                                auth: { logout: {} },
+                              },
+                              authMethods: [{ id: "oauth-personal", name: "Google" }],
                             },
                           }
                         : {
@@ -472,12 +456,12 @@ it.layer(NodeServices.layer)("Antigravity installation", (it) => {
   );
 
   it.effect.each([
-    { name: "checksum mismatch", completeAsset: { sha256: "2".repeat(64) } },
-    { name: "short download", archive: completeArchive.subarray(0, -1), completeAsset: {} },
+    { name: "checksum mismatch", asset: { ...releaseAsset(), sha256: "2".repeat(64) } },
+    { name: "short download", archive: completeArchive.subarray(0, -1), asset: releaseAsset() },
     {
       name: "oversized download",
       archive: Buffer.concat([completeArchive, Buffer.from("extra")]),
-      completeAsset: {},
+      asset: releaseAsset(),
     },
     { name: "wrong Content-Length", contentLength: completeArchive.byteLength + 1 },
     { name: "missing harness", archive: Buffer.from(zipFixtures.missingHarness, "base64") },
@@ -485,14 +469,10 @@ it.layer(NodeServices.layer)("Antigravity installation", (it) => {
     { name: "path traversal", archive: Buffer.from(zipFixtures.traversal, "base64") },
     { name: "symbolic link", archive: Buffer.from(zipFixtures.symlink, "base64") },
     { name: "oversized member", archive: Buffer.from(zipFixtures.oversizedMember, "base64") },
-  ])("rejects $name before runtime validation", ({ completeAsset, ...options }) =>
+  ])("rejects $name before runtime validation", (options) =>
     Effect.gen(function* () {
-      // Pin the asset to the complete archive so the download itself is what disagrees.
-      const asset =
-        completeAsset === undefined ? undefined : { ...(yield* releaseAsset()), ...completeAsset };
       const { installation, validations, stagingReleased, fs, path } = yield* makeHarness({
         ...options,
-        ...(asset === undefined ? {} : { asset }),
         previous: true,
       });
       yield* installation.start;
@@ -740,9 +720,7 @@ it.layer(NodeServices.layer)("Antigravity installation", (it) => {
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
-        const baseDir = yield* fs
-          .makeTempDirectoryScoped({ prefix: "t3-agy-path-test-" })
-          .pipe(Effect.flatMap((directory) => fs.realPath(directory)));
+        const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-agy-path-test-" });
         const externalDirectory = path.join(baseDir, "external");
         const externalExecutable = path.join(externalDirectory, executableName);
         const externalHarness = path.join(externalDirectory, harnessName);
@@ -900,7 +878,7 @@ it.layer(NodeServices.layer)("Antigravity installation", (it) => {
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
         const archive = Buffer.from(zipFixtures.windows, "base64");
-        const asset = yield* releaseAsset(archive, "win32");
+        const asset = releaseAsset(archive, "win32");
         let denyPointerRename = true;
         const renameTargets: string[] = [];
         const { installation, requests, validations } = yield* makeHarness({
@@ -955,28 +933,4 @@ it.layer(NodeServices.layer)("Antigravity installation", (it) => {
       expect(requests).toEqual([]);
     }),
   );
-
-  it("resolves all supported platform release assets including Intel Mac", () => {
-    const supportedPlatforms: Array<{ readonly platform: NodeJS.Platform; readonly arch: string }> =
-      [
-        { platform: "darwin", arch: "arm64" },
-        { platform: "darwin", arch: "x64" },
-        { platform: "linux", arch: "x64" },
-        { platform: "linux", arch: "arm64" },
-        { platform: "win32", arch: "x64" },
-        { platform: "win32", arch: "arm64" },
-      ];
-
-    for (const { platform, arch } of supportedPlatforms) {
-      const asset = resolveAntigravityReleaseAsset(platform, arch);
-      expect(asset).not.toBeNull();
-      expect(asset?.version).toBe("1.3.0");
-      expect(asset?.url).toContain("1.3.0");
-      expect(asset?.archiveBytes).toBeGreaterThan(0);
-      expect(asset?.executable.bytes).toBeGreaterThan(0);
-      expect(asset?.harness.bytes).toBeGreaterThan(0);
-    }
-
-    expect(resolveAntigravityReleaseAsset("freebsd", "x64")).toBeNull();
-  });
 });

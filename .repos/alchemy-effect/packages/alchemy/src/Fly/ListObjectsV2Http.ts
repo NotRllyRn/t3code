@@ -8,7 +8,6 @@ import { ListObjectsV2 } from "./ListObjectsV2.ts";
  * `listObjectsV2` against the Tigris endpoint with the bucket's credentials.
  *
  * @layer
- * @product Bucket
  * @provides Fly.ListObjectsV2
  */
 export const ListObjectsV2Http = Layer.effect(

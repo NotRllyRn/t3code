@@ -6,7 +6,7 @@ import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import { MinimumLogLevel } from "effect/References";
 import * as Schedule from "effect/Schedule";
-import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClient from "effect/unstable/http/HttpClient";
 import InitIOWorker from "./fixtures/init-io/worker.ts";
 
 const { test, beforeAll, afterAll, deploy, destroy } = Test.make({
@@ -90,8 +90,5 @@ test(
       expect(body.initFetches).toBe(1);
     }
   }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:worker", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

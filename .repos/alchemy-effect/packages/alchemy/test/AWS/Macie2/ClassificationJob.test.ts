@@ -95,8 +95,5 @@ test.provider.skipIf(!process.env.AWS_TEST_SLOW)(
       const session = yield* getSession;
       expect(session).toBeUndefined();
     }),
-  {
-    tags: ["provider:aws", "provider:aws:macie2", "provider:aws:s3", "live"],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

@@ -1,4 +1,4 @@
-import * as HttpRouter from "effect/http/HttpRouter";
+import * as HttpRouter from "effect/unstable/http/HttpRouter";
 /**
  * Shared test-stack fixture for the git-service suites (DESIGN.md §9).
  *

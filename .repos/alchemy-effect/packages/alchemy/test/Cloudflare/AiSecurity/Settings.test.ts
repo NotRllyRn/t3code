@@ -93,7 +93,6 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  { tags: ["provider:cloudflare", "provider:cloudflare:zone", "live"] },
 );
 
 // Canonical `list()` test (zone-scoped singleton): there is no account-wide
@@ -125,7 +124,6 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  { tags: ["provider:cloudflare", "provider:cloudflare:ai", "live"] },
 );
 
 test.provider.skipIf(!entitledZoneId)(
@@ -177,8 +175,5 @@ test.provider.skipIf(!entitledZoneId)(
       const restored = yield* getSettings(zoneId);
       expect(restored.enabled ?? false).toEqual(false);
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:ai", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

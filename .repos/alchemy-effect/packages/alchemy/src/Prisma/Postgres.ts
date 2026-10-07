@@ -20,7 +20,6 @@ import { Database } from "./Database.ts";
  * ```
  *
  * @resource
- * @product Postgres
  */
 export const Postgres = Database;
 export type { DatabaseProps as PostgresProps } from "./Database.ts";

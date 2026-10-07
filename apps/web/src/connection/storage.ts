@@ -1,19 +1,18 @@
 import {
   ConnectionCatalogDocument,
   type ConnectionCatalogDocument as ConnectionCatalogDocumentType,
+  ConnectionPersistenceError,
+  ConnectionRegistrationStore,
+  ConnectionTargetStore,
   EMPTY_CONNECTION_CATALOG_DOCUMENT,
-  ORCHESTRATION_CACHE_SCHEMA_VERSION,
-  StoredOrchestrationShellSnapshot,
-  StoredOrchestrationThreadSnapshot,
-  decodeOrDiscardOrchestrationCache,
+  EnvironmentCacheStore,
+  encodeShellSnapshotForCache,
   putRemoteDpopTokenInCatalog,
   registerConnectionInCatalog,
   removeCatalogValue,
   removeConnectionFromCatalog,
   setConnectionEnabledInCatalog,
-  setRoutesInCatalog,
   replaceCatalogValue,
-  Persistence,
 } from "@t3tools/client-runtime/platform";
 import { TokenStore } from "@t3tools/client-runtime/authorization";
 import {
@@ -26,7 +25,14 @@ import {
   gitHubRoutingConnectionKey,
   gitHubRoutingPermissionFor,
 } from "@t3tools/client-runtime/connection";
-import { EnvironmentId, ServerConfig, ThreadId, VcsListRefsResult } from "@t3tools/contracts";
+import {
+  EnvironmentId,
+  OrchestrationShellSnapshot,
+  OrchestrationThreadDetailSnapshot,
+  ServerConfig,
+  ThreadId,
+  VcsListRefsResult,
+} from "@t3tools/contracts";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -46,9 +52,28 @@ const THREAD_STORE_NAME = "thread";
 const SERVER_CONFIG_STORE_NAME = "server-config";
 const VCS_REFS_STORE_NAME = "vcs-refs";
 const CATALOG_KEY = "document";
-const StoredShellSnapshot = StoredOrchestrationShellSnapshot;
+const SHELL_SNAPSHOT_CACHE_SCHEMA_VERSION = 1;
+
+const StoredShellSnapshot = Schema.Struct({
+  schemaVersion: Schema.Literal(SHELL_SNAPSHOT_CACHE_SCHEMA_VERSION),
+  environmentId: EnvironmentId,
+  snapshot: OrchestrationShellSnapshot,
+});
 const StoredShellSnapshotJson = Schema.fromJsonString(StoredShellSnapshot);
-const StoredThreadSnapshot = StoredOrchestrationThreadSnapshot;
+// v2 stores the snapshot sequence alongside the thread so a warm cache can
+// resume via `afterSequence` instead of re-downloading the full thread body.
+// v3 adds windowed (paginated) snapshots carrying `page` metadata. The bump
+// exists for rollback safety: a pre-pagination client would decode a windowed
+// v2 record, silently drop the unknown `page` field, and treat the partial
+// thread as complete forever. Older entries fail to decode → cold cache.
+// v4 reloads pre-thinking caches: their fallback system roles cannot recover
+// settled reasoning messages by resuming afterSequence.
+const StoredThreadSnapshot = Schema.Struct({
+  schemaVersion: Schema.Literal(4),
+  environmentId: EnvironmentId,
+  threadId: ThreadId,
+  snapshot: OrchestrationThreadDetailSnapshot,
+});
 const StoredThreadSnapshotJson = Schema.fromJsonString(StoredThreadSnapshot);
 const StoredServerConfig = Schema.Struct({
   schemaVersion: Schema.Literal(1),
@@ -67,7 +92,6 @@ const ConnectionCatalogDocumentJson = Schema.fromJsonString(ConnectionCatalogDoc
 const decodeConnectionCatalogDocument = Schema.decodeUnknownEffect(ConnectionCatalogDocumentJson);
 const encodeConnectionCatalogDocument = Schema.encodeEffect(ConnectionCatalogDocumentJson);
 const decodeStoredShellSnapshot = Schema.decodeUnknownEffect(StoredShellSnapshotJson);
-const encodeStoredShellSnapshot = Schema.encodeEffect(StoredShellSnapshotJson);
 const decodeStoredThreadSnapshot = Schema.decodeUnknownEffect(StoredThreadSnapshotJson);
 const encodeStoredThreadSnapshot = Schema.encodeEffect(StoredThreadSnapshotJson);
 const decodeStoredServerConfig = Schema.decodeUnknownEffect(StoredServerConfigJson);
@@ -87,7 +111,6 @@ function persistenceError(
     | "list-targets"
     | "list-disabled-targets"
     | "register-connection"
-    | "set-connection-routes"
     | "remove-connection"
     | "set-connection-enabled"
     | "load-shell"
@@ -104,7 +127,7 @@ function persistenceError(
     | "clear-environment",
   cause: unknown,
 ) {
-  return new Persistence.ConnectionPersistenceError({
+  return new ConnectionPersistenceError({
     operation,
     message: `Could not ${operation.replaceAll("-", " ")}: ${String(cause)}`,
   });
@@ -118,251 +141,108 @@ const openDatabase = Effect.fn("web.connectionStorage.openDatabase")(function* (
       );
       return;
     }
-    try {
-      const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
-      request.addEventListener("upgradeneeded", () => {
-        if (!request.result.objectStoreNames.contains(CATALOG_STORE_NAME)) {
-          request.result.createObjectStore(CATALOG_STORE_NAME);
-        }
-        if (!request.result.objectStoreNames.contains(SHELL_STORE_NAME)) {
-          request.result.createObjectStore(SHELL_STORE_NAME);
-        }
-        if (!request.result.objectStoreNames.contains(THREAD_STORE_NAME)) {
-          request.result.createObjectStore(THREAD_STORE_NAME);
-        }
-        if (!request.result.objectStoreNames.contains(SERVER_CONFIG_STORE_NAME)) {
-          request.result.createObjectStore(SERVER_CONFIG_STORE_NAME);
-        }
-        if (!request.result.objectStoreNames.contains(VCS_REFS_STORE_NAME)) {
-          request.result.createObjectStore(VCS_REFS_STORE_NAME);
-        }
-      });
-      request.addEventListener("error", () => {
-        resume(Effect.fail(catalogError("open", request.error ?? "Unknown IndexedDB error")));
-      });
-      request.addEventListener("success", () => {
-        resume(Effect.succeed(request.result));
-      });
-    } catch (cause) {
-      resume(Effect.fail(catalogError("open", cause)));
-    }
+    const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
+    request.addEventListener("upgradeneeded", () => {
+      if (!request.result.objectStoreNames.contains(CATALOG_STORE_NAME)) {
+        request.result.createObjectStore(CATALOG_STORE_NAME);
+      }
+      if (!request.result.objectStoreNames.contains(SHELL_STORE_NAME)) {
+        request.result.createObjectStore(SHELL_STORE_NAME);
+      }
+      if (!request.result.objectStoreNames.contains(THREAD_STORE_NAME)) {
+        request.result.createObjectStore(THREAD_STORE_NAME);
+      }
+      if (!request.result.objectStoreNames.contains(SERVER_CONFIG_STORE_NAME)) {
+        request.result.createObjectStore(SERVER_CONFIG_STORE_NAME);
+      }
+      if (!request.result.objectStoreNames.contains(VCS_REFS_STORE_NAME)) {
+        request.result.createObjectStore(VCS_REFS_STORE_NAME);
+      }
+    });
+    request.addEventListener("error", () => {
+      resume(Effect.fail(catalogError("open", request.error ?? "Unknown IndexedDB error")));
+    });
+    request.addEventListener("success", () => {
+      resume(Effect.succeed(request.result));
+    });
   });
 });
 
-interface DatabaseHandle {
-  readonly get: Effect.Effect<IDBDatabase, ConnectionTransientError>;
-  /** Forget `database` if it is still the shared connection, so the next access reopens. */
-  readonly invalidate: (database: IDBDatabase) => Effect.Effect<void>;
-}
-
-/** Share a connection until the browser closes it; the next access reopens it. */
-const makeDatabaseHandle = Effect.fn("web.connectionStorage.makeDatabaseHandle")(function* () {
-  const lock = yield* Semaphore.make(1);
-  let current: IDBDatabase | null = null;
-  const forget = (database: IDBDatabase) => {
-    if (current === database) current = null;
-  };
-  const get = Effect.suspend(() =>
-    current !== null
-      ? Effect.succeed(current)
-      : lock.withPermits(1)(
-          Effect.gen(function* () {
-            if (current !== null) return current;
-            const opened = yield* openDatabase();
-            current = opened;
-            opened.addEventListener("close", () => forget(opened));
-            // Another tab upgrading the schema waits on this connection.
-            opened.addEventListener("versionchange", () => {
-              forget(opened);
-              opened.close();
-            });
-            return opened;
-          }),
-        ),
-  );
-  const close = lock.withPermits(1)(
-    Effect.sync(() => {
-      current?.close();
-      current = null;
-    }),
-  );
-  const handle: DatabaseHandle = {
-    get,
-    invalidate: (database) => Effect.sync(() => forget(database)),
-  };
-  return { handle, close };
-});
-
-/**
- * Runs `use` on the shared connection. A connection the browser already closed
- * throws InvalidStateError even when no close event reached this tab, so drop
- * it and retry once on a fresh one instead of failing every later operation.
- */
-function withDatabase<A>(
-  database: DatabaseHandle,
-  use: (opened: IDBDatabase) => Effect.Effect<A, ConnectionTransientError>,
-) {
-  // Only a connection that opened and then failed is stale; a failing open is
-  // storage being unavailable, which a retry would not fix.
-  const closedConnection = Symbol("closedConnection");
-  const attempt = Effect.flatMap(database.get, (opened) =>
-    use(opened).pipe(
-      Effect.catchIf(
-        (error) => error.detail.includes("InvalidStateError"),
-        (error) =>
-          database
-            .invalidate(opened)
-            .pipe(Effect.andThen(Effect.fail({ [closedConnection]: error } as const))),
-      ),
-    ),
-  );
-  return attempt.pipe(
-    Effect.catchIf(
-      (error): error is { readonly [closedConnection]: ConnectionTransientError } =>
-        closedConnection in error,
-      () => Effect.flatMap(database.get, use),
-    ),
-  );
-}
-
-function readDatabaseValueOnConnection(database: IDBDatabase, storeName: string, key: IDBValidKey) {
+function readDatabaseValue(database: IDBDatabase, storeName: string, key: IDBValidKey) {
   return Effect.callback<unknown, ConnectionTransientError>((resume) => {
-    try {
-      const request = database.transaction(storeName, "readonly").objectStore(storeName).get(key);
-      request.addEventListener("error", () => {
-        resume(Effect.fail(catalogError("read", request.error ?? "Unknown IndexedDB read error")));
-      });
-      request.addEventListener("success", () => {
-        resume(Effect.succeed(request.result));
-      });
-    } catch (cause) {
-      resume(Effect.fail(catalogError("read", cause)));
-    }
+    const request = database.transaction(storeName, "readonly").objectStore(storeName).get(key);
+    request.addEventListener("error", () => {
+      resume(Effect.fail(catalogError("read", request.error ?? "Unknown IndexedDB read error")));
+    });
+    request.addEventListener("success", () => {
+      resume(Effect.succeed(request.result));
+    });
   }).pipe(Effect.withSpan("web.connectionStorage.readDatabaseValue"));
 }
 
-function writeDatabaseValueOnConnection(
+function writeDatabaseValue(
   database: IDBDatabase,
   storeName: string,
   key: IDBValidKey,
   value: unknown,
 ) {
   return Effect.callback<void, ConnectionTransientError>((resume) => {
-    try {
-      const transaction = database.transaction(storeName, "readwrite");
-      // Every failed write fires "abort". A failed commit, such as
-      // QuotaExceededError, fires only "abort" and no "error".
-      transaction.addEventListener("abort", () => {
-        resume(
-          Effect.fail(catalogError("write", transaction.error ?? "Unknown IndexedDB write error")),
-        );
-      });
-      transaction.addEventListener("complete", () => {
-        resume(Effect.void);
-      });
-      transaction.objectStore(storeName).put(value, key);
-    } catch (cause) {
-      resume(Effect.fail(catalogError("write", cause)));
-    }
+    const transaction = database.transaction(storeName, "readwrite");
+    // Every failed write fires "abort". A failed commit, such as
+    // QuotaExceededError, fires only "abort" and no "error".
+    transaction.addEventListener("abort", () => {
+      resume(
+        Effect.fail(catalogError("write", transaction.error ?? "Unknown IndexedDB write error")),
+      );
+    });
+    transaction.addEventListener("complete", () => {
+      resume(Effect.void);
+    });
+    transaction.objectStore(storeName).put(value, key);
   }).pipe(Effect.withSpan("web.connectionStorage.writeDatabaseValue"));
 }
 
-function removeDatabaseValueOnConnection(
-  database: IDBDatabase,
-  storeName: string,
-  key: IDBValidKey,
-) {
+function removeDatabaseValue(database: IDBDatabase, storeName: string, key: IDBValidKey) {
   return Effect.callback<void, ConnectionTransientError>((resume) => {
-    try {
-      const transaction = database.transaction(storeName, "readwrite");
-      transaction.addEventListener("abort", () => {
-        resume(
-          Effect.fail(
-            catalogError("remove", transaction.error ?? "Unknown IndexedDB remove error"),
-          ),
-        );
-      });
-      transaction.addEventListener("complete", () => {
-        resume(Effect.void);
-      });
-      transaction.objectStore(storeName).delete(key);
-    } catch (cause) {
-      resume(Effect.fail(catalogError("remove", cause)));
-    }
+    const transaction = database.transaction(storeName, "readwrite");
+    transaction.addEventListener("error", () => {
+      resume(
+        Effect.fail(catalogError("remove", transaction.error ?? "Unknown IndexedDB remove error")),
+      );
+    });
+    transaction.addEventListener("complete", () => {
+      resume(Effect.void);
+    });
+    transaction.objectStore(storeName).delete(key);
   }).pipe(Effect.withSpan("web.connectionStorage.removeDatabaseValue"));
 }
 
-function removeDatabaseValuesInRangeOnConnection(
-  database: IDBDatabase,
-  storeName: string,
-  range: IDBKeyRange,
-) {
+function removeDatabaseValuesInRange(database: IDBDatabase, storeName: string, range: IDBKeyRange) {
   return Effect.callback<void, ConnectionTransientError>((resume) => {
-    try {
-      const transaction = database.transaction(storeName, "readwrite");
-      transaction.addEventListener("abort", () => {
-        resume(
-          Effect.fail(
-            catalogError("remove", transaction.error ?? "Unknown IndexedDB cursor error"),
-          ),
-        );
-      });
-      transaction.addEventListener("complete", () => {
-        resume(Effect.void);
-      });
-      const request = transaction.objectStore(storeName).openCursor(range);
-      request.addEventListener("error", () => {
-        resume(
-          Effect.fail(catalogError("remove", request.error ?? "Unknown IndexedDB cursor error")),
-        );
-      });
-      request.addEventListener("success", () => {
-        const cursor = request.result;
-        if (cursor === null) {
-          return;
-        }
-        try {
-          cursor.delete();
-          cursor.continue();
-        } catch (cause) {
-          resume(Effect.fail(catalogError("remove", cause)));
-        }
-      });
-    } catch (cause) {
-      resume(Effect.fail(catalogError("remove", cause)));
-    }
+    const transaction = database.transaction(storeName, "readwrite");
+    transaction.addEventListener("error", () => {
+      resume(
+        Effect.fail(catalogError("remove", transaction.error ?? "Unknown IndexedDB cursor error")),
+      );
+    });
+    transaction.addEventListener("complete", () => {
+      resume(Effect.void);
+    });
+    const request = transaction.objectStore(storeName).openCursor(range);
+    request.addEventListener("error", () => {
+      resume(
+        Effect.fail(catalogError("remove", request.error ?? "Unknown IndexedDB cursor error")),
+      );
+    });
+    request.addEventListener("success", () => {
+      const cursor = request.result;
+      if (cursor === null) {
+        return;
+      }
+      cursor.delete();
+      cursor.continue();
+    });
   }).pipe(Effect.withSpan("web.connectionStorage.removeDatabaseValuesInRange"));
-}
-
-function readDatabaseValue(database: DatabaseHandle, storeName: string, key: IDBValidKey) {
-  return withDatabase(database, (opened) => readDatabaseValueOnConnection(opened, storeName, key));
-}
-
-function writeDatabaseValue(
-  database: DatabaseHandle,
-  storeName: string,
-  key: IDBValidKey,
-  value: unknown,
-) {
-  return withDatabase(database, (opened) =>
-    writeDatabaseValueOnConnection(opened, storeName, key, value),
-  );
-}
-
-function removeDatabaseValue(database: DatabaseHandle, storeName: string, key: IDBValidKey) {
-  return withDatabase(database, (opened) =>
-    removeDatabaseValueOnConnection(opened, storeName, key),
-  );
-}
-
-function removeDatabaseValuesInRange(
-  database: DatabaseHandle,
-  storeName: string,
-  range: IDBKeyRange,
-) {
-  return withDatabase(database, (opened) =>
-    removeDatabaseValuesInRangeOnConnection(opened, storeName, range),
-  );
 }
 
 function threadCacheKey(environmentId: EnvironmentId, threadId: ThreadId) {
@@ -393,7 +273,7 @@ export interface CatalogBackend {
   readonly quarantine?: (raw: string) => Effect.Effect<void, ConnectionTransientError>;
 }
 
-export function makeCatalogBackend(database: DatabaseHandle): CatalogBackend {
+export function makeCatalogBackend(database: IDBDatabase): CatalogBackend {
   const bridge = window.desktopBridge;
   if (bridge?.getConnectionCatalog !== undefined && bridge.setConnectionCatalog !== undefined) {
     return {
@@ -600,16 +480,15 @@ export function makeBrowserGitHubRoutingPermissions(
   });
 }
 
-export const layer = Layer.effectContext(
+export const connectionStorageLayer = Layer.effectContext(
   Effect.gen(function* () {
-    const { handle: database } = yield* Effect.acquireRelease(
-      makeDatabaseHandle(),
-      (owned) => owned.close,
+    const database = yield* Effect.acquireRelease(openDatabase(), (database) =>
+      Effect.sync(() => database.close()),
     );
     const catalog = yield* makeCatalogStore(makeCatalogBackend(database));
     const githubRoutingPermissions = makeBrowserGitHubRoutingPermissions();
 
-    const targetStore = Persistence.ConnectionTargetStore.of({
+    const targetStore = ConnectionTargetStore.of({
       list: catalog.read.pipe(
         Effect.map((document) => document.targets),
         Effect.mapError((cause) => persistenceError("list-targets", cause)),
@@ -619,18 +498,14 @@ export const layer = Layer.effectContext(
         Effect.mapError((cause) => persistenceError("list-disabled-targets", cause)),
       ),
     });
-    const registrationStore = Persistence.ConnectionRegistrationStore.of({
-      register: (registration, routes) =>
+    const registrationStore = ConnectionRegistrationStore.of({
+      register: (registration) =>
         catalog
-          .update((document) => registerConnectionInCatalog(document, registration, routes))
+          .update((document) => registerConnectionInCatalog(document, registration))
           .pipe(Effect.mapError((cause) => persistenceError("register-connection", cause))),
-      setRoutes: (environmentId, routes) =>
+      remove: (target) =>
         catalog
-          .update((document) => setRoutesInCatalog(document, environmentId, routes))
-          .pipe(Effect.mapError((cause) => persistenceError("set-connection-routes", cause))),
-      remove: (environmentId) =>
-        catalog
-          .update((document) => removeConnectionFromCatalog(document, environmentId))
+          .update((document) => removeConnectionFromCatalog(document, target))
           .pipe(Effect.mapError((cause) => persistenceError("remove-connection", cause))),
       setEnabled: (environmentId, enabled) =>
         catalog
@@ -708,7 +583,7 @@ export const layer = Layer.effectContext(
           ),
         })),
     });
-    const cacheStore = Persistence.EnvironmentCacheStore.of({
+    const cacheStore = EnvironmentCacheStore.of({
       loadShell: (environmentId) =>
         readDatabaseValue(database, SHELL_STORE_NAME, environmentId).pipe(
           Effect.tap(() => Effect.promise(() => projectFaviconCache.hydrate())),
@@ -716,27 +591,34 @@ export const layer = Layer.effectContext(
             if (typeof raw !== "string") {
               return Effect.succeedNone;
             }
-            return decodeOrDiscardOrchestrationCache(
-              decodeStoredShellSnapshot(raw).pipe(
-                Effect.mapError((cause) => persistenceError("load-shell", cause)),
-                Effect.map((stored) =>
-                  stored.environmentId === environmentId
-                    ? Option.some(stored.snapshot)
-                    : Option.none(),
-                ),
+            return decodeStoredShellSnapshot(raw).pipe(
+              Effect.mapError((cause) => persistenceError("load-shell", cause)),
+              Effect.map((stored) =>
+                stored.environmentId === environmentId
+                  ? Option.some(stored.snapshot)
+                  : Option.none(),
               ),
-              removeDatabaseValue(database, SHELL_STORE_NAME, environmentId),
             );
           }),
-          Effect.mapError((cause) => persistenceError("load-shell", cause)),
+          Effect.mapError((cause) =>
+            cause._tag === "ConnectionPersistenceError"
+              ? cause
+              : persistenceError("load-shell", cause),
+          ),
         ),
       saveShell: (environmentId, snapshot) =>
         Effect.gen(function* () {
-          const encoded = yield* encodeStoredShellSnapshot({
-            schemaVersion: ORCHESTRATION_CACHE_SCHEMA_VERSION,
-            environmentId,
-            snapshot,
-          }).pipe(Effect.mapError((cause) => persistenceError("save-shell", cause)));
+          const encodedSnapshot = yield* encodeShellSnapshotForCache(snapshot);
+          const encoded = yield* Effect.try({
+            try: () =>
+              // @effect-diagnostics-next-line preferSchemaOverJson:off - the snapshot is already encoded.
+              JSON.stringify({
+                schemaVersion: SHELL_SNAPSHOT_CACHE_SCHEMA_VERSION,
+                environmentId,
+                snapshot: encodedSnapshot,
+              } satisfies typeof StoredShellSnapshot.Encoded),
+            catch: (cause) => persistenceError("save-shell", cause),
+          });
           yield* writeDatabaseValue(database, SHELL_STORE_NAME, environmentId, encoded);
         }).pipe(
           Effect.mapError((cause) =>
@@ -789,36 +671,33 @@ export const layer = Layer.effectContext(
             if (typeof raw !== "string") {
               return Effect.succeedNone;
             }
-            return decodeOrDiscardOrchestrationCache(
-              decodeStoredThreadSnapshot(raw).pipe(
-                Effect.mapError((cause) => persistenceError("load-thread", cause)),
-                Effect.map((stored) =>
-                  stored.environmentId === environmentId && stored.threadId === threadId
-                    ? Option.some(stored.snapshot)
-                    : Option.none(),
-                ),
-              ),
-              removeDatabaseValue(
-                database,
-                THREAD_STORE_NAME,
-                threadCacheKey(environmentId, threadId),
+            return decodeStoredThreadSnapshot(raw).pipe(
+              Effect.mapError((cause) => persistenceError("load-thread", cause)),
+              Effect.map((stored) =>
+                stored.environmentId === environmentId && stored.threadId === threadId
+                  ? Option.some(stored.snapshot)
+                  : Option.none(),
               ),
             );
           }),
-          Effect.mapError((cause) => persistenceError("load-thread", cause)),
+          Effect.mapError((cause) =>
+            cause._tag === "ConnectionPersistenceError"
+              ? cause
+              : persistenceError("load-thread", cause),
+          ),
         ),
       saveThread: (environmentId, snapshot) =>
         Effect.gen(function* () {
           const encoded = yield* encodeStoredThreadSnapshot({
-            schemaVersion: ORCHESTRATION_CACHE_SCHEMA_VERSION,
+            schemaVersion: 4,
             environmentId,
-            threadId: snapshot.projection.thread.id,
+            threadId: snapshot.thread.id,
             snapshot,
           }).pipe(Effect.mapError((cause) => persistenceError("save-thread", cause)));
           yield* writeDatabaseValue(
             database,
             THREAD_STORE_NAME,
-            threadCacheKey(environmentId, snapshot.projection.thread.id),
+            threadCacheKey(environmentId, snapshot.thread.id),
             encoded,
           );
         }).pipe(
@@ -909,13 +788,13 @@ export const layer = Layer.effectContext(
         ).pipe(Effect.mapError((cause) => persistenceError("clear-environment", cause))),
     });
 
-    return Context.make(Persistence.ConnectionTargetStore, targetStore).pipe(
+    return Context.make(ConnectionTargetStore, targetStore).pipe(
       Context.add(GitHubRoutingPermissions, githubRoutingPermissions),
-      Context.add(Persistence.ConnectionRegistrationStore, registrationStore),
+      Context.add(ConnectionRegistrationStore, registrationStore),
       Context.add(ProfileStore.ConnectionProfileStore, profileStore),
       Context.add(CredentialStore.ConnectionCredentialStore, credentialStore),
       Context.add(TokenStore.RemoteDpopAccessTokenStore, remoteTokenStore),
-      Context.add(Persistence.EnvironmentCacheStore, cacheStore),
+      Context.add(EnvironmentCacheStore, cacheStore),
     );
   }),
 );

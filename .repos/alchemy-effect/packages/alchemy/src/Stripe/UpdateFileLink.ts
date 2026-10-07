@@ -25,7 +25,6 @@ export interface UpdateFileLinkRequest extends Omit<
  * ```
  *
  * @binding
- * @product Files
  */
 export interface UpdateFileLink extends Binding.Service<
   UpdateFileLink,

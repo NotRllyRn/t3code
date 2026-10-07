@@ -36,7 +36,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:iotmanagedintegrations", "live"] },
 );
 
 class LockerStillExists extends Data.TaggedError("LockerStillExists")<{
@@ -118,8 +117,5 @@ test.provider.skipIf(!process.env.AWS_TEST_IOT_MI)(
       yield* stack.destroy();
       yield* assertLockerGone(replaced.credentialLockerId);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:iotmanagedintegrations", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

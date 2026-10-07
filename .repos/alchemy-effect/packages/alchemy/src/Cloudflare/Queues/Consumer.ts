@@ -13,7 +13,6 @@ import * as Provider from "../../Provider.ts";
 import { Resource } from "../../Resource.ts";
 import { Stack } from "../../Stack.ts";
 import { CloudflareEnvironment } from "../CloudflareEnvironment.ts";
-import { localAccountId } from "../LocalAccount.ts";
 import {
   isLiveId,
   LOCAL_PROVIDERS_URL,
@@ -720,6 +719,7 @@ export const ConsumerProviderLocal = () =>
             Array.from(MutableHashMap.values(localRuntimeState.queueConsumers)),
           ),
         diff: Effect.fn(function* ({ news, output }) {
+          const { accountId } = yield* yield* CloudflareEnvironment;
           if (!output) return { action: "update" };
           // A real (non-`dev:`) consumerId on a local-mode row is legacy
           // damage from pre-stamping dev runs — replace so the new
@@ -729,9 +729,6 @@ export const ConsumerProviderLocal = () =>
             return { action: "replace" };
           }
           if (!isResolved(news)) return undefined;
-          const accountId = isLiveId(news.queueId)
-            ? (yield* yield* CloudflareEnvironment).accountId
-            : yield* localAccountId;
           if (
             output.queueId !== news.queueId ||
             output.accountId !== accountId
@@ -763,9 +760,7 @@ export const ConsumerProviderLocal = () =>
           ).pipe(Option.getOrUndefined);
         }),
         reconcile: Effect.fn(function* ({ news, output }) {
-          const accountId = isLiveId(news.queueId)
-            ? (yield* yield* CloudflareEnvironment).accountId
-            : yield* localAccountId;
+          const { accountId } = yield* yield* CloudflareEnvironment;
           // A LIVE queue (`Alchemy.remote()`) consumed by a LOCAL worker:
           // Cloudflare only pushes to deployed consumers, so the local
           // runtime drains the real queue via the HTTP pull API instead.

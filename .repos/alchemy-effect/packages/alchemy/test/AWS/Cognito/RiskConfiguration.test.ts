@@ -88,5 +88,5 @@ test.provider(
       yield* assertPoolDeleted(outputs.lite.userPoolId);
       yield* assertPoolDeleted(outputs.essentials.userPoolId);
     }),
-  { tags: ["provider:aws", "provider:aws:cognito", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );

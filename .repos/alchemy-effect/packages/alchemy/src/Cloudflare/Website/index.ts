@@ -5,7 +5,6 @@ export * from "./Nuxt.ts";
 export * from "./Octane.ts";
 export * from "./StaticSite.ts";
 export * from "./SvelteKit.ts";
-export * from "./Vinext.ts";
 export * from "./Vite.ts";
 export * from "./Vocs.ts";
 export * from "./Waku.ts";

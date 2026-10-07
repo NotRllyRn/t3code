@@ -120,10 +120,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertServiceNetworkDeleted(network.serviceNetworkId);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:vpclattice", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test.provider(
@@ -171,10 +168,7 @@ test.provider(
 
       yield* stack.destroy();
     }),
-  {
-    tags: ["provider:aws", "provider:aws:vpclattice", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test.provider(
@@ -275,15 +269,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertServiceNetworkDeleted(first.network.serviceNetworkId);
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:iam",
-      "provider:aws:vpclattice",
-      "live",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );
 
 test.provider(
@@ -322,15 +308,7 @@ test.provider(
       yield* assertAssociationDeleted(association.associationId);
       yield* assertServiceNetworkDeleted(network.serviceNetworkId);
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:ec2",
-      "provider:aws:vpclattice",
-      "live",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );
 
 test.provider(
@@ -448,13 +426,5 @@ test.provider(
       // delete is idempotent and must clean that state without another API error.
       yield* stack.destroy();
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:ec2",
-      "provider:aws:vpclattice",
-      "live",
-    ],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

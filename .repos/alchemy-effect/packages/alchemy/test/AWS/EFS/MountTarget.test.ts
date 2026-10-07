@@ -66,70 +66,66 @@ const infra = (securityGroups?: () => string[]) =>
     return { files, target, extraSg };
   });
 
-describe.sequential(
-  "EFS MountTarget",
-  { tags: ["provider:aws", "provider:aws:ec2", "provider:aws:efs", "live"] },
-  () => {
-    beforeAll(
+describe.sequential("EFS MountTarget", () => {
+  beforeAll(
+    Effect.gen(function* () {
+      yield* sharedStack.destroy();
+
+      // initial deploy: no explicit security groups → the VPC default group
+      const deployed = yield* sharedStack.deploy(infra());
+      fileSystemId = deployed.files.fileSystemId;
+      mountTargetId = deployed.target.mountTargetId;
+      extraSecurityGroupId = deployed.extraSg.groupId;
+    }),
+    { timeout: 240_000 },
+  );
+
+  afterAll(sharedStack.destroy(), { timeout: 240_000 });
+
+  test.provider(
+    "mount target is available in the subnet with the default security group",
+    () =>
       Effect.gen(function* () {
-        yield* sharedStack.destroy();
+        expect(mountTargetId).toMatch(/^fsmt-/);
 
-        // initial deploy: no explicit security groups → the VPC default group
-        const deployed = yield* sharedStack.deploy(infra());
-        fileSystemId = deployed.files.fileSystemId;
-        mountTargetId = deployed.target.mountTargetId;
-        extraSecurityGroupId = deployed.extraSg.groupId;
+        const observed = yield* efs
+          .describeMountTargets({ MountTargetId: mountTargetId })
+          .pipe(Effect.map((r) => r.MountTargets![0]));
+        expect(observed.LifeCycleState).toBe("available");
+        expect(observed.SubnetId).toBe(subnetId);
+        expect(observed.FileSystemId).toBe(fileSystemId);
+        expect(observed.IpAddress).toBeTruthy();
+
+        const groups = yield* efs.describeMountTargetSecurityGroups({
+          MountTargetId: mountTargetId,
+        });
+        expect(groups.SecurityGroups).toEqual([defaultSecurityGroupId]);
       }),
-      { timeout: 240_000 },
-    );
+    { timeout: 60_000 },
+  );
 
-    afterAll(sharedStack.destroy(), { timeout: 240_000 });
+  test.provider(
+    "security groups are modified in place",
+    () =>
+      Effect.gen(function* () {
+        const updated = yield* sharedStack.deploy(
+          infra(() => [defaultSecurityGroupId, extraSecurityGroupId]),
+        );
+        // same mount target — securityGroups is mutable
+        expect(updated.target.mountTargetId).toBe(mountTargetId);
 
-    test.provider(
-      "mount target is available in the subnet with the default security group",
-      () =>
-        Effect.gen(function* () {
-          expect(mountTargetId).toMatch(/^fsmt-/);
-
-          const observed = yield* efs
-            .describeMountTargets({ MountTargetId: mountTargetId })
-            .pipe(Effect.map((r) => r.MountTargets![0]));
-          expect(observed.LifeCycleState).toBe("available");
-          expect(observed.SubnetId).toBe(subnetId);
-          expect(observed.FileSystemId).toBe(fileSystemId);
-          expect(observed.IpAddress).toBeTruthy();
-
-          const groups = yield* efs.describeMountTargetSecurityGroups({
+        const observed = yield* efs
+          .describeMountTargetSecurityGroups({
             MountTargetId: mountTargetId,
-          });
-          expect(groups.SecurityGroups).toEqual([defaultSecurityGroupId]);
-        }),
-      { timeout: 60_000 },
-    );
-
-    test.provider(
-      "security groups are modified in place",
-      () =>
-        Effect.gen(function* () {
-          const updated = yield* sharedStack.deploy(
-            infra(() => [defaultSecurityGroupId, extraSecurityGroupId]),
-          );
-          // same mount target — securityGroups is mutable
-          expect(updated.target.mountTargetId).toBe(mountTargetId);
-
-          const observed = yield* efs
-            .describeMountTargetSecurityGroups({
-              MountTargetId: mountTargetId,
-            })
-            .pipe(Effect.map((r) => [...r.SecurityGroups].sort()));
-          expect(observed).toEqual(
-            [defaultSecurityGroupId, extraSecurityGroupId].sort(),
-          );
-        }),
-      { timeout: 120_000 },
-    );
-  },
-);
+          })
+          .pipe(Effect.map((r) => [...r.SecurityGroups].sort()));
+        expect(observed).toEqual(
+          [defaultSecurityGroupId, extraSecurityGroupId].sort(),
+        );
+      }),
+    { timeout: 120_000 },
+  );
+});
 
 // Full teardown verification for the shared fixture is implicit: the mount
 // target's delete waits until it is observed gone (its ENI must release
@@ -192,8 +188,5 @@ test.provider.skipIf(!process.env.AWS_TEST_EFS_MULTI_AZ)(
       Effect.tap(() => stack.destroy()),
       Effect.onError(() => stack.destroy().pipe(Effect.ignore)),
     ),
-  {
-    tags: ["provider:aws", "provider:aws:ec2", "provider:aws:efs", "live"],
-    timeout: 600_000,
-  },
+  { timeout: 600_000 },
 );

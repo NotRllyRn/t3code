@@ -91,15 +91,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertGroupGone("alchemy-test-asg-list");
     }).pipe(Effect.ensuring(cleanupLaunchTemplate)),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:autoscaling",
-      "provider:aws:ec2",
-      "live",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );
 
 // Whole-resource `launchTemplate: template` spelling. The engine resolves the
@@ -188,13 +180,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertGroupGone(wholeAsgName);
     }).pipe(Effect.ensuring(cleanupWholeAsg)),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:autoscaling",
-      "provider:aws:ec2",
-      "live",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

@@ -245,7 +245,6 @@ export type TerminalLocation = Resource<
  * ```
  *
  * @resource
- * @product Terminal
  */
 export const TerminalLocation = Resource<TerminalLocation>(
   "Stripe.TerminalLocation",

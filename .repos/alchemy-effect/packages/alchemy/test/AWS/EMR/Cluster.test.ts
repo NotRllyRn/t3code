@@ -27,7 +27,6 @@ test.provider(
       );
       expect(error._tag).toBe("ClusterNotFound");
     }),
-  { tags: ["provider:aws", "provider:aws:emr", "live"] },
 );
 
 test.provider(
@@ -39,7 +38,6 @@ test.provider(
       );
       expect(error._tag).toBe("JobFlowNotFound");
     }),
-  { tags: ["provider:aws", "provider:aws:emr", "live"] },
 );
 
 // Resolve a subnet of the account's default VPC (public subnet — EMR
@@ -187,17 +185,7 @@ test.provider.skipIf(!process.env.AWS_TEST_SLOW)(
       yield* assertClusterTerminating(cluster.clusterId);
     }),
   // create (~10-15 min) + update + termination initiation, one test.
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:ec2",
-      "provider:aws:emr",
-      "provider:aws:iam",
-      "provider:aws:s3",
-      "live",
-    ],
-    timeout: 2_700_000,
-  },
+  { timeout: 2_700_000 },
 );
 
 // Termination is verified as INITIATED (TERMINATING, irreversible) or fully

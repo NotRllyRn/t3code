@@ -25,7 +25,6 @@ test.provider.skipIf(!!process.env.FAST)(
         expect(Array.isArray(link.subnetIds)).toBe(true);
       }
     }),
-  { tags: ["provider:aws", "provider:aws:apigatewayv2", "live"] },
 );
 
 // Full lifecycle. SKIPPED by default: a v2 VPC link takes ~1-2 minutes to
@@ -86,13 +85,5 @@ test.provider.skipIf(
       );
       expect(["deleted", "DELETING"]).toContain(gone);
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:apigatewayv2",
-      "provider:aws:ec2",
-      "live",
-    ],
-    timeout: 480_000,
-  },
+  { timeout: 480_000 },
 );

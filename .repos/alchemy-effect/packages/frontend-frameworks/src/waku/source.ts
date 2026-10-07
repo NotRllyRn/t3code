@@ -93,6 +93,7 @@ export interface SourceContext {
 /** Mirror of alchemy `Cloudflare/Workers/Source.DevContext`. */
 export interface DevContext extends SourceContext {
   readonly worker: {
+    readonly name: string;
     readonly bindings: Array<BindingHook<BindingServices>>;
     readonly durableObjectNamespaces: Array<
       RuntimeDurableObject & { uniqueKey: string }
@@ -846,7 +847,7 @@ export const makeWakuSourceProvider = (
           // from it exist in dev.
           ...(options.main !== undefined ? { main: options.main } : undefined),
           worker: {
-            name: ctx.workerName,
+            name: ctx.worker.name,
             bindings: ctx.worker.bindings,
             durableObjectNamespaces: ctx.worker.durableObjectNamespaces,
             hyperdrives: ctx.worker.hyperdrives,

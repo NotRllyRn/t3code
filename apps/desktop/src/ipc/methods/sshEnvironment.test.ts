@@ -5,7 +5,7 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
+import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http";
 
 import {
   DesktopSshEnvironmentRequestError,
@@ -22,7 +22,7 @@ function jsonResponse(request: HttpClientRequest.HttpClientRequest, body: unknow
   );
 }
 
-function layerHttpClient(
+function makeHttpClientLayer(
   handler: (
     request: HttpClientRequest.HttpClientRequest,
   ) => Effect.Effect<HttpClientResponse.HttpClientResponse, never>,
@@ -36,7 +36,7 @@ function layerHttpClient(
 describe("SSH environment IPC", () => {
   it.effect("fetches and decodes the remote environment descriptor", () => {
     const requestUrls: string[] = [];
-    const layer = layerHttpClient((request) =>
+    const layer = makeHttpClientLayer((request) =>
       Effect.sync(() => {
         requestUrls.push(request.url);
         return jsonResponse(request, {
@@ -66,7 +66,7 @@ describe("SSH environment IPC", () => {
   });
 
   it.effect("wraps schema decode failures in a typed request error", () => {
-    const layer = layerHttpClient((request) =>
+    const layer = makeHttpClientLayer((request) =>
       Effect.succeed(jsonResponse(request, { environmentId: "remote-env" })),
     );
 
@@ -89,7 +89,7 @@ describe("SSH environment IPC", () => {
 
   it.effect("rejects non-loopback HTTP endpoints before issuing a request", () => {
     let requestCount = 0;
-    const layer = layerHttpClient((request) =>
+    const layer = makeHttpClientLayer((request) =>
       Effect.sync(() => {
         requestCount += 1;
         return jsonResponse(request, {});

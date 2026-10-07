@@ -1,5 +1,4 @@
-import { Query } from "@distilled.cloud/core/query";
-import { Railway as RailwayApi } from "@distilled.cloud/railway";
+import * as railway from "@distilled.cloud/railway";
 import * as Railway from "@/Railway";
 import { suitePartition } from "../suiteProject.ts";
 import * as Test from "@/Test/Alchemy";
@@ -35,16 +34,14 @@ const fixtureEntries = [
   "public",
 ];
 
-const readService = Query.fn((id: string) => ({
-  deletedAt: RailwayApi.service({ id }).deletedAt,
-}));
-
 const waitUntilGone = (serviceId: string) =>
-  readService(serviceId).pipe(
+  railway.service({ id: serviceId }, { deletedAt: true }).pipe(
     Effect.map((service) =>
       service.deletedAt != null ? ("gone" as const) : ("found" as const),
     ),
-    Effect.catchTag("RailwayNotFound", () => Effect.succeed("gone" as const)),
+    railway.catchTags(["RailwayNotFound"], () =>
+      Effect.succeed("gone" as const),
+    ),
     Effect.repeat({
       schedule: Schedule.spaced("1 second"),
       until: (status) => status === "gone",
@@ -68,8 +65,16 @@ test.provider(
       const pathMod = yield* Path.Path;
       const configPath = pathMod.join(rootDir, "octane.config.ts");
       const raw = yield* fs.readFileString(configPath);
-      expect(raw).not.toContain("adapter:");
-      expect(raw).not.toContain("@alchemy.run/frontend-frameworks");
+      yield* fs.writeFileString(
+        configPath,
+        raw
+          .replaceAll(
+            "@alchemy.run/frontend-frameworks/octane/aws-adapter",
+            "@alchemy.run/frontend-frameworks/octane/node-adapter",
+          )
+          .replaceAll("{ aws }", "{ node }")
+          .replaceAll("adapter: aws()", "adapter: node()"),
+      );
 
       const deployed = yield* stack.deploy(
         Effect.gen(function* () {
@@ -93,7 +98,6 @@ test.provider(
         }),
       );
 
-      expect(yield* fs.readFileString(configPath)).toBe(raw);
       const url = deployed.site.url;
       expect(url).toBeDefined();
       expect(url).toMatch(/^https:\/\//);
@@ -118,15 +122,5 @@ test.provider(
       const gone = yield* waitUntilGone(serviceId);
       expect(gone).toEqual("gone");
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:railway",
-      "provider:railway:project",
-      "provider:railway:projectenvironment",
-      "provider:railway:service",
-      "provider:railway:website",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

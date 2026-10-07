@@ -5,7 +5,11 @@ import * as Exit from "effect/Exit";
 import * as Metric from "effect/Metric";
 import { dual } from "effect/Function";
 
-import { compactMetricAttributes, outcomeFromExit } from "./Attributes.ts";
+import {
+  compactMetricAttributes,
+  normalizeModelMetricLabel,
+  outcomeFromExit,
+} from "./Attributes.ts";
 
 export const rpcRequestsTotal = Metric.counter("t3_rpc_requests_total", {
   description: "Total RPC requests handled by the websocket RPC server.",
@@ -15,17 +19,28 @@ export const rpcRequestDuration = Metric.timer("t3_rpc_request_duration", {
   description: "RPC request handling duration.",
 });
 
-export const orchestrationEffectClaimsTotal = Metric.counter(
-  "t3_orchestration_effect_claims_total",
+export const orchestrationCommandsTotal = Metric.counter("t3_orchestration_commands_total", {
+  description: "Total orchestration commands dispatched.",
+});
+
+export const orchestrationCommandDuration = Metric.timer("t3_orchestration_command_duration", {
+  description: "Orchestration command dispatch duration.",
+});
+
+export const orchestrationCommandAckDuration = Metric.timer(
+  "t3_orchestration_command_ack_duration",
   {
-    description: "Total completed orchestration effect outbox claim attempts by result.",
+    description:
+      "Time from orchestration command dispatch to the first committed domain event emitted for that command.",
   },
 );
 
-export const orchestrationEffectQueueWait = Metric.timer("t3_orchestration_effect_queue_wait", {
-  description:
-    "Time from an orchestration effect's temporal availability until claim, including same-thread blocking.",
-});
+export const orchestrationEventsProcessedTotal = Metric.counter(
+  "t3_orchestration_events_processed_total",
+  {
+    description: "Total orchestration intent events processed by runtime reactors.",
+  },
+);
 
 export const providerSessionsTotal = Metric.counter("t3_provider_sessions_total", {
   description: "Total provider session lifecycle operations.",
@@ -36,7 +51,11 @@ export const providerTurnsTotal = Metric.counter("t3_provider_turns_total", {
 });
 
 export const providerTurnDuration = Metric.timer("t3_provider_turn_duration", {
-  description: "Time for the provider adapter to start a turn, not how long the turn runs.",
+  description: "Provider turn request duration.",
+});
+
+export const providerRuntimeEventsTotal = Metric.counter("t3_provider_runtime_events_total", {
+  description: "Total canonical provider runtime events processed.",
 });
 
 export const gitCommandsTotal = Metric.counter("t3_git_commands_total", {
@@ -53,40 +72,6 @@ export const terminalSessionsTotal = Metric.counter("t3_terminal_sessions_total"
 
 export const terminalRestartsTotal = Metric.counter("t3_terminal_restarts_total", {
   description: "Total terminal restart requests handled.",
-});
-
-/**
- * One per webhook request that reached a task, by `outcome` (accepted,
- * not_found, rejected_signature, disabled, rate_limited, queue_full, expired,
- * prompt_too_long, error) and `source` (relay or direct).
- */
-export const webhookDeliveriesTotal = Metric.counter("t3_webhook_deliveries_total", {
-  description: "Webhook requests handled, by outcome and source.",
-});
-
-export const webhookDeliveryDuration = Metric.timer("t3_webhook_delivery_duration", {
-  description: "Time to verify, log, and enqueue one webhook request.",
-});
-
-/** How long a relay-held request waited before this environment got it. */
-export const webhookHeldDelay = Metric.timer("t3_webhook_held_delay", {
-  description:
-    "Time between the relay receiving a webhook request and the environment handling it.",
-});
-
-/** Runs started by webhook deliveries, by `outcome` (started, skipped, failed). */
-export const webhookRunsTotal = Metric.counter("t3_webhook_runs_total", {
-  description: "Runs started from webhook deliveries, by outcome.",
-});
-
-/** Secrets agents asked users for, by how each ended: saved, declined, cancelled, timed_out. */
-export const secretRequestsTotal = Metric.counter("t3_secret_requests_total", {
-  description: "Secrets agents asked users for, by how each request ended.",
-});
-
-/** One-use secret refs a tool tried to use, by result: used, rejected. */
-export const secretRefsConsumedTotal = Metric.counter("t3_secret_refs_consumed_total", {
-  description: "Secret refs tools tried to use, by result.",
 });
 
 export const metricAttributes = (
@@ -110,13 +95,16 @@ export interface WithMetricsOptions {
   ) => Readonly<Record<string, unknown>>;
 }
 
-const recordMetrics = (
+const withMetricsImpl = <A, E, R>(
+  effect: Effect.Effect<A, E, R>,
   options: WithMetricsOptions,
-  startedAt: bigint,
-  exit: Exit.Exit<unknown, unknown>,
-) =>
+): Effect.Effect<A, E, R> =>
   Effect.gen(function* () {
-    const duration = Duration.nanos((yield* Clock.monotonicTimeNanos) - startedAt);
+    const startedAt = yield* Clock.currentTimeNanos;
+    const exit = yield* Effect.exit(effect);
+    const endedAt = yield* Clock.currentTimeNanos;
+    const elapsedNanos = endedAt > startedAt ? endedAt - startedAt : 0n;
+    const duration = Duration.nanos(elapsedNanos);
     const baseAttributes =
       typeof options.attributes === "function" ? options.attributes() : (options.attributes ?? {});
 
@@ -141,21 +129,38 @@ const recordMetrics = (
         1,
       );
     }
+
+    if (Exit.isSuccess(exit)) {
+      return exit.value;
+    }
+    return yield* Effect.failCause(exit.cause);
   });
 
-// Durations come from the monotonic clock, so wall-clock corrections cannot skew them, and
-// metrics are recorded in an exit finalizer, so interrupted work is counted as "interrupt".
-const withMetricsImpl = <A, E, R>(
-  effect: Effect.Effect<A, E, R>,
-  options: WithMetricsOptions,
-): Effect.Effect<A, E, R> =>
-  Effect.flatMap(Clock.monotonicTimeNanos, (startedAt) =>
-    Effect.onExit(effect, (exit) => recordMetrics(options, startedAt, exit)),
-  );
-
 export const withMetrics: {
-  (
+  <A, E, R>(
     options: WithMetricsOptions,
-  ): <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
+  ): (effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
   <A, E, R>(effect: Effect.Effect<A, E, R>, options: WithMetricsOptions): Effect.Effect<A, E, R>;
 } = dual(2, withMetricsImpl);
+
+export const providerMetricAttributes = (
+  provider: string,
+  extra?: Readonly<Record<string, unknown>>,
+) =>
+  compactMetricAttributes({
+    provider,
+    ...extra,
+  });
+
+export const providerTurnMetricAttributes = (input: {
+  readonly provider: string;
+  readonly model: string | null | undefined;
+  readonly extra?: Readonly<Record<string, unknown>>;
+}) => {
+  const modelFamily = normalizeModelMetricLabel(input.model);
+  return compactMetricAttributes({
+    provider: input.provider,
+    ...(modelFamily ? { modelFamily } : {}),
+    ...input.extra,
+  });
+};

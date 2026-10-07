@@ -122,7 +122,7 @@ const formatStaticView = (
     <CliEnvironment capabilities={{ ...capabilities, colors, columns }}>
       {view}
     </CliEnvironment>,
-    { columns, colorProfile: colors ? "truecolor" : "none" },
+    { columns },
   ).replace(/[\s\n]+$/, "");
   return colors ? output : stripVTControlCharacters(output);
 };
@@ -458,7 +458,7 @@ export const makeRuntime = (
         exitOnCtrlC: false,
         interactive: capabilities.input,
         alternateScreen: alternateScreen,
-        colorProfile: capabilities.colors ? "truecolor" : "none",
+        colorProfile: capabilities.colors ? undefined : "none",
         ...(captureDirectStdio
           ? {
               patchConsole: "stdio" as const,

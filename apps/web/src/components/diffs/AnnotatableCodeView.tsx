@@ -11,7 +11,7 @@ import type { ScopedThreadRef } from "@t3tools/contracts";
 import { useCallback, useMemo, useState, type ReactNode, type Ref } from "react";
 
 import { type DraftId, useComposerDraftStore } from "~/composerDraftStore";
-import { fnv1a32, resolveFileDiffPath } from "~/lib/diffRendering";
+import { fnv1a32 } from "~/lib/diffRendering";
 import {
   buildDiffReviewComment,
   restoreDiffReviewCommentRange,
@@ -35,7 +35,7 @@ interface DiffCommentAnnotationGroup {
 }
 
 type DiffCommentLineAnnotation = DiffLineAnnotation<DiffCommentAnnotationGroup>;
-export type AnnotatableCodeViewHandle = CodeViewHandle<DiffCommentAnnotationGroup, undefined>;
+export type AnnotatableCodeViewHandle = CodeViewHandle<DiffCommentAnnotationGroup>;
 const EMPTY_REVIEW_COMMENTS: ReadonlyArray<ReviewCommentContext> = [];
 
 function annotationSide(range: SelectedLineRange): AnnotationSide {
@@ -217,15 +217,15 @@ export function AnnotatableCodeView({
       if (!range) return;
       const item = context.item;
       if (item.type !== "diff") return;
-      // Read from the item, not the file list, so this callback keeps its identity as
-      // patches arrive; the viewer re-applies its options whenever it changes.
+      const file = filesByKey.get(item.id);
+      if (!file) return;
       const id = nextFileCommentId();
       const comment = buildDiffReviewComment({
         id,
         sectionId,
         sectionTitle,
-        filePath: resolveFileDiffPath(item.fileDiff),
-        fileDiff: item.fileDiff,
+        filePath: file.filePath,
+        fileDiff: file.fileDiff,
         range,
         text: "",
       });
@@ -242,7 +242,7 @@ export function AnnotatableCodeView({
         },
       });
     },
-    [sectionId, sectionTitle],
+    [filesByKey, sectionId, sectionTitle],
   );
 
   const hasOpenComment = draft !== null;

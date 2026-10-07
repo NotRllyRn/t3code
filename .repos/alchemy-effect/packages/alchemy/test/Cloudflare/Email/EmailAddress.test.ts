@@ -68,5 +68,4 @@ test.provider.skipIf(!emailRoutingScoped)(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  { tags: ["provider:cloudflare", "provider:cloudflare:email", "live"] },
 );

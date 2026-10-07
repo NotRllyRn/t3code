@@ -139,14 +139,6 @@ test.provider.skipIf(!emailRoutingScoped)(
       // Destroy again — delete is idempotent.
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:email",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-  },
 );
 
 test.provider.skipIf(!emailRoutingScoped)(
@@ -195,14 +187,6 @@ test.provider.skipIf(!emailRoutingScoped)(
       const gone = yield* findByName(zoneId, NAME_REPLACE_B);
       expect(gone).toBeUndefined();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:email",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-  },
 );
 
 test.provider.skipIf(!emailRoutingScoped)(
@@ -262,15 +246,7 @@ test.provider.skipIf(!emailRoutingScoped)(
       const gone = yield* findByName(zoneId, NAME_ADOPT);
       expect(gone).toBeUndefined();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:email",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test.provider.skipIf(!emailRoutingScoped)(
@@ -315,15 +291,7 @@ test.provider.skipIf(!emailRoutingScoped)(
       const gone = yield* findByName(zoneId, NAME_LIST);
       expect(gone).toBeUndefined();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:email",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 /**

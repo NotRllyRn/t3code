@@ -45,14 +45,6 @@ const assertApplicationDeleted = Effect.fn(function* (applicationName: string) {
 
 describe.skipIf(!!process.env.FAST)(
   "AWS.KinesisAnalyticsV2.Application",
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:kinesisanalyticsv2",
-      "provider:aws:s3",
-      "live",
-    ],
-  },
   () => {
     test.provider(
       "create Flink application in READY, update configuration in place, destroy",
@@ -236,7 +228,7 @@ describe.skipIf(!!process.env.FAST)(
             .pipe(Effect.result);
           expect(Result.isFailure(roleResult)).toBe(true);
         }).pipe(Effect.ensuring(deleteCodeBucketIdempotent(appCodeBucket))),
-      { tags: ["provider:aws:iam"], timeout: 300_000 },
+      { timeout: 300_000 },
     );
 
     test.provider(

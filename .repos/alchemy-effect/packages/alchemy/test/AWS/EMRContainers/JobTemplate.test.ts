@@ -14,39 +14,31 @@ const { test } = Test.make({ providers: AWS.providers() });
 // surface the typed ResourceNotFoundException; deleteJobTemplate on the
 // same id must surface the typed ValidationException the idempotent delete
 // path swallows (its typed union has no not-found tag).
-test.provider(
-  "typed error semantics on a nonexistent job template",
-  () =>
-    Effect.gen(function* () {
-      const id = "abcdefabcdefabcdefabcdef01";
+test.provider("typed error semantics on a nonexistent job template", () =>
+  Effect.gen(function* () {
+    const id = "abcdefabcdefabcdefabcdef01";
 
-      const describeError = yield* Effect.flip(
-        emrc.describeJobTemplate({ id }),
-      );
-      expect(describeError._tag).toBe("ResourceNotFoundException");
+    const describeError = yield* Effect.flip(emrc.describeJobTemplate({ id }));
+    expect(describeError._tag).toBe("ResourceNotFoundException");
 
-      const deleteError = yield* Effect.flip(emrc.deleteJobTemplate({ id }));
-      expect(deleteError._tag).toBe("ValidationException");
-    }),
-  { tags: ["provider:aws", "provider:aws:emrcontainers", "live"] },
+    const deleteError = yield* Effect.flip(emrc.deleteJobTemplate({ id }));
+    expect(deleteError._tag).toBe("ValidationException");
+  }),
 );
 
 // Ungated list() probe: proves the pagination + attribute mapping wiring.
-test.provider(
-  "list returns a well-formed array of job templates",
-  () =>
-    Effect.gen(function* () {
-      const provider = yield* Provider.findProvider(JobTemplate);
-      const all = yield* provider.list();
+test.provider("list returns a well-formed array of job templates", () =>
+  Effect.gen(function* () {
+    const provider = yield* Provider.findProvider(JobTemplate);
+    const all = yield* provider.list();
 
-      expect(Array.isArray(all)).toBe(true);
-      for (const jt of all) {
-        expect(typeof jt.jobTemplateId).toBe("string");
-        expect(typeof jt.jobTemplateName).toBe("string");
-        expect(jt.jobTemplateArn).toContain(":/jobtemplates/");
-      }
-    }),
-  { tags: ["provider:aws", "provider:aws:emrcontainers", "live"] },
+    expect(Array.isArray(all)).toBe(true);
+    for (const jt of all) {
+      expect(typeof jt.jobTemplateId).toBe("string");
+      expect(typeof jt.jobTemplateName).toBe("string");
+      expect(jt.jobTemplateArn).toContain(":/jobtemplates/");
+    }
+  }),
 );
 
 // Full lifecycle — job templates are account-level, free, and provision
@@ -141,13 +133,5 @@ test.provider(
       );
       expect(gone._tag).toBe("ResourceNotFoundException");
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:emrcontainers",
-      "provider:aws:iam",
-      "live",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

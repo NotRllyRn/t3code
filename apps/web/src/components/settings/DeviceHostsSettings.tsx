@@ -230,8 +230,7 @@ function DeviceHostList({
                         }
                       >
                         {platform.platform === "ios" ? (
-                          // The Apple mark is bottom-heavy; lift it so it does not dip under the label.
-                          <AppleIcon className="size-3.5 -translate-y-px" />
+                          <AppleIcon className="size-3.5" />
                         ) : (
                           <AndroidIcon className="size-3.5" />
                         )}

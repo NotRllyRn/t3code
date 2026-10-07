@@ -48,7 +48,6 @@ export type VirtualField = Resource<
  * ```
  *
  * @resource
- * @product Dataset
  */
 export const VirtualField = Resource<VirtualField>("Axiom.VirtualField");
 

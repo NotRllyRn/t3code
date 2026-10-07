@@ -225,7 +225,6 @@ export interface Milestone extends Resource<
  * ```
  *
  * @resource
- * @product Issue
  */
 export const Milestone = Resource<Milestone>("GitHub.Milestone");
 

@@ -1,5 +1,5 @@
 import { assertTrue, deepStrictEqual, strictEqual } from "@effect/vitest/utils"
-import { Context, Effect, type Option, Predicate, Schema, SchemaGetter, SchemaIssue } from "effect"
+import { Context, Effect, Option, Predicate, Schema, SchemaGetter, SchemaIssue } from "effect"
 import type { StandardSchemaV1 } from "effect/StandardSchema"
 import { describe, it } from "vitest"
 
@@ -90,7 +90,7 @@ const expectAsyncFailure = async <I, A>(
 }
 
 const AsyncString = Schema.String.pipe(Schema.decode({
-  decode: SchemaGetter.transformOptionalEffect((os: Option.Option<string>) =>
+  decode: new SchemaGetter.Getter((os: Option.Option<string>) =>
     Effect.gen(function*() {
       yield* Effect.sleep("10 millis")
       return os
@@ -155,10 +155,10 @@ describe("toStandardSchemaV1", () => {
 
     it("sync decoding should throw", () => {
       const DepString = Schema.Number.pipe(Schema.decode({
-        decode: SchemaGetter.transformEffect((n) =>
+        decode: SchemaGetter.onSome((n) =>
           Effect.gen(function*() {
             const magicNumber = yield* MagicNumber
-            return n * magicNumber
+            return Option.some(n * magicNumber)
           })
         ),
         encode: SchemaGetter.passthrough()
@@ -175,11 +175,11 @@ describe("toStandardSchemaV1", () => {
 
     it("async decoding should report a missing dependency", () => {
       const DepString = Schema.Number.pipe(Schema.decode({
-        decode: SchemaGetter.transformEffect((n) =>
+        decode: SchemaGetter.onSome((n) =>
           Effect.gen(function*() {
             const magicNumber = yield* MagicNumber
             yield* Effect.sleep("10 millis")
-            return n * magicNumber
+            return Option.some(n * magicNumber)
           })
         ),
         encode: SchemaGetter.passthrough()

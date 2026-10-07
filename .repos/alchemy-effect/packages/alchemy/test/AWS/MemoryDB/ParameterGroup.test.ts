@@ -21,7 +21,6 @@ test.provider(
       );
       expect(error._tag).toBe("ParameterGroupNotFoundFault");
     }),
-  { tags: ["provider:aws", "provider:aws:memorydb", "live"] },
 );
 
 const readParameterValue = (name: string, parameter: string) =>
@@ -118,5 +117,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertGroupGone(created.parameterGroupName);
     }),
-  { tags: ["provider:aws", "provider:aws:memorydb", "live"], timeout: 300_000 },
+  { timeout: 300_000 },
 );

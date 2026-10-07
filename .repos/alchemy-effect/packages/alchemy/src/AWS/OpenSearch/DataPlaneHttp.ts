@@ -13,7 +13,7 @@
  */
 import * as Credentials from "@distilled.cloud/aws/Credentials";
 import * as Region from "@distilled.cloud/aws/Region";
-import * as SigV4 from "@distilled.cloud/aws/SigV4";
+import { AwsV4Signer } from "aws4fetch";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as Binding from "../../Binding.ts";
@@ -57,7 +57,7 @@ export type OpenSearchSend = (
   request: OpenSearchHttpRequest,
 ) => Effect.Effect<
   { status: number; body: unknown },
-  OpenSearchApiError | Credentials.CredentialsError | SigV4.SigningError
+  OpenSearchApiError | Credentials.CredentialsError
 >;
 
 const refreshParam = (
@@ -152,18 +152,21 @@ export const makeOpenSearchDataPlaneBinding = <Client>(options: {
           return { credentials, region };
         }).pipe(Effect.provideContext(services));
 
-        const signed = yield* SigV4.sign({
+        const signer = new AwsV4Signer({
           method: request.method,
           url: url.toString(),
           headers,
           body,
           accessKeyId: Redacted.value(credentials.accessKeyId),
-          secretAccessKey: credentials.secretAccessKey,
-          sessionToken: credentials.sessionToken,
+          secretAccessKey: Redacted.value(credentials.secretAccessKey),
+          sessionToken: credentials.sessionToken
+            ? Redacted.value(credentials.sessionToken)
+            : undefined,
           service: "es",
           region,
           allHeaders: true,
         });
+        const signed = yield* Effect.promise(() => signer.sign());
 
         const toError = (status: number) => (cause: unknown) =>
           new OpenSearchApiError({
@@ -175,10 +178,10 @@ export const makeOpenSearchDataPlaneBinding = <Client>(options: {
 
         const response = yield* Effect.tryPromise({
           try: () =>
-            fetch(signed.url, {
+            fetch(signed.url.toString(), {
               method: signed.method,
               headers: signed.headers,
-              body,
+              body: signed.body as BodyInit | undefined,
             }),
           catch: toError(0),
         });

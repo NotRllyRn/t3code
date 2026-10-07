@@ -8,7 +8,6 @@ import { makeHttpStripeIdBinding } from "./StripeHttp.ts";
  * Function or Worker Effect.
  *
  * @layer
- * @product Files
  * @provides Stripe.RetrieveFileLink
  */
 export const RetrieveFileLinkHttp = Layer.effect(

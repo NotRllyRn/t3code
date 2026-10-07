@@ -27,13 +27,7 @@ export default function CopyForAgent() {
 
   return (
     <div className="alc-copy-agent" data-nosnippet="">
-      <code
-        className="alc-copy-agent__text"
-        tabIndex={0}
-        aria-label="Prompt for your coding agent"
-      >
-        {PROMPT}
-      </code>
+      <code className="alc-copy-agent__text">{PROMPT}</code>
       <button
         type="button"
         onClick={onCopy}

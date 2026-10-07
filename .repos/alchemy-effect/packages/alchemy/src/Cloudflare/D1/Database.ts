@@ -4,7 +4,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
-import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClient from "effect/unstable/http/HttpClient";
 
 import { isResolved } from "../../Diff.ts";
 import * as ProviderLayer from "../../Local/ProviderLayer.ts";
@@ -23,7 +23,6 @@ import {
 import { hashImports, readSqlFile } from "../../SQL/SqlFile.ts";
 import { recordsEqual } from "../../Util/equal.ts";
 import { CloudflareEnvironment } from "../CloudflareEnvironment.ts";
-import { localAccountId } from "../LocalAccount.ts";
 import {
   generateLocalId,
   LOCAL_PROVIDERS_URL,
@@ -607,7 +606,7 @@ export const ProviderLocal = () =>
       return {
         stables: ["accountId"],
         diff: Effect.fn(function* ({ news = {}, output }) {
-          const accountId = yield* localAccountId;
+          const { accountId } = yield* yield* CloudflareEnvironment;
           if (!output?.databaseId) return { action: "update" } as const;
           if (!isResolved(news)) return undefined;
           if (output.accountId !== accountId) {
@@ -634,7 +633,7 @@ export const ProviderLocal = () =>
           return output ?? undefined;
         }),
         reconcile: Effect.fn(function* ({ id, news = {}, output }) {
-          const accountId = yield* localAccountId;
+          const { accountId } = yield* yield* CloudflareEnvironment;
           const databaseId = output?.databaseId ?? generateLocalId();
 
           // Sync migrations — the shared pipeline, driven through the

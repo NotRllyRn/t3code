@@ -1,7 +1,7 @@
-import { layerRemoteHttpClient } from "@t3tools/client-runtime/rpc";
+import { remoteHttpClientLayer } from "@t3tools/client-runtime/rpc";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
+import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http";
 
 import { readDesktopPrimaryBearerToken } from "./desktopAuth";
 import { resolvePrimaryEnvironmentHttpUrl } from "./target";
@@ -30,28 +30,28 @@ function withPrimaryBearerToken(client: HttpClient.HttpClient): HttpClient.HttpC
   );
 }
 
-export function layerForCurrentOrigin() {
+export function makePrimaryEnvironmentHttpLayer() {
   return Layer.unwrap(
     Effect.sync(() => {
-      const layerBase = layerRemoteHttpClient(globalThis.fetch);
+      const baseLayer = remoteHttpClientLayer(globalThis.fetch);
       if (isSameOriginBrowserPrimary()) {
         return Layer.merge(
-          layerBase,
+          baseLayer,
           Layer.succeed(FetchHttpClient.RequestInit, { credentials: "include" }),
         );
       }
 
-      const layerBearerClient = Layer.effect(
+      const bearerClientLayer = Layer.effect(
         HttpClient.HttpClient,
         Effect.map(HttpClient.HttpClient, withPrimaryBearerToken),
-      ).pipe(Layer.provide(layerBase));
+      ).pipe(Layer.provide(baseLayer));
 
       return Layer.merge(
-        layerBearerClient,
+        bearerClientLayer,
         Layer.succeed(FetchHttpClient.RequestInit, { credentials: "omit" }),
       );
     }),
   );
 }
 
-export const layer = layerForCurrentOrigin();
+export const primaryEnvironmentHttpLayer = makePrimaryEnvironmentHttpLayer();

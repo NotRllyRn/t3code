@@ -22,7 +22,7 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:amp", "live"], timeout: 30_000 },
+  { timeout: 30_000 },
 );
 
 test.provider(
@@ -35,7 +35,7 @@ test.provider(
       );
       expect(yaml).toContain("scrape_configs");
     }),
-  { tags: ["provider:aws", "provider:aws:amp", "live"], timeout: 30_000 },
+  { timeout: 30_000 },
 );
 
 // Full scraper lifecycle requires a live Amazon EKS cluster to scrape and
@@ -99,8 +99,5 @@ test.provider.skipIf(!process.env.AWS_TEST_AMP_SCRAPER)(
 
       yield* stack.destroy();
     }),
-  {
-    tags: ["provider:aws", "provider:aws:amp", "provider:aws:logs", "live"],
-    timeout: 1_800_000,
-  },
+  { timeout: 1_800_000 },
 );

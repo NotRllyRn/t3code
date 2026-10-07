@@ -29,7 +29,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:deadline", "live"] },
 );
 
 test.provider(
@@ -43,7 +42,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:deadline", "live"] },
 );
 
 class FarmStillExists extends Data.TaggedError("FarmStillExists") {}
@@ -217,7 +215,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertFarmDeleted(created.farm.farmId);
     }).pipe(logLevel),
-  { tags: ["provider:aws", "provider:aws:deadline", "live"], timeout: 180_000 },
+  { timeout: 180_000 },
 );
 
 // A customer-managed fleet provisions no EC2 capacity, but fleet lifecycle
@@ -286,8 +284,5 @@ test.provider.skipIf(!process.env.AWS_TEST_DEADLINE)(
       yield* stack.destroy();
       yield* assertFarmDeleted(farm.farmId);
     }).pipe(logLevel),
-  {
-    tags: ["provider:aws", "provider:aws:deadline", "provider:aws:iam", "live"],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );

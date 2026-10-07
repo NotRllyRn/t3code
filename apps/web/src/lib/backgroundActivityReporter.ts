@@ -118,8 +118,7 @@ function scopeForSubscription(
   if (observation.method !== WS_METHODS.subscribeVcsStatus) {
     return null;
   }
-  const input = observation.input as { readonly cwd?: unknown; readonly includeRemote?: unknown };
-  if (input.includeRemote === false) return null;
+  const input = observation.input as { readonly cwd?: unknown };
   return typeof input.cwd === "string" ? { type: "vcs-status", cwd: input.cwd } : null;
 }
 
@@ -165,20 +164,20 @@ export function retainedBackgroundScopes(
   ).filter((scope): scope is BackgroundScope => scope !== null);
 }
 
-export const layerObserver = Layer.succeed(
+export const backgroundActivityObserverLayer = Layer.succeed(
   EnvironmentRpcSubscriptionObserver,
   EnvironmentRpcSubscriptionObserver.of({
     observe: observeBackgroundActivitySubscription,
   }),
 );
 
-export const layer = Layer.effectDiscard(
+export const backgroundActivityReporterLayer = Layer.effectDiscard(
   Effect.gen(function* () {
     if (typeof window === "undefined" || typeof document === "undefined") {
       return;
     }
 
-    const registry = yield* EnvironmentRegistry.EnvironmentRegistry;
+    const registry = yield* EnvironmentRegistry;
     const clock = yield* Clock.Clock;
     const reportRequests = yield* Queue.sliding<void>(1);
     const requestReport = () => Queue.offerUnsafe(reportRequests, undefined);

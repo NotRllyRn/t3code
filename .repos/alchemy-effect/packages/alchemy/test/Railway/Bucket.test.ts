@@ -2,8 +2,7 @@ import { fromCredentials } from "@distilled.cloud/aws/Credentials";
 import * as AwsEndpoint from "@distilled.cloud/aws/Endpoint";
 import type { RegionName } from "@distilled.cloud/aws/Region";
 import * as S3 from "@distilled.cloud/aws/s3";
-import { Query } from "@distilled.cloud/core/query";
-import { Railway as RailwayApi } from "@distilled.cloud/railway";
+import * as railway from "@distilled.cloud/railway";
 import * as Provider from "@/Provider";
 import * as Railway from "@/Railway";
 import { projectBuckets } from "@/Railway/GraphQL.ts";
@@ -26,29 +25,10 @@ const logLevel = Effect.provideService(
 const OBJECT_KEY = "alchemy-marker.txt";
 const OBJECT_BODY = "hello-from-railway";
 
-const readBucketCredentials = Query.fn(
-  (bucketId: string, environmentId: string, projectId: string) =>
-    RailwayApi.bucketS3Credentials({ bucketId, environmentId, projectId }).pipe(
-      Query.map((creds) => ({
-        bucketName: creds.bucketName,
-        endpoint: creds.endpoint,
-        accessKeyId: creds.accessKeyId,
-        secretAccessKey: creds.secretAccessKey,
-        region: creds.region,
-      })),
-    ),
-);
-
-const readEnvironmentConfig = Query.fn((id: string, projectId: string) => ({
-  config: RailwayApi.environment({ id, projectId }).config,
-}));
-
 const listProjectBuckets = (projectId: string) =>
-  projectBuckets(projectId, (bucket) => ({
-    id: bucket.id,
-    name: bucket.name,
-    projectId: bucket.projectId,
-  })).pipe(Effect.catchTag("RailwayNotFound", () => Effect.succeed([])));
+  projectBuckets(projectId, { id: true, name: true, projectId: true }).pipe(
+    railway.catchTags(["RailwayNotFound"], () => Effect.succeed([])),
+  );
 
 const findBucket = (projectId: string, bucketId: string, name: string) =>
   listProjectBuckets(projectId).pipe(
@@ -64,25 +44,40 @@ const firstCredentials = (
   environmentId: string,
   projectId: string,
 ) =>
-  readBucketCredentials(bucketId, environmentId, projectId).pipe(
-    Effect.flatMap((items) => {
-      const first = items[0];
-      return first !== undefined
-        ? Effect.succeed(first)
-        : Effect.fail(new Error("missing bucket credentials"));
-    }),
-    Effect.retry({
-      schedule: Schedule.spaced("2 seconds"),
-      times: 8,
-    }),
-  );
+  railway
+    .bucketS3Credentials(
+      {
+        bucketId,
+        environmentId,
+        projectId,
+      },
+      {
+        bucketName: true,
+        endpoint: true,
+        accessKeyId: true,
+        secretAccessKey: true,
+        region: true,
+      },
+    )
+    .pipe(
+      Effect.flatMap((items) => {
+        const first = items[0];
+        return first !== undefined
+          ? Effect.succeed(first)
+          : Effect.fail(new Error("missing bucket credentials"));
+      }),
+      Effect.retry({
+        schedule: Schedule.spaced("2 seconds"),
+        times: 8,
+      }),
+    );
 
 const waitUntilBucketGone = (
   environmentId: string,
   projectId: string,
   bucketId: string,
 ) =>
-  readEnvironmentConfig(environmentId, projectId).pipe(
+  railway.environment({ id: environmentId, projectId }, { config: true }).pipe(
     Effect.map((env) => {
       const buckets =
         env.config !== null &&
@@ -99,7 +94,9 @@ const waitUntilBucketGone = (
         ? ("gone" as const)
         : ("found" as const);
     }),
-    Effect.catchTag("RailwayNotFound", () => Effect.succeed("gone" as const)),
+    railway.catchTags(["RailwayNotFound"], () =>
+      Effect.succeed("gone" as const),
+    ),
     Effect.repeat({
       schedule: Schedule.spaced("2 seconds"),
       until: (status) => status === "gone",
@@ -277,16 +274,5 @@ test.provider(
       );
       expect(gone).toEqual("gone");
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:s3",
-      "provider:railway",
-      "provider:railway:bucket",
-      "provider:railway:project",
-      "provider:railway:projectenvironment",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

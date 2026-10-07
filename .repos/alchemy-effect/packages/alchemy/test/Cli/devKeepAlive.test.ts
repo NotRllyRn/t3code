@@ -18,7 +18,7 @@ const parks = <A, E>(effect: Effect.Effect<A, E>) =>
     effect.pipe(Effect.timeoutOption("50 millis"), Effect.map(Option.isNone)),
   );
 
-describe("devKeepAlive", { tags: ["unit", "local"] }, () => {
+describe("devKeepAlive", () => {
   test("passes success through untouched", () =>
     expect(Effect.runPromise(devKeepAlive(Effect.succeed(42)))).resolves.toBe(
       42,

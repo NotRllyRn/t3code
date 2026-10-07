@@ -9,19 +9,106 @@ import { testCertificateBody, testPrivateKey } from "./fixtures.ts";
 
 const { test } = Test.make({ providers: AWS.providers() });
 
-describe(
-  "AWS.IAM device and server certificate resources",
-  { tags: ["provider:aws", "provider:aws:iam", "live"] },
-  () => {
-    test.provider("create, update, and delete a server certificate", (stack) =>
+describe("AWS.IAM device and server certificate resources", () => {
+  test.provider("create, update, and delete a server certificate", (stack) =>
+    Effect.gen(function* () {
+      yield* stack.destroy();
+
+      const certificate = yield* stack.deploy(
+        Effect.gen(function* () {
+          return yield* ServerCertificate("ServerCertificate", {
+            certificateBody: testCertificateBody,
+            privateKey: testPrivateKey,
+            tags: {
+              env: "test",
+            },
+          });
+        }),
+      );
+
+      const created = yield* IAM.getServerCertificate({
+        ServerCertificateName: certificate.serverCertificateName,
+      });
+      expect(
+        created.ServerCertificate.ServerCertificateMetadata
+          .ServerCertificateName,
+      ).toBe(certificate.serverCertificateName);
+
+      yield* stack.deploy(
+        Effect.gen(function* () {
+          return yield* ServerCertificate("ServerCertificate", {
+            certificateBody: testCertificateBody,
+            privateKey: testPrivateKey,
+            tags: {
+              env: "prod",
+            },
+          });
+        }),
+      );
+
+      const updatedTags = yield* IAM.listServerCertificateTags({
+        ServerCertificateName: certificate.serverCertificateName,
+      });
+      expect(
+        Object.fromEntries(
+          (updatedTags.Tags ?? []).map((tag) => [tag.Key, tag.Value]),
+        ),
+      ).toMatchObject({
+        env: "prod",
+      });
+
+      yield* stack.destroy();
+
+      const deleted = yield* IAM.getServerCertificate({
+        ServerCertificateName: certificate.serverCertificateName,
+      }).pipe(Effect.option);
+      expect(deleted._tag).toBe("None");
+    }),
+  );
+
+  test.provider("list enumerates the deployed server certificate", (stack) =>
+    Effect.gen(function* () {
+      yield* stack.destroy();
+
+      const certificate = yield* stack.deploy(
+        Effect.gen(function* () {
+          return yield* ServerCertificate("ListServerCertificate", {
+            certificateBody: testCertificateBody,
+            privateKey: testPrivateKey,
+            tags: {
+              env: "test",
+            },
+          });
+        }),
+      );
+
+      const provider = yield* Provider.findProvider(ServerCertificate);
+      const all = yield* provider.list();
+
+      const found = all.find(
+        (cert) =>
+          cert.serverCertificateArn === certificate.serverCertificateArn,
+      );
+      expect(found).toBeDefined();
+      expect(found?.serverCertificateName).toBe(
+        certificate.serverCertificateName,
+      );
+      expect(found?.certificateBody).toBe(testCertificateBody);
+      expect(found?.tags).toMatchObject({ env: "test" });
+
+      yield* stack.destroy();
+    }),
+  );
+
+  test.provider(
+    "create, update, and delete an unassigned virtual MFA device",
+    (stack) =>
       Effect.gen(function* () {
         yield* stack.destroy();
 
-        const certificate = yield* stack.deploy(
+        const device = yield* stack.deploy(
           Effect.gen(function* () {
-            return yield* ServerCertificate("ServerCertificate", {
-              certificateBody: testCertificateBody,
-              privateKey: testPrivateKey,
+            return yield* VirtualMFADevice("VirtualMfaDevice", {
               tags: {
                 env: "test",
               },
@@ -29,19 +116,21 @@ describe(
           }),
         );
 
-        const created = yield* IAM.getServerCertificate({
-          ServerCertificateName: certificate.serverCertificateName,
+        expect(device.base32StringSeed).toBeDefined();
+        expect(device.qrCodePNG).toBeDefined();
+
+        const created = yield* IAM.listVirtualMFADevices({
+          AssignmentStatus: "Unassigned",
         });
         expect(
-          created.ServerCertificate.ServerCertificateMetadata
-            .ServerCertificateName,
-        ).toBe(certificate.serverCertificateName);
+          created.VirtualMFADevices.some(
+            (entry) => entry.SerialNumber === device.serialNumber,
+          ),
+        ).toBe(true);
 
         yield* stack.deploy(
           Effect.gen(function* () {
-            return yield* ServerCertificate("ServerCertificate", {
-              certificateBody: testCertificateBody,
-              privateKey: testPrivateKey,
+            return yield* VirtualMFADevice("VirtualMfaDevice", {
               tags: {
                 env: "prod",
               },
@@ -49,8 +138,8 @@ describe(
           }),
         );
 
-        const updatedTags = yield* IAM.listServerCertificateTags({
-          ServerCertificateName: certificate.serverCertificateName,
+        const updatedTags = yield* IAM.listMFADeviceTags({
+          SerialNumber: device.serialNumber,
         });
         expect(
           Object.fromEntries(
@@ -62,108 +151,15 @@ describe(
 
         yield* stack.destroy();
 
-        const deleted = yield* IAM.getServerCertificate({
-          ServerCertificateName: certificate.serverCertificateName,
+        const deleted = yield* IAM.listVirtualMFADevices({
+          AssignmentStatus: "Unassigned",
         }).pipe(Effect.option);
-        expect(deleted._tag).toBe("None");
-      }),
-    );
-
-    test.provider("list enumerates the deployed server certificate", (stack) =>
-      Effect.gen(function* () {
-        yield* stack.destroy();
-
-        const certificate = yield* stack.deploy(
-          Effect.gen(function* () {
-            return yield* ServerCertificate("ListServerCertificate", {
-              certificateBody: testCertificateBody,
-              privateKey: testPrivateKey,
-              tags: {
-                env: "test",
-              },
-            });
-          }),
-        );
-
-        const provider = yield* Provider.findProvider(ServerCertificate);
-        const all = yield* provider.list();
-
-        const found = all.find(
-          (cert) =>
-            cert.serverCertificateArn === certificate.serverCertificateArn,
-        );
-        expect(found).toBeDefined();
-        expect(found?.serverCertificateName).toBe(
-          certificate.serverCertificateName,
-        );
-        expect(found?.certificateBody).toBe(testCertificateBody);
-        expect(found?.tags).toMatchObject({ env: "test" });
-
-        yield* stack.destroy();
-      }),
-    );
-
-    test.provider(
-      "create, update, and delete an unassigned virtual MFA device",
-      (stack) =>
-        Effect.gen(function* () {
-          yield* stack.destroy();
-
-          const device = yield* stack.deploy(
-            Effect.gen(function* () {
-              return yield* VirtualMFADevice("VirtualMfaDevice", {
-                tags: {
-                  env: "test",
-                },
-              });
-            }),
-          );
-
-          expect(device.base32StringSeed).toBeDefined();
-          expect(device.qrCodePNG).toBeDefined();
-
-          const created = yield* IAM.listVirtualMFADevices({
-            AssignmentStatus: "Unassigned",
-          });
-          expect(
-            created.VirtualMFADevices.some(
+        expect(
+          deleted._tag === "None" ||
+            !deleted.value.VirtualMFADevices.some(
               (entry) => entry.SerialNumber === device.serialNumber,
             ),
-          ).toBe(true);
-
-          yield* stack.deploy(
-            Effect.gen(function* () {
-              return yield* VirtualMFADevice("VirtualMfaDevice", {
-                tags: {
-                  env: "prod",
-                },
-              });
-            }),
-          );
-
-          const updatedTags = yield* IAM.listMFADeviceTags({
-            SerialNumber: device.serialNumber,
-          });
-          expect(
-            Object.fromEntries(
-              (updatedTags.Tags ?? []).map((tag) => [tag.Key, tag.Value]),
-            ),
-          ).toMatchObject({
-            env: "prod",
-          });
-
-          yield* stack.destroy();
-
-          const deleted = yield* IAM.listVirtualMFADevices({
-            AssignmentStatus: "Unassigned",
-          }).pipe(Effect.option);
-          expect(
-            deleted._tag === "None" ||
-              !deleted.value.VirtualMFADevices.some(
-                (entry) => entry.SerialNumber === device.serialNumber,
-              ),
-          ).toBe(true);
-        }),
-    );
-  },
-);
+        ).toBe(true);
+      }),
+  );
+});

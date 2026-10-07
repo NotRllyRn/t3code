@@ -139,15 +139,7 @@ test.provider(
         expect(deactivated.voided_at).toEqual(expect.any(Number));
       }
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:stripe",
-      "provider:stripe:creditgrant",
-      "provider:stripe:customer",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -193,15 +185,7 @@ test.provider(
       const after = yield* provider.list();
       expect(after.find((grant) => grant.id === deployed.id)).toBeUndefined();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:stripe",
-      "provider:stripe:creditgrant",
-      "provider:stripe:customer",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -265,13 +249,5 @@ test.provider(
       const gone = yield* waitUntilVoided(replaced.id);
       expect(gone === "voided" || gone === "gone").toEqual(true);
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:stripe",
-      "provider:stripe:creditgrant",
-      "provider:stripe:customer",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

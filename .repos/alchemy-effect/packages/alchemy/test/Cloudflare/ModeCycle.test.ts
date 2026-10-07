@@ -112,16 +112,7 @@ test.provider(
       // 5. destroy — local rows only; nothing upstream to clean.
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:d1",
-      "provider:cloudflare:kv",
-      "provider:cloudflare:r2",
-      "live",
-    ],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 /**
@@ -177,5 +168,5 @@ test.provider(
         yield* state.get({ stack: stk.name, stage: stk.stage, fqn }),
       ).toBeUndefined();
     }).pipe(logLevel),
-  { tags: ["provider:cloudflare", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );

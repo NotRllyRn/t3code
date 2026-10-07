@@ -32,7 +32,6 @@ test.provider.skipIf(!!process.env.FAST)(
         expect(typeof m.restApiId).toBe("string");
       }
     }),
-  { tags: ["provider:aws", "provider:aws:apigateway", "live"] },
 );
 
 test.provider.skipIf(
@@ -97,8 +96,5 @@ test.provider.skipIf(
       yield* stack.destroy();
       yield* assertRestApiDeleted(deployed.restApiId);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:apigateway", "live"],
-    timeout: 600_000,
-  },
+  { timeout: 600_000 },
 );

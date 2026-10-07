@@ -24,7 +24,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:greengrassv2", "live"] },
 );
 
 const recipe = (version: string) =>
@@ -123,8 +122,5 @@ test.provider(
       yield* stack.destroy();
       yield* waitUntilComponentGone(bumped.arn);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:greengrassv2", "live"],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );

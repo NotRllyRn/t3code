@@ -24,7 +24,6 @@ export interface RetrieveCustomerTaxIdRequest extends Omit<
  * ```
  *
  * @binding
- * @product Customer
  */
 export interface RetrieveCustomerTaxId extends Binding.Service<
   RetrieveCustomerTaxId,

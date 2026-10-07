@@ -100,5 +100,5 @@ test.provider(
         );
       expect(gone).toBe(true);
     }),
-  { tags: ["provider:aws", "provider:aws:cognito", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );

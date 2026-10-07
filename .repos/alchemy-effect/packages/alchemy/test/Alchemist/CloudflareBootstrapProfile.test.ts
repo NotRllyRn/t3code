@@ -1,13 +1,11 @@
 import { AlchemyContext } from "@/AlchemyContext.ts";
 import { resolveStateStoreScope } from "@/Alchemist/routes/cloudflare.ts";
+import { AuthError } from "@/Auth/AuthProvider.ts";
 import { CredentialsStoreLive } from "@/Auth/Credentials.ts";
 import { ProfileStore, ProfileStoreLive } from "@/Auth/Profile.ts";
-import { CredentialsUnavailable } from "@/Auth/Resolve.ts";
 import * as Interaction from "@/Interaction.ts";
 import { PlatformServices } from "@/Util/PlatformServices.ts";
 import { expect, it } from "alchemy-test";
-import * as Cause from "effect/Cause";
-import * as Exit from "effect/Exit";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -118,7 +116,7 @@ it.live(
         expect(scoped.accountId).toBe(STAGING_ACCOUNT);
       }),
     ),
-  { tags: ["unit", "local"], exclusive: true },
+  { exclusive: true },
 );
 
 it.live(
@@ -138,7 +136,7 @@ it.live(
         expect(scoped.accountId).toBe(DEFAULT_ACCOUNT);
       }),
     ),
-  { tags: ["unit", "local"], exclusive: true },
+  { exclusive: true },
 );
 
 it.live(
@@ -160,16 +158,12 @@ it.live(
         });
         expect(scoped.accountId).toBe(STAGING_ACCOUNT);
 
-        // Environment resolution is lazy: missing auth surfaces when the
-        // account is demanded, through the environment's defect channel.
-        const missing = yield* Effect.exit(resolveStateStoreScope({ envFile }));
-        expect(Exit.isFailure(missing)).toBe(true);
-        if (Exit.isFailure(missing)) {
-          const error = Cause.squash(missing.cause);
-          expect(error).toBeInstanceOf(CredentialsUnavailable);
-          expect(String(error)).toContain("profile 'default'");
-        }
+        const missing = yield* resolveStateStoreScope({ envFile }).pipe(
+          Effect.flip,
+        );
+        expect(missing).toBeInstanceOf(AuthError);
+        expect((missing as AuthError).message).toContain("profile 'default'");
       }),
     ),
-  { tags: ["unit", "local"], exclusive: true },
+  { exclusive: true },
 );

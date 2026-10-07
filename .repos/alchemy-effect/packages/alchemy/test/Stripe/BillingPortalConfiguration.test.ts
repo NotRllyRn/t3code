@@ -1,10 +1,7 @@
 import * as Provider from "@/Provider";
 import * as Stripe from "@/Stripe";
 import * as Test from "@/Test/Alchemy";
-import {
-  GetBillingPortalConfiguration,
-  GetBillingPortalConfigurations,
-} from "@distilled.cloud/stripe/stripe";
+import { GetBillingPortalConfiguration } from "@distilled.cloud/stripe/stripe";
 import { expect } from "alchemy-test";
 import * as Effect from "effect/Effect";
 import { MinimumLogLevel } from "effect/References";
@@ -12,22 +9,6 @@ import * as Schedule from "effect/Schedule";
 import { isMissingStripeResource } from "@/Stripe/missing.ts";
 
 const { test } = Test.make({ providers: Stripe.providers() });
-
-// Stripe cannot deactivate the account default, and the API cannot choose a
-// different default. Require account setup before creating disposable fixtures.
-const requireDefaultConfiguration = Effect.gen(function* () {
-  const configurations = yield* GetBillingPortalConfigurations({
-    is_default: true,
-    limit: 1,
-  });
-  if (configurations.data.length === 0) {
-    return yield* Effect.fail(
-      new Error(
-        "Configure the default customer portal in the Stripe Dashboard before running BillingPortalConfiguration lifecycle tests.",
-      ),
-    );
-  }
-});
 
 const logLevel = Effect.provideService(
   MinimumLogLevel,
@@ -50,12 +31,9 @@ const waitUntilDeactivated = (id: string) =>
   );
 
 test.provider(
-  // Use a separate stack from the legacy test, which could own the account
-  // default and cannot destroy it. Leave that default and its state intact.
-  "create, update, and deactivate a non-default billing portal configuration",
+  "create, update, and deactivate a billing portal configuration",
   (stack) =>
     Effect.gen(function* () {
-      yield* requireDefaultConfiguration;
       yield* stack.destroy();
 
       const created = yield* stack.deploy(
@@ -80,7 +58,6 @@ test.provider(
       );
 
       expect(created.id).toMatch(/^bpc_/);
-      expect(created.isDefault).toEqual(false);
       expect(created.name).toEqual("Alchemy Customer Portal");
       expect(created.active).toEqual(true);
       expect(created.defaultReturnUrl).toEqual("https://example.com/account");
@@ -102,7 +79,6 @@ test.provider(
         configuration: created.id,
       });
       expect(fetched.id).toEqual(created.id);
-      expect(fetched.is_default).toEqual(false);
       expect(fetched.name).toEqual("Alchemy Customer Portal");
       expect(fetched.active).toEqual(true);
       expect(fetched.default_return_url).toEqual("https://example.com/account");
@@ -141,7 +117,6 @@ test.provider(
       );
 
       expect(updated.id).toEqual(created.id);
-      expect(updated.isDefault).toEqual(false);
       expect(updated.name).toEqual("Alchemy Customer Portal Updated");
       expect(updated.active).toEqual(true);
       expect(updated.defaultReturnUrl).toEqual("https://example.com/billing");
@@ -173,21 +148,13 @@ test.provider(
       const deactivated = yield* waitUntilDeactivated(created.id);
       expect(deactivated).toEqual("inactive");
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:stripe",
-      "provider:stripe:billingportalconfiguration",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider(
   "list enumerates the deployed billing portal configuration",
   (stack) =>
     Effect.gen(function* () {
-      yield* requireDefaultConfiguration;
       yield* stack.destroy();
 
       const deployed = yield* stack.deploy(
@@ -201,8 +168,6 @@ test.provider(
           });
         }),
       );
-
-      expect(deployed.isDefault).toEqual(false);
 
       const provider = yield* Provider.findProvider(
         Stripe.BillingPortalConfiguration,
@@ -221,12 +186,5 @@ test.provider(
       const deactivated = yield* waitUntilDeactivated(deployed.id);
       expect(deactivated).toEqual("inactive");
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:stripe",
-      "provider:stripe:billingportalconfiguration",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

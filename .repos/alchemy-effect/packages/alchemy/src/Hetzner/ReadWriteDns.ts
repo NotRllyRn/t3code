@@ -43,7 +43,6 @@ import { type WriteDnsClient } from "./WriteDns.ts";
  * ```
  *
  * @binding
- * @product DNS
  */
 export interface ReadWriteDns extends Binding.Service<
   ReadWriteDns,

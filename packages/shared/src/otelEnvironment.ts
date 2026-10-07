@@ -65,9 +65,7 @@ interface Flag {
 const TrimmedLowercase = Schema.String.pipe(
   Schema.decodeTo(
     Schema.String,
-    SchemaTransformation.trim().pipe(
-      SchemaTransformation.composeTransformation(SchemaTransformation.toLowerCase()),
-    ),
+    SchemaTransformation.trim().compose(SchemaTransformation.toLowerCase()),
   ),
 );
 

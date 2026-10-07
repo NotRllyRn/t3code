@@ -29,7 +29,7 @@ const alchemyBin = path.join(
   "node_modules",
   "alchemy",
   "bin",
-  "alchemy.js",
+  "alchemy.ts",
 );
 const STAGE = "dev-cli-test";
 const runDevSsr = process.env.ALCHEMY_TEST_SOLIDSTART_DEV_SSR === "1";

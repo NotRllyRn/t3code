@@ -141,15 +141,7 @@ test.provider(
       expect((yield* getIssue(name, created.issueNumber)).state).toBe("closed");
       yield* stack.destroy();
     }),
-  {
-    tags: [
-      "provider:github",
-      "provider:github:issue",
-      "provider:github:repository",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -193,13 +185,5 @@ test.provider(
       );
       yield* stack.destroy();
     }),
-  {
-    tags: [
-      "provider:github",
-      "provider:github:issue",
-      "provider:github:repository",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

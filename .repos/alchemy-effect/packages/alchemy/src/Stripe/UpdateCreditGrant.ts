@@ -25,7 +25,6 @@ export interface UpdateCreditGrantRequest extends Omit<
  * ```
  *
  * @binding
- * @product Billing
  */
 export interface UpdateCreditGrant extends Binding.Service<
   UpdateCreditGrant,

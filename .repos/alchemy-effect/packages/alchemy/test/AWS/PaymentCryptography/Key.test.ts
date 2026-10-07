@@ -18,7 +18,6 @@ const { test } = Test.make({ providers: AWS.providers() });
 test.provider.skipIf(!!process.env.AWS_TEST_PAYMENTCRYPTO)(
   "reap: schedule deletion for keys leaked by crashed gated runs",
   () => reapLeakedKeys(),
-  { tags: ["provider:aws", "provider:aws:paymentcryptography", "live"] },
 );
 
 // Ungated typed-error probes: prove the distilled error unions carry the
@@ -35,7 +34,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:paymentcryptography", "live"] },
 );
 
 test.provider(
@@ -49,7 +47,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:paymentcryptography", "live"] },
 );
 
 const dataKeyAttributes = {
@@ -154,8 +151,5 @@ test.provider.skipIf(!process.env.AWS_TEST_PAYMENTCRYPTO)(
       // window is mandatory). Idempotent: a no-op when destroy already ran.
       Effect.ensuring(reapLeakedKeys([stack.name])),
     ),
-  {
-    tags: ["provider:aws", "provider:aws:paymentcryptography", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

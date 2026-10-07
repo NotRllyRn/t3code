@@ -54,7 +54,7 @@ test.provider(
         );
       expect(result).toBe("missing");
     }),
-  { tags: ["provider:aws", "provider:aws:s3control", "live"], timeout: 60_000 },
+  { timeout: 60_000 },
 );
 
 test.provider(
@@ -130,10 +130,7 @@ test.provider(
       yield* assertAccessPointDeleted(deployed.accessPoint.accessPointName);
     }),
   // Generous wall: deploys serialize on the per-profile lock across suites.
-  {
-    tags: ["provider:aws", "provider:aws:s3", "provider:aws:s3control", "live"],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );
 
 test.provider(
@@ -184,8 +181,5 @@ test.provider(
   // Individual steps are fast (<3s solo), but deploys serialize on the
   // per-profile lock across every concurrently-running suite, so the
   // last-scheduled test in a busy run can queue for minutes.
-  {
-    tags: ["provider:aws", "provider:aws:s3", "provider:aws:s3control", "live"],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );

@@ -12,7 +12,6 @@ import * as Channel from "./Channel.ts"
 import * as Effect from "./Effect.ts"
 import { dual } from "./Function.ts"
 import * as Schema from "./Schema.ts"
-import type * as SchemaAST from "./SchemaAST.ts"
 
 /**
  * Creates a channel that encodes non-empty chunks of schema values into the
@@ -97,8 +96,7 @@ export const encodeUnknown: <S extends Schema.Constraint>(
  * @since 4.0.0
  */
 export const decode = <S extends Schema.Constraint>(
-  schema: S,
-  options?: SchemaAST.ParseOptions
+  schema: S
 ) =>
 <IE = never, Done = unknown>(): Channel.Channel<
   Arr.NonEmptyReadonlyArray<S["Type"]>,
@@ -109,7 +107,7 @@ export const decode = <S extends Schema.Constraint>(
   Done,
   S["DecodingServices"]
 > => {
-  const decode = Schema.decodeEffect(Schema.NonEmptyArray(schema), options)
+  const decode = Schema.decodeEffect(Schema.NonEmptyArray(schema))
   return Channel.fromTransform((upstream, _scope) => Effect.succeed(Effect.flatMap(upstream, (chunk) => decode(chunk))))
 }
 
@@ -133,8 +131,7 @@ export const decode = <S extends Schema.Constraint>(
  * @since 4.0.0
  */
 export const decodeUnknown: <S extends Schema.Constraint>(
-  schema: S,
-  options?: SchemaAST.ParseOptions
+  schema: S
 ) => <IE = never, Done = unknown>() => Channel.Channel<
   Arr.NonEmptyReadonlyArray<S["Type"]>,
   IE | Schema.SchemaError,

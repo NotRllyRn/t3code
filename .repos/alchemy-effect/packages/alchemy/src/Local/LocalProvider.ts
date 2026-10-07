@@ -300,8 +300,7 @@ export const make = <
       // The provider layer scope: in the sidecar this closes at session
       // shutdown, interrupting every registered instance and running its
       // finalizers (killing the processes).
-      // Close independent instances concurrently at provider shutdown.
-      const rootScope = yield* Scope.fork(yield* Effect.scope, "parallel");
+      const rootScope = yield* Effect.scope;
 
       // Keyed by FQN (namespace path + logical id): a restart replaces the
       // entry, a replacement's new generation overwrites it (and the old

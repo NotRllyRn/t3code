@@ -2,20 +2,19 @@ import type { ConfigError } from "effect/Config";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as HttpClient from "effect/http/HttpClient";
-import * as HttpClientResponse from "effect/http/HttpClientResponse";
+import * as HttpClient from "effect/unstable/http/HttpClient";
+import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 import {
   type Rpc,
   RpcClient,
   type RpcGroup,
   RpcSerialization,
-} from "effect/rpc";
-import type * as RpcClientError from "effect/rpc/RpcClientError";
+} from "effect/unstable/rpc";
+import type * as RpcClientError from "effect/unstable/rpc/RpcClientError";
 import type { Dependencies } from "../../Dependencies.ts";
 import type { HttpEffect } from "../../Http.ts";
 import type { InputProps } from "../../Input.ts";
 import type { Named } from "../../Named.ts";
-import type { PlatformIdentity } from "../../Platform.ts";
 import type { Rpc as RpcShape } from "../../Rpc.ts";
 import { effectClass, taggedFunction } from "../../Util/effect.ts";
 import type { Worker, WorkerProps } from "./Worker.ts";
@@ -65,10 +64,15 @@ export interface RpcWorkerYieldable<
 >
   extends
     Effect.Effect<Worker<{}> & RpcShape<Self> & Dependencies<Deps>, never, any>,
-    Named<Id>,
-    PlatformIdentity<Id> {
+    Named<Id> {
   /** @internal */
   readonly [SchemaSymbol]: RpcGroup.RpcGroup<Rpcs>;
+  /**
+   * Logical id of the Worker this class declares. Copied from the
+   * underlying `Cloudflare.Worker` so callers can read it off the
+   * class without yielding (e.g. `transferredFrom: TaskWorker`).
+   */
+  readonly LogicalId: Id;
 }
 
 /**
@@ -294,7 +298,7 @@ const bind = <Self, Rpcs extends Rpc.Any>(
  * `RpcDurableObject`) import the same value.
  * ```typescript
  * import * as Schema from "effect/Schema";
- * import { Rpc, RpcGroup } from "effect/rpc";
+ * import { Rpc, RpcGroup } from "effect/unstable/rpc";
  *
  * export class TaskNotFound extends Schema.TaggedClass<TaskNotFound>()(
  *   "TaskNotFound",
@@ -320,7 +324,7 @@ const bind = <Self, Rpcs extends Rpc.Any>(
  * import * as Cloudflare from "alchemy/Cloudflare";
  * import * as Effect from "effect/Effect";
  * import * as Layer from "effect/Layer";
- * import { RpcSerialization, RpcServer } from "effect/rpc";
+ * import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
  * import { TaskRpcs } from "./rpcs.ts";
  *
  * export default class Worker extends Cloudflare.RpcWorker<Worker>()(
@@ -435,9 +439,9 @@ const bind = <Self, Rpcs extends Rpc.Any>(
  * import * as Effect from "effect/Effect";
  * import * as Layer from "effect/Layer";
  * import * as Schedule from "effect/Schedule";
- * import * as FetchHttpClient from "effect/http/FetchHttpClient";
- * import * as RpcClient from "effect/rpc/RpcClient";
- * import * as RpcSerialization from "effect/rpc/RpcSerialization";
+ * import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
+ * import * as RpcClient from "effect/unstable/rpc/RpcClient";
+ * import * as RpcSerialization from "effect/unstable/rpc/RpcSerialization";
  * import Stack from "../alchemy.run.ts";
  * import { TaskRpcs } from "../src/rpcs.ts";
  *

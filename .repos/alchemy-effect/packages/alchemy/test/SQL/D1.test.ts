@@ -32,13 +32,5 @@ test(
     const { url } = yield* stack;
     yield* exerciseSqlSurface(url);
   }),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:d1",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: TEST_TIMEOUT,
-  },
+  { timeout: TEST_TIMEOUT },
 );

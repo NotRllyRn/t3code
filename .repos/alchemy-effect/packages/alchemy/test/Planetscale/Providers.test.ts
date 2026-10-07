@@ -2,7 +2,6 @@ import { AlchemyContext } from "@/AlchemyContext.ts";
 import { AuthProviders } from "@/Auth/AuthProvider.ts";
 import * as CliKit from "@/Cli/CliKit/index.ts";
 import * as Planetscale from "@/Planetscale";
-import { Credentials } from "@/Planetscale/Credentials.ts";
 import { Stack } from "@/Stack.ts";
 import { Stage } from "@/Stage.ts";
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -11,19 +10,15 @@ import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Result from "effect/Result";
-import * as FetchHttpClient from "effect/http/FetchHttpClient";
+import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 import { v4 as uuidv4 } from "uuid";
 
 it.live(
-  "resolving Planetscale credentials rejects an unknown explicit profile",
+  "building the Planetscale provider layers rejects an unknown explicit profile",
   () =>
     Effect.gen(function* () {
       const result = yield* Effect.result(
-        Effect.sandbox(
-          Effect.gen(function* () {
-            return yield* yield* Credentials;
-          }).pipe(Effect.provide(Planetscale.providers())),
-        ),
+        Effect.sandbox(Layer.build(Planetscale.providers())),
       );
       expect(Result.isFailure(result)).toBe(true);
       if (Result.isFailure(result)) {
@@ -62,5 +57,4 @@ it.live(
       Effect.scoped,
       Effect.provide(CliKit.layer({ input: false })),
     ),
-  { tags: ["unit", "provider:planetscale", "local"] },
 );

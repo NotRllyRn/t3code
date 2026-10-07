@@ -8,7 +8,6 @@ import { UpdateFileLink } from "./UpdateFileLink.ts";
  * Function or Worker Effect.
  *
  * @layer
- * @product Files
  * @provides Stripe.UpdateFileLink
  */
 export const UpdateFileLinkHttp = Layer.effect(

@@ -27,7 +27,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:docdbelastic", "live"] },
 );
 
 // Resolve two default-for-AZ subnets and the default security group.
@@ -139,13 +138,5 @@ test.provider.skipIf(!process.env.AWS_TEST_SLOW)(
       yield* assertClusterDeleting(cluster.clusterArn);
     }),
   // cluster create (~10 min) + delete initiation, one test.
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:docdbelastic",
-      "provider:aws:ec2",
-      "live",
-    ],
-    timeout: 1_500_000,
-  },
+  { timeout: 1_500_000 },
 );

@@ -147,15 +147,5 @@ test.provider.skipIf(!process.env.AWS_TEST_SLOW)(
     }),
   // Docker build + push (~2-4 min) + CE/queue (~1-2 min) + Fargate job run
   // (~2-4 min) + destroy (~2-3 min).
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:batch",
-      "provider:aws:ec2",
-      "provider:aws:ecr",
-      "provider:aws:iam",
-      "live",
-    ],
-    timeout: 1_200_000,
-  },
+  { timeout: 1_200_000 },
 );

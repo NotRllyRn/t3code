@@ -261,16 +261,16 @@ const DIFF_VIEW_UNSAFE_CSS = `${DIFF_SURFACE_THEME_UNSAFE_CSS}
 `;
 
 export type StyledDiffCodeViewOptions<LAnnotation> = Omit<
-  NonNullable<CodeViewProps<LAnnotation, undefined>["options"]>,
+  NonNullable<CodeViewProps<LAnnotation>["options"]>,
   "unsafeCSS" | "itemMetrics" | "layout"
 >;
 
 type StyledDiffCodeViewProps<LAnnotation> = (
-  | Omit<ControlledCodeViewProps<LAnnotation, undefined>, "options">
-  | Omit<UncontrolledCodeViewProps<LAnnotation, undefined>, "options">
+  | Omit<ControlledCodeViewProps<LAnnotation>, "options">
+  | Omit<UncontrolledCodeViewProps<LAnnotation>, "options">
 ) & {
   readonly options?: StyledDiffCodeViewOptions<LAnnotation>;
-  readonly viewerRef?: Ref<CodeViewHandle<LAnnotation, undefined>>;
+  readonly viewerRef?: Ref<CodeViewHandle<LAnnotation>>;
   /**
    * Appended to the shared stylesheet inside the viewer's shadow root, for a surface that has
    * to restyle chrome the viewer owns — such as replacing its per-file line counts.

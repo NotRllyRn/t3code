@@ -111,14 +111,7 @@ test.provider(
       const restored = yield* getSetting(accountId);
       expect(restored.defaultAsn).toEqual(baselineAsn);
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:networkinterconnects",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // Canonical `list()` test (account singleton): there is no enumeration API
@@ -159,12 +152,5 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:networkinterconnects",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

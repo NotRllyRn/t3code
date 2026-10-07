@@ -221,14 +221,14 @@ vi.mock("./PreviewChromeRow", () => ({
     onPictureInPicture?: () => void;
     pictureInPicture?: boolean;
     trailingActions?: {
-      props: { actions?: { toggleNativePictureInPicture?: () => void } };
+      props: { onNativePictureInPicture?: () => void };
     };
   }) => {
     mocks.submittedUrl = props.onSubmit;
     mocks.toggleAnnotation = props.onPickElement ?? null;
     mocks.togglePictureInPicture = props.onPictureInPicture ?? null;
     mocks.toggleNativePictureInPicture =
-      props.trailingActions?.props.actions?.toggleNativePictureInPicture ?? null;
+      props.trailingActions?.props.onNativePictureInPicture ?? null;
     mocks.pictureInPicturePressed = props.pictureInPicture ?? false;
     return null;
   },
@@ -241,8 +241,8 @@ vi.mock("./PreviewEmptyState", () => ({
   },
 }));
 vi.mock("./PreviewMoreMenu", () => ({
-  PreviewMoreMenu: (props: { actions: { toggleNativePictureInPicture?: () => void } }) => {
-    mocks.toggleNativePictureInPicture = props.actions.toggleNativePictureInPicture ?? null;
+  PreviewMoreMenu: (props: { onNativePictureInPicture: () => void }) => {
+    mocks.toggleNativePictureInPicture = props.onNativePictureInPicture;
     return null;
   },
 }));

@@ -90,8 +90,5 @@ test.provider(
         ),
       );
     }),
-  {
-    tags: ["provider:aws", "provider:aws:ecr", "provider:aws:iam", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

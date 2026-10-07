@@ -144,8 +144,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertServiceDeleted(replaced.service.serviceId);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:cloudmap", "provider:aws:ec2", "live"],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

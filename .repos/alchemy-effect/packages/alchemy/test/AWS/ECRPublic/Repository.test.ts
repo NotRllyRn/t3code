@@ -122,8 +122,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertRepositoryDeleted(repo.repositoryName);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:ecrpublic", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

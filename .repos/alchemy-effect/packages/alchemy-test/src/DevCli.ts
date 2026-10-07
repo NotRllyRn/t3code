@@ -118,7 +118,7 @@ export class DevCli {
     this.stage = options.stage ?? "dev-cli-test";
     this.alchemyBin =
       options.alchemyBin ??
-      path.join(this.root, "node_modules", "alchemy", "bin", "alchemy.js");
+      path.join(this.root, "node_modules", "alchemy", "bin", "alchemy.ts");
     this.env = { ...process.env, ...options.env };
   }
 

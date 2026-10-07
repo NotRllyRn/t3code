@@ -90,10 +90,7 @@ test.provider.skipIf(!entitled)(
       );
       expect(gone).toBeUndefined();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:email", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // list() enumerates the account's blocked senders. On the entitled account it
@@ -131,8 +128,5 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:email", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

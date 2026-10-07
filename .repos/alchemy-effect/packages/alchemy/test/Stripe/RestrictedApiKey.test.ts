@@ -35,10 +35,7 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:stripe", "provider:stripe:restrictedapikey", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -85,8 +82,5 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:stripe", "provider:stripe:restrictedapikey", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

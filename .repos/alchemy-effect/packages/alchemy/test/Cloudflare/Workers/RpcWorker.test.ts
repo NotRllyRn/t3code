@@ -5,7 +5,7 @@ import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
 import { MinimumLogLevel } from "effect/References";
 import * as Schedule from "effect/Schedule";
-import * as RpcClient from "effect/rpc/RpcClient";
+import * as RpcClient from "effect/unstable/rpc/RpcClient";
 import { CallerRpcs, TargetRpcs } from "./fixtures/rpc-worker-binding/group.ts";
 import Stack from "./fixtures/rpc-worker-binding/stack.ts";
 
@@ -65,10 +65,7 @@ test(
       expect(result.greeting).toBe("hello world");
     }).pipe(Effect.scoped, Effect.provide(clientLayer(targetUrl)));
   }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:worker", "live"],
-    timeout: 60_000,
-  },
+  { timeout: 60_000 },
 );
 
 test(
@@ -83,10 +80,7 @@ test(
       expect(result.greeting).toBe("hello alchemy");
     }).pipe(Effect.scoped, Effect.provide(clientLayer(callerUrl)));
   }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:worker", "live"],
-    timeout: 60_000,
-  },
+  { timeout: 60_000 },
 );
 
 test(
@@ -118,8 +112,5 @@ test(
       }
     }).pipe(Effect.scoped, Effect.provide(clientLayer(callerUrl)));
   }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:worker", "live"],
-    timeout: 60_000,
-  },
+  { timeout: 60_000 },
 );

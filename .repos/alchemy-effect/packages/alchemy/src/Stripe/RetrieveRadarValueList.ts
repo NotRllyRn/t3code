@@ -24,7 +24,6 @@ export interface RetrieveRadarValueListRequest extends Omit<
  * ```
  *
  * @binding
- * @product Radar
  */
 export interface RetrieveRadarValueList extends Binding.Service<
   RetrieveRadarValueList,

@@ -8,7 +8,6 @@ export const HeadObjectHttp = Layer.effect(
   makeBucketHttpBinding({
     tag: "AWS.S3.HeadObject",
     operation: S3.headObject,
-    actions: ["s3:GetObject", "s3:GetObjectVersion"],
-    listBucket: true,
+    actions: ["s3:GetObject"],
   }),
 );

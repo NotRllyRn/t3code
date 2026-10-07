@@ -81,8 +81,5 @@ test.provider(
       const after = yield* describeCe;
       expect(after).toBeUndefined();
     }),
-  {
-    tags: ["provider:aws", "provider:aws:batch", "provider:aws:ec2", "live"],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

@@ -17,7 +17,6 @@ import {
  * nested retrieve takes both `account` and `id`.
  *
  * @layer
- * @product Account
  * @provides Stripe.RetrieveAccountExternalAccount
  */
 export const RetrieveAccountExternalAccountHttp = Layer.effect(

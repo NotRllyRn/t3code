@@ -159,8 +159,5 @@ test.provider(
         );
       expect(afterDestroy).toBe("not-found");
     }),
-  {
-    tags: ["provider:aws", "provider:aws:budgets", "provider:aws:iam", "live"],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

@@ -25,14 +25,14 @@ import {
 import type { AuthEnvironmentScope, DpopFailureReason } from "@t3tools/contracts";
 import { parseAllowedOAuthScope } from "@t3tools/shared/oauthScope";
 import { causeErrorTag } from "@t3tools/shared/observability";
-import * as Clock from "effect/Clock";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
+import { identity } from "effect/Function";
 import * as Layer from "effect/Layer";
-import * as Cookies from "effect/http/Cookies";
-import * as HttpEffect from "effect/http/HttpEffect";
-import { HttpServerRequest, HttpServerResponse } from "effect/http";
-import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
+import * as Cookies from "effect/unstable/http/Cookies";
+import * as HttpEffect from "effect/unstable/http/HttpEffect";
+import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
+import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 
 import * as EnvironmentAuth from "./EnvironmentAuth.ts";
 import * as SessionStore from "./SessionStore.ts";
@@ -157,36 +157,6 @@ export function failEnvironmentNotFound(reason: EnvironmentResourceNotFoundReaso
   );
 }
 
-/**
- * `<img>` and WebSocket cannot set headers, so media routes (device hub,
- * preview stream) authenticate the way the `/ws` upgrade does: a cookie for browser
- * sessions, or a short-lived `wsTicket` minted over authenticated HTTP for
- * bearer and DPoP clients. The upgrade authenticator already implements that
- * fallback order, so it is used for plain requests as well.
- */
-export const authenticateMediaRequest = (requiredScope: AuthEnvironmentScope) =>
-  Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const serverAuth = yield* EnvironmentAuth.EnvironmentAuth;
-    const session = yield* serverAuth.authenticateWebSocketUpgrade(request).pipe(
-      Effect.catch((error) =>
-        Effect.gen(function* () {
-          if (EnvironmentAuth.isServerAuthCredentialError(error)) {
-            return yield* failEnvironmentAuthInvalid(
-              EnvironmentAuth.serverAuthCredentialReason(error),
-              EnvironmentAuth.serverAuthDpopFailureReason(error),
-            );
-          }
-          return yield* failEnvironmentInternal("internal_error", error);
-        }),
-      ),
-    );
-    if (!session.scopes.includes(requiredScope)) {
-      return yield* failEnvironmentScopeRequired(requiredScope);
-    }
-    return session;
-  });
-
 export function failEnvironmentInternal(reason: EnvironmentInternalErrorReason, error?: unknown) {
   return Effect.gen(function* () {
     const traceId = yield* currentEnvironmentTraceId;
@@ -228,14 +198,13 @@ export const requireEnvironmentScope = Effect.fn("environment.auth.requireScope"
   return session;
 });
 
-export const layerAuthenticatedAuth = Layer.effect(
+export const environmentAuthenticatedAuthLayer = Layer.effect(
   EnvironmentAuthenticatedAuth,
   Effect.gen(function* () {
     const serverAuth = yield* EnvironmentAuth.EnvironmentAuth;
     return (httpEffect) =>
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest;
-        const startTime = yield* Clock.currentTimeNanos;
         const session = yield* serverAuth.authenticateHttpRequest(request).pipe(
           Effect.catchIf(EnvironmentAuth.isServerAuthCredentialError, (error) =>
             failEnvironmentAuthInvalid(
@@ -247,21 +216,18 @@ export const layerAuthenticatedAuth = Layer.effect(
             failEnvironmentInternal("internal_error", error),
           ),
         );
-        const endTime = yield* Clock.currentTimeNanos;
-        const handler = httpEffect.pipe(
+        return yield* httpEffect.pipe(
           Effect.provideService(EnvironmentAuthenticatedPrincipal, {
             ...session,
             scopes: new Set(session.scopes),
           }),
+          session.subject === "cloud-connect" ? traceAuthenticatedRelayRequest : identity,
         );
-        return yield* session.subject === "cloud-connect"
-          ? traceAuthenticatedRelayRequest(handler, { startTime, endTime })
-          : handler;
-      }).pipe(Effect.catchTags({ EnvironmentAuthInvalidError: appendDpopChallengeOnUnauthorized }));
+      }).pipe(Effect.catchTag("EnvironmentAuthInvalidError", appendDpopChallengeOnUnauthorized));
   }),
 );
 
-export const layer = HttpApiBuilder.group(
+export const authHttpApiLayer = HttpApiBuilder.group(
   EnvironmentHttpApi,
   "auth",
   Effect.fnUntraced(function* (handlers) {
@@ -508,10 +474,9 @@ export const layer = HttpApiBuilder.group(
             );
             return { revoked };
           },
-          Effect.catchTags({
-            ServerAuthForbiddenOperationError: () =>
-              failEnvironmentOperationForbidden("current_session_revoke_not_allowed"),
-          }),
+          Effect.catchTag("ServerAuthForbiddenOperationError", () =>
+            failEnvironmentOperationForbidden("current_session_revoke_not_allowed"),
+          ),
           Effect.catchIf(EnvironmentAuth.isServerAuthInternalError, (error) =>
             failEnvironmentInternal("client_session_revoke_failed", error),
           ),

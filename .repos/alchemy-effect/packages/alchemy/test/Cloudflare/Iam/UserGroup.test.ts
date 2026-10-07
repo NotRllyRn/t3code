@@ -172,10 +172,7 @@ test.provider(
 
       yield* expectGone(accountId, v1.group.userGroupId);
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:iam", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 const UG_LIST_NAME = "alchemy-iam-ug-list";
@@ -206,8 +203,5 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:iam", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

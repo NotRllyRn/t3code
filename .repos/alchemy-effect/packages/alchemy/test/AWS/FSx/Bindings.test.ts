@@ -5,8 +5,8 @@ import { describe, expect } from "alchemy-test";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as Schedule from "effect/Schedule";
-import * as HttpClient from "effect/http/HttpClient";
-import * as HttpClientRequest from "effect/http/HttpClientRequest";
+import * as HttpClient from "effect/unstable/http/HttpClient";
+import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
 import FSxBindingsFunctionLive, {
   FSxBindingsFunction,
 } from "./bindings-handler";
@@ -65,226 +65,212 @@ const postJson = (path: string) =>
     Effect.flatMap((r) => r.json),
   );
 
-describe.sequential(
-  "FSx Bindings",
-  { tags: ["provider:aws", "provider:aws:fsx", "provider:aws:lambda", "live"] },
-  () => {
-    beforeAll(
+describe.sequential("FSx Bindings", () => {
+  beforeAll(
+    Effect.gen(function* () {
+      yield* Effect.logInfo("FSx test setup: destroying previous resources");
+      yield* sharedStack.destroy();
+
+      yield* Effect.logInfo("FSx test setup: deploying fixture");
+      const { functionUrl } = yield* sharedStack.deploy(
+        Effect.gen(function* () {
+          return yield* FSxBindingsFunction;
+        }).pipe(Effect.provide(FSxBindingsFunctionLive)),
+      );
+
+      expect(functionUrl).toBeTruthy();
+      baseUrl = functionUrl!.replace(/\/+$/, "");
+
+      const readinessUrl = `${baseUrl}/bindings`;
+      yield* Effect.logInfo(
+        `FSx test setup: probing readiness at ${readinessUrl}`,
+      );
+      yield* HttpClient.get(readinessUrl).pipe(
+        Effect.flatMap((response) =>
+          response.status === 200
+            ? Effect.succeed(response)
+            : Effect.fail(new Error(`Function not ready: ${response.status}`)),
+        ),
+        Effect.tapError((error) =>
+          Effect.logWarning(
+            `FSx test setup: fixture not ready yet (${String(error)})`,
+          ),
+        ),
+        Effect.retry({ schedule: readinessPolicy }),
+      );
+    }),
+    { timeout: 240_000 },
+  );
+
+  afterAll(sharedStack.destroy(), { timeout: 240_000 });
+
+  describe("binding registration", () => {
+    test.provider("all 14 capabilities initialize in the runtime", (_stack) =>
       Effect.gen(function* () {
-        yield* Effect.logInfo("FSx test setup: destroying previous resources");
-        yield* sharedStack.destroy();
-
-        yield* Effect.logInfo("FSx test setup: deploying fixture");
-        const { functionUrl } = yield* sharedStack.deploy(
-          Effect.gen(function* () {
-            return yield* FSxBindingsFunction;
-          }).pipe(Effect.provide(FSxBindingsFunctionLive)),
-        );
-
-        expect(functionUrl).toBeTruthy();
-        baseUrl = functionUrl!.replace(/\/+$/, "");
-
-        const readinessUrl = `${baseUrl}/bindings`;
-        yield* Effect.logInfo(
-          `FSx test setup: probing readiness at ${readinessUrl}`,
-        );
-        yield* HttpClient.get(readinessUrl).pipe(
-          Effect.flatMap((response) =>
-            response.status === 200
-              ? Effect.succeed(response)
-              : Effect.fail(
-                  new Error(`Function not ready: ${response.status}`),
-                ),
-          ),
-          Effect.tapError((error) =>
-            Effect.logWarning(
-              `FSx test setup: fixture not ready yet (${String(error)})`,
-            ),
-          ),
-          Effect.retry({ schedule: readinessPolicy }),
-        );
+        const response = (yield* getJson("/bindings")) as any;
+        expect(response.bound).toHaveLength(14);
       }),
-      { timeout: 240_000 },
     );
+  });
 
-    afterAll(sharedStack.destroy(), { timeout: 240_000 });
+  describe("DescribeBackups", () => {
+    test.provider("lists the account's FSx backups", (_stack) =>
+      Effect.gen(function* () {
+        const response = (yield* getJson("/backups")) as any;
+        expect(typeof response.count).toBe("number");
+      }),
+    );
+  });
 
-    describe("binding registration", () => {
-      test.provider("all 14 capabilities initialize in the runtime", (_stack) =>
+  describe("DescribeSnapshots", () => {
+    test.provider("lists the account's OpenZFS snapshots", (_stack) =>
+      Effect.gen(function* () {
+        const response = (yield* getJson("/snapshots")) as any;
+        expect(typeof response.count).toBe("number");
+      }),
+    );
+  });
+
+  describe("DescribeVolumes", () => {
+    test.provider("lists the account's ONTAP/OpenZFS volumes", (_stack) =>
+      Effect.gen(function* () {
+        const response = (yield* getJson("/volumes")) as any;
+        expect(typeof response.count).toBe("number");
+      }),
+    );
+  });
+
+  describe("DescribeStorageVirtualMachines", () => {
+    test.provider("lists the account's ONTAP SVMs", (_stack) =>
+      Effect.gen(function* () {
+        const response = (yield* getJson("/svms")) as any;
+        expect(typeof response.count).toBe("number");
+      }),
+    );
+  });
+
+  describe("DescribeDataRepositoryTasks", () => {
+    test.provider("lists the account's data repository tasks", (_stack) =>
+      Effect.gen(function* () {
+        const response = (yield* getJson("/dr-tasks")) as any;
+        expect(typeof response.count).toBe("number");
+      }),
+    );
+  });
+
+  describe("DescribeDataRepositoryAssociations", () => {
+    test.provider(
+      "lists the account's data repository associations",
+      (_stack) =>
         Effect.gen(function* () {
-          const response = (yield* getJson("/bindings")) as any;
-          expect(response.bound).toHaveLength(14);
-        }),
-      );
-    });
-
-    describe("DescribeBackups", () => {
-      test.provider("lists the account's FSx backups", (_stack) =>
-        Effect.gen(function* () {
-          const response = (yield* getJson("/backups")) as any;
+          const response = (yield* getJson("/dr-associations")) as any;
           expect(typeof response.count).toBe("number");
         }),
-      );
-    });
+    );
+  });
 
-    describe("DescribeSnapshots", () => {
-      test.provider("lists the account's OpenZFS snapshots", (_stack) =>
+  describe("DeleteBackup", () => {
+    test.provider(
+      "returns the typed BackupNotFound for a missing backup",
+      (_stack) =>
         Effect.gen(function* () {
-          const response = (yield* getJson("/snapshots")) as any;
-          expect(typeof response.count).toBe("number");
+          const response = (yield* postJson("/backup/delete-missing")) as any;
+          expect(response.tag).toBe("BackupNotFound");
         }),
-      );
-    });
+    );
+  });
 
-    describe("DescribeVolumes", () => {
-      test.provider("lists the account's ONTAP/OpenZFS volumes", (_stack) =>
+  describe("CopyBackup", () => {
+    test.provider(
+      "returns the typed BackupNotFound for a missing source backup",
+      (_stack) =>
         Effect.gen(function* () {
-          const response = (yield* getJson("/volumes")) as any;
-          expect(typeof response.count).toBe("number");
+          const response = (yield* postJson("/backup/copy-missing")) as any;
+          expect(response.tag).toBe("BackupNotFound");
         }),
-      );
-    });
+    );
+  });
 
-    describe("DescribeStorageVirtualMachines", () => {
-      test.provider("lists the account's ONTAP SVMs", (_stack) =>
+  describe("UpdateSnapshot", () => {
+    // FSx misclassifies this not-found as a wire `BadRequest`; the distilled
+    // patch (patches/fsx.json) carves the typed UpdateSnapshotNotFound out
+    // of it by message predicate.
+    test.provider(
+      "returns the typed UpdateSnapshotNotFound for a missing snapshot",
+      (_stack) =>
         Effect.gen(function* () {
-          const response = (yield* getJson("/svms")) as any;
-          expect(typeof response.count).toBe("number");
+          const response = (yield* postJson("/snapshot/update-missing")) as any;
+          expect(response.tag).toBe("UpdateSnapshotNotFound");
         }),
-      );
-    });
+    );
+  });
 
-    describe("DescribeDataRepositoryTasks", () => {
-      test.provider("lists the account's data repository tasks", (_stack) =>
+  describe("DeleteSnapshot", () => {
+    test.provider(
+      "returns the typed SnapshotNotFound for a missing snapshot",
+      (_stack) =>
         Effect.gen(function* () {
-          const response = (yield* getJson("/dr-tasks")) as any;
-          expect(typeof response.count).toBe("number");
+          const response = (yield* postJson("/snapshot/delete-missing")) as any;
+          expect(response.tag).toBe("SnapshotNotFound");
         }),
-      );
-    });
+    );
+  });
 
-    describe("DescribeDataRepositoryAssociations", () => {
-      test.provider(
-        "lists the account's data repository associations",
-        (_stack) =>
-          Effect.gen(function* () {
-            const response = (yield* getJson("/dr-associations")) as any;
-            expect(typeof response.count).toBe("number");
-          }),
-      );
-    });
+  describe("CreateSnapshot", () => {
+    // FSx misclassifies this not-found as a wire `BadRequest`; the distilled
+    // patch (patches/fsx.json) carves the typed SnapshotVolumeNotFound out
+    // of it by message predicate.
+    test.provider(
+      "returns the typed SnapshotVolumeNotFound for a missing volume",
+      (_stack) =>
+        Effect.gen(function* () {
+          const response = (yield* postJson(
+            "/snapshot/create-missing-volume",
+          )) as any;
+          expect(response.tag).toBe("SnapshotVolumeNotFound");
+        }),
+    );
+  });
 
-    describe("DeleteBackup", () => {
-      test.provider(
-        "returns the typed BackupNotFound for a missing backup",
-        (_stack) =>
-          Effect.gen(function* () {
-            const response = (yield* postJson("/backup/delete-missing")) as any;
-            expect(response.tag).toBe("BackupNotFound");
-          }),
-      );
-    });
+  describe("RestoreVolumeFromSnapshot", () => {
+    // FSx misclassifies this not-found as a wire `BadRequest`; the distilled
+    // patch (patches/fsx.json) carves the typed RestoreSnapshotNotFound out
+    // of it by message predicate.
+    test.provider(
+      "returns the typed RestoreSnapshotNotFound for a missing snapshot",
+      (_stack) =>
+        Effect.gen(function* () {
+          const response = (yield* postJson("/volume/restore-missing")) as any;
+          expect(response.tag).toBe("RestoreSnapshotNotFound");
+        }),
+    );
+  });
 
-    describe("CopyBackup", () => {
-      test.provider(
-        "returns the typed BackupNotFound for a missing source backup",
-        (_stack) =>
-          Effect.gen(function* () {
-            const response = (yield* postJson("/backup/copy-missing")) as any;
-            expect(response.tag).toBe("BackupNotFound");
-          }),
-      );
-    });
+  describe("CopySnapshotAndUpdateVolume", () => {
+    // FSx reports a nonexistent source snapshot as a wire `BadRequest` with
+    // "SourceSnapshotARN provided is not a valid ARN"; the distilled patch
+    // (patches/fsx.json) carves the typed SourceSnapshotNotFound out of it
+    // by message predicate.
+    test.provider(
+      "returns the typed SourceSnapshotNotFound for a missing source snapshot",
+      (_stack) =>
+        Effect.gen(function* () {
+          const response = (yield* postJson(
+            "/volume/copy-snapshot-missing",
+          )) as any;
+          expect(response.tag).toBe("SourceSnapshotNotFound");
+        }),
+    );
+  });
 
-    describe("UpdateSnapshot", () => {
-      // FSx misclassifies this not-found as a wire `BadRequest`; the distilled
-      // patch (patches/fsx.json) carves the typed UpdateSnapshotNotFound out
-      // of it by message predicate.
-      test.provider(
-        "returns the typed UpdateSnapshotNotFound for a missing snapshot",
-        (_stack) =>
-          Effect.gen(function* () {
-            const response = (yield* postJson(
-              "/snapshot/update-missing",
-            )) as any;
-            expect(response.tag).toBe("UpdateSnapshotNotFound");
-          }),
-      );
-    });
-
-    describe("DeleteSnapshot", () => {
-      test.provider(
-        "returns the typed SnapshotNotFound for a missing snapshot",
-        (_stack) =>
-          Effect.gen(function* () {
-            const response = (yield* postJson(
-              "/snapshot/delete-missing",
-            )) as any;
-            expect(response.tag).toBe("SnapshotNotFound");
-          }),
-      );
-    });
-
-    describe("CreateSnapshot", () => {
-      // FSx misclassifies this not-found as a wire `BadRequest`; the distilled
-      // patch (patches/fsx.json) carves the typed SnapshotVolumeNotFound out
-      // of it by message predicate.
-      test.provider(
-        "returns the typed SnapshotVolumeNotFound for a missing volume",
-        (_stack) =>
-          Effect.gen(function* () {
-            const response = (yield* postJson(
-              "/snapshot/create-missing-volume",
-            )) as any;
-            expect(response.tag).toBe("SnapshotVolumeNotFound");
-          }),
-      );
-    });
-
-    describe("RestoreVolumeFromSnapshot", () => {
-      // FSx misclassifies this not-found as a wire `BadRequest`; the distilled
-      // patch (patches/fsx.json) carves the typed RestoreSnapshotNotFound out
-      // of it by message predicate.
-      test.provider(
-        "returns the typed RestoreSnapshotNotFound for a missing snapshot",
-        (_stack) =>
-          Effect.gen(function* () {
-            const response = (yield* postJson(
-              "/volume/restore-missing",
-            )) as any;
-            expect(response.tag).toBe("RestoreSnapshotNotFound");
-          }),
-      );
-    });
-
-    describe("CopySnapshotAndUpdateVolume", () => {
-      // FSx reports a nonexistent source snapshot as a wire `BadRequest` with
-      // "SourceSnapshotARN provided is not a valid ARN"; the distilled patch
-      // (patches/fsx.json) carves the typed SourceSnapshotNotFound out of it
-      // by message predicate.
-      test.provider(
-        "returns the typed SourceSnapshotNotFound for a missing source snapshot",
-        (_stack) =>
-          Effect.gen(function* () {
-            const response = (yield* postJson(
-              "/volume/copy-snapshot-missing",
-            )) as any;
-            expect(response.tag).toBe("SourceSnapshotNotFound");
-          }),
-      );
-    });
-
-    describe("CancelDataRepositoryTask", () => {
-      test.provider(
-        "returns the typed DataRepositoryTaskNotFound for a missing task",
-        (_stack) =>
-          Effect.gen(function* () {
-            const response = (yield* postJson(
-              "/dr-task/cancel-missing",
-            )) as any;
-            expect(response.tag).toBe("DataRepositoryTaskNotFound");
-          }),
-      );
-    });
-  },
-);
+  describe("CancelDataRepositoryTask", () => {
+    test.provider(
+      "returns the typed DataRepositoryTaskNotFound for a missing task",
+      (_stack) =>
+        Effect.gen(function* () {
+          const response = (yield* postJson("/dr-task/cancel-missing")) as any;
+          expect(response.tag).toBe("DataRepositoryTaskNotFound");
+        }),
+    );
+  });
+});

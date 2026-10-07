@@ -1,6 +1,4 @@
-import { SOCIAL_REDIRECTS } from "./social-redirects.ts";
 import type { WorkerEnv } from "../alchemy.run.ts";
-import { referenceDestination } from "./reference-links.ts";
 
 // Minimal `HTMLRewriter` shape — the workers runtime exposes it as a
 // global, but we don't pull in `@cloudflare/workers-types`, so declare
@@ -242,10 +240,6 @@ const REDIRECTS: Record<string, string> = {
 };
 
 const resolveRedirect = (url: URL): string | undefined => {
-  const social = SOCIAL_REDIRECTS[url.pathname.replace(/\/$/, "")];
-  if (social) return social;
-  const reference = referenceDestination(url.pathname + url.search);
-  if (reference) return reference;
   let p = url.pathname.replace(/\/$/, "");
   const isMarkdown = p.endsWith(".md");
   if (isMarkdown) p = p.slice(0, -".md".length);

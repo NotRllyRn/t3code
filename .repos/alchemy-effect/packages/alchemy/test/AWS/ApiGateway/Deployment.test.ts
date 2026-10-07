@@ -69,7 +69,6 @@ test.provider.skipIf(!!process.env.FAST)(
       yield* stack.destroy();
       yield* assertRestApiDeleted(api.restApiId);
     }).pipe(Effect.ensuring(reapRestApis("AgDepApi"))),
-  { tags: ["provider:aws", "provider:aws:apigateway", "live"] },
 );
 
 test.provider.skipIf(!!process.env.FAST)(
@@ -124,7 +123,6 @@ test.provider.skipIf(!!process.env.FAST)(
       yield* stack.destroy();
       yield* assertRestApiDeleted(api.restApiId);
     }).pipe(Effect.ensuring(reapRestApis("AgTrigApi"))),
-  { tags: ["provider:aws", "provider:aws:apigateway", "live"] },
 );
 
 test.provider.skipIf(!!process.env.FAST)(
@@ -165,5 +163,4 @@ test.provider.skipIf(!!process.env.FAST)(
       yield* stack.destroy();
       yield* assertRestApiDeleted(api.restApiId);
     }).pipe(Effect.ensuring(reapRestApis("AgListApi"))),
-  { tags: ["provider:aws", "provider:aws:apigateway", "live"] },
 );

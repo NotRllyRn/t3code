@@ -21,15 +21,12 @@ const observed = devopsguru.describeServiceIntegration({}).pipe(
 
 // Ungated typed probe: describeServiceIntegration always answers with the
 // typed response shape — never an untyped catch-all.
-test.provider(
-  "describeServiceIntegration returns typed results",
-  () =>
-    Effect.gen(function* () {
-      const config = yield* observed;
-      expect(typeof config.opsCenter).toBe("boolean");
-      expect(typeof config.logsAnomalyDetection).toBe("boolean");
-    }),
-  { tags: ["provider:aws", "provider:aws:devopsguru", "live"] },
+test.provider("describeServiceIntegration returns typed results", () =>
+  Effect.gen(function* () {
+    const config = yield* observed;
+    expect(typeof config.opsCenter).toBe("boolean");
+    expect(typeof config.logsAnomalyDetection).toBe("boolean");
+  }),
 );
 
 // The integration is an account/region singleton. This test only runs when
@@ -91,8 +88,5 @@ test.provider(
       expect(after.logsAnomalyDetection).toBe(false);
       expect(after.encryptionType).toBe("AWS_OWNED_KMS_KEY");
     }),
-  {
-    tags: ["provider:aws", "provider:aws:devopsguru", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

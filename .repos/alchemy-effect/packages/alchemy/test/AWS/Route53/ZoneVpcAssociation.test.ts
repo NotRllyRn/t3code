@@ -127,8 +127,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertZoneGone(deployed.zone.id);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:ec2", "provider:aws:route53", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

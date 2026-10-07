@@ -24,7 +24,6 @@ export interface RetrieveApplePayDomainRequest extends Omit<
  * ```
  *
  * @binding
- * @product Payment Methods
  */
 export interface RetrieveApplePayDomain extends Binding.Service<
   RetrieveApplePayDomain,

@@ -135,8 +135,5 @@ test.provider(
       );
       expect(roleGone).toBe(true);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:bedrock", "provider:aws:iam", "live"],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

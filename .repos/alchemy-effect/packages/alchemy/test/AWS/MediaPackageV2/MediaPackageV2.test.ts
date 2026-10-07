@@ -22,7 +22,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:mediapackagev2", "live"] },
 );
 
 const assertGroupGone = (channelGroupName: string) =>
@@ -237,8 +236,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertGroupGone(first.group.channelGroupName);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:mediapackagev2", "live"],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );

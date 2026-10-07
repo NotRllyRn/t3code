@@ -55,13 +55,5 @@ test.provider.skipIf(!hasAxiomCreds)(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:axiom",
-      "provider:axiom:annotation",
-      "provider:axiom:dataset",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

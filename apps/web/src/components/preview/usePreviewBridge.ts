@@ -39,10 +39,8 @@ export function usePreviewBridge(input: {
   threadRef: ScopedThreadRef;
   tabId: string;
   runtimeTabId: string;
-  /** The server drives this tab and reports its navigation itself. */
-  serverDriven?: boolean;
 }): void {
-  const { threadRef, tabId, runtimeTabId, serverDriven = false } = input;
+  const { threadRef, tabId, runtimeTabId } = input;
   const clearBrowserPointer = useBrowserPointerStore((state) => state.clear);
   const reportStatus = useAtomCommand(previewEnvironment.reportStatus, "preview status report");
   const bridge = previewBridge;
@@ -81,7 +79,7 @@ export function usePreviewBridge(input: {
         lastReportedUrl: lastReportedUrl.current,
         lastReportedKind: lastReportedKind.current,
       });
-      if (!reported || serverDriven) return;
+      if (!reported) return;
       lastReportedUrl.current = reported.lastReportedUrl;
       lastReportedKind.current = reported.lastReportedKind;
       void reportStatus({

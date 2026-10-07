@@ -177,7 +177,6 @@ export type Certificate = Resource<
  * ```
  *
  * @resource
- * @product Certificate
  */
 export const Certificate = Resource<Certificate>("Fly.Certificate");
 

@@ -44,10 +44,7 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:dlp", "live"],
-    timeout: 90_000,
-  },
+  { timeout: 90_000 },
 );
 
 // Entitled-only: deploy a profile + standalone entry and assert `list()`
@@ -87,8 +84,5 @@ test.provider.skipIf(!entitled)(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:dlp", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

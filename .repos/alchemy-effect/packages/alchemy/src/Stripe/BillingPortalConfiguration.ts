@@ -418,7 +418,6 @@ export type BillingPortalConfiguration = Resource<
  * ```
  *
  * @resource
- * @product Billing
  */
 export const BillingPortalConfiguration = Resource<BillingPortalConfiguration>(
   "Stripe.BillingPortalConfiguration",

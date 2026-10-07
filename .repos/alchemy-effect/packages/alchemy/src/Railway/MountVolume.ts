@@ -143,7 +143,6 @@ export const assertHostDisk = (input: {
  * :::
  *
  * @binding
- * @product Volume
  */
 export interface MountVolume extends Binding.Service<
   MountVolume,

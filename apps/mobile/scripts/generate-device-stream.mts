@@ -5,9 +5,8 @@ import { build } from "vite-plus";
 
 const mobileRoot = NodePath.resolve(NodePath.dirname(NodeURL.fileURLToPath(import.meta.url)), "..");
 
-/** Metro embeds each shared browser transport as a small script in a native WebView. */
-async function generateWebViewScript(feature: string, name: string) {
-  const stem = `${name.toLowerCase()}-stream`;
+/** Metro embeds the shared browser transport as a small script in the native WebView. */
+export async function generateDeviceStreamScript() {
   const result = await build({
     configFile: false,
     logLevel: "silent",
@@ -16,8 +15,8 @@ async function generateWebViewScript(feature: string, name: string) {
       target: "es2022",
       minify: true,
       lib: {
-        entry: NodePath.join(mobileRoot, "src/features", feature, `${stem}.browser.ts`),
-        name: `T3${name}Stream`,
+        entry: NodePath.join(mobileRoot, "src/features/devices/device-stream.browser.ts"),
+        name: "T3DeviceStream",
         formats: ["iife"],
       },
     },
@@ -26,18 +25,15 @@ async function generateWebViewScript(feature: string, name: string) {
   const chunk = bundles
     .flatMap((bundle) => ("output" in bundle ? bundle.output : []))
     .find((output) => output.type === "chunk");
-  if (!chunk) throw new Error(`${name} build did not emit a script.`);
-  const root = NodePath.join(mobileRoot, ".generated", stem);
+  if (!chunk) throw new Error("Device stream build did not emit a script.");
+  const root = NodePath.join(mobileRoot, ".generated/device-stream");
   await NodeFSP.mkdir(root, { recursive: true });
-  for (const [file, contents] of [
+  for (const [name, contents] of [
     ["index.js", `module.exports = ${JSON.stringify(chunk.code)};\n`],
     ["package.json", '{"main":"index.js"}\n'],
   ] as const) {
-    const destination = NodePath.join(root, file);
+    const destination = NodePath.join(root, name);
     const previous = await NodeFSP.readFile(destination, "utf8").catch(() => null);
     if (previous !== contents) await NodeFSP.writeFile(destination, contents);
   }
 }
-
-export const generateDeviceStreamScript = () => generateWebViewScript("devices", "Device");
-export const generatePreviewStreamScript = () => generateWebViewScript("browser", "Preview");

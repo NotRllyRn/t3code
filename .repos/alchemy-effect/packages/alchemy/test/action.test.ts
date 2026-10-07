@@ -74,7 +74,7 @@ const makePlan = <A, Err = never, Req = never>(
 
 // ── Plan tests ────────────────────────────────────────────────────────────
 
-describe("Plan", { tags: ["unit", "local"] }, () => {
+describe("Plan", () => {
   test(
     "first-time task -> run",
     Effect.gen(function* () {
@@ -294,7 +294,7 @@ describe("Plan", { tags: ["unit", "local"] }, () => {
 
 // ── Apply tests ───────────────────────────────────────────────────────────
 
-describe("Apply", { tags: ["unit", "local"] }, () => {
+describe("Apply", () => {
   test.provider("first run invokes body and persists ran state", (stack) =>
     Effect.gen(function* () {
       const counter = yield* Ref.make(0);

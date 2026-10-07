@@ -1,13 +1,9 @@
-import {
-  layerRuntime,
-  registerHttpServer,
-} from "@alchemy.run/cloudflare-runtime/core";
+import { layerRuntime } from "@alchemy.run/cloudflare-runtime/core";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Match from "effect/Match";
 import * as Stdio from "effect/Stdio";
 import * as Stream from "effect/Stream";
-import * as FetchHttpClient from "effect/http/FetchHttpClient";
+import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 import * as NodeV8 from "node:v8";
 import {
   Artifacts,
@@ -16,7 +12,6 @@ import {
 } from "../../Artifacts.ts";
 import { CloudflareAuth } from "../Auth/AuthProvider.ts";
 import * as Credentials from "../Credentials.ts";
-import * as CloudflareEnvironment from "../CloudflareEnvironment.ts";
 import * as RpcServerEnvironment from "../../Local/RpcServerEnvironment.ts";
 import { PlatformServices, runMain } from "../../Util/PlatformServices.ts";
 import { materializeRuntimeBindings } from "./RuntimeBindings.ts";
@@ -48,18 +43,12 @@ const program = Effect.scoped(
   Effect.gen(function* () {
     const config = yield* readConfig;
     const credentials = Credentials.fromAuthProvider().pipe(
-      Layer.provideMerge(CloudflareEnvironment.fromProfile()),
       Layer.provide(CloudflareAuth),
     );
-    const runtimeContext = yield* Layer.unwrap(
-      Effect.gen(function* () {
-        const environment = yield* CloudflareEnvironment.CloudflareEnvironment;
-        return layerRuntime({
-          api: { accountId: Effect.map(environment, (env) => env.accountId) },
-          storage: { directory: config.storageDirectory },
-        });
-      }),
-    ).pipe(
+    const runtimeContext = yield* layerRuntime({
+      api: { accountId: config.accountId },
+      storage: { directory: config.storageDirectory },
+    }).pipe(
       Layer.provide(Layer.mergeAll(credentials, FetchHttpClient.layer)),
       Layer.build,
     );
@@ -129,26 +118,15 @@ const program = Effect.scoped(
             }),
           ),
           Effect.flatMap((handle) =>
-            Match.value(handle).pipe(
-              Match.when({ mode: "server" }, (handle) =>
-                (handle.serviceBinding === "http"
-                  ? registerHttpServer(config.worker.name, handle.url).pipe(
-                      Effect.provideContext(runtimeContext),
-                    )
-                  : Effect.void
-                ).pipe(Effect.as(handle.url.toString())),
-              ),
-              Match.when({ mode: "bundle" }, () =>
-                Effect.fail(
+            handle.mode === "server"
+              ? Effect.succeed(handle.url.toString())
+              : Effect.fail(
                   new SourceProviderError({
                     provider: source.descriptor.provider,
                     message:
                       "A source declared devMode 'server' but returned a bundle-mode dev handle.",
                   }),
                 ),
-              ),
-              Match.exhaustive,
-            ),
           ),
         )
       : yield* Vite.viteDev(

@@ -59,8 +59,5 @@ test.provider.skipIf(!hasAxiomCreds)(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:axiom", "provider:axiom:apitoken", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

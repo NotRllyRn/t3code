@@ -141,14 +141,5 @@ test.provider(
       const after = yield* getPipeline;
       expect(after).toBeUndefined();
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:codepipeline",
-      "provider:aws:iam",
-      "provider:aws:s3",
-      "live",
-    ],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );

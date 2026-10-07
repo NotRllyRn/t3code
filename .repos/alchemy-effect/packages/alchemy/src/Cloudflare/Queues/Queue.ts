@@ -14,7 +14,6 @@ import * as Provider from "../../Provider.ts";
 import { isResourceOfType, Resource } from "../../Resource.ts";
 import { Stack } from "../../Stack.ts";
 import { CloudflareEnvironment } from "../CloudflareEnvironment.ts";
-import { localAccountId } from "../LocalAccount.ts";
 import { detachQueueConsumersOfScript } from "./Consumer.ts";
 import {
   generateLocalId,
@@ -77,8 +76,8 @@ export type Queue = Resource<
  * ```typescript
  * import * as Cloudflare from "alchemy/Cloudflare";
  * import * as Effect from "effect/Effect";
- * import { HttpServerRequest } from "effect/http/HttpServerRequest";
- * import * as HttpServerResponse from "effect/http/HttpServerResponse";
+ * import { HttpServerRequest } from "effect/unstable/http/HttpServerRequest";
+ * import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
  *
  * export const Queue = Cloudflare.Queues.Queue("Queue");
  *
@@ -407,7 +406,7 @@ export const ProviderLocal = () =>
       return {
         stables: ["accountId"],
         diff: Effect.fn(function* ({ id, olds = {}, news = {}, output }) {
-          const accountId = yield* localAccountId;
+          const { accountId } = yield* yield* CloudflareEnvironment;
           if (!output?.queueId) return { action: "update" };
           // A real (non-`dev:`) queueId on a local-mode row is legacy damage:
           // pre-stamping dev runs preserved the live id, which the worker
@@ -439,7 +438,7 @@ export const ProviderLocal = () =>
           ).pipe(Option.getOrUndefined);
         }),
         reconcile: Effect.fn(function* ({ id, news = {}, output }) {
-          const accountId = yield* localAccountId;
+          const { accountId } = yield* yield* CloudflareEnvironment;
           const queue: Queue["Attributes"] = {
             // Never carry a real (non-`dev:`) id forward onto a local row —
             // the worker binding would treat it as an `Alchemy.remote()`

@@ -32,7 +32,6 @@ test.provider.skipIf(!!process.env.FAST)(
       const after = yield* ag.getAccount({});
       expect(after.cloudwatchRoleArn).toEqual(before.cloudwatchRoleArn);
     }),
-  { tags: ["provider:aws", "provider:aws:apigateway", "live"] },
 );
 
 test.provider.skipIf(!!process.env.FAST)(
@@ -48,5 +47,4 @@ test.provider.skipIf(!!process.env.FAST)(
 
       yield* stack.destroy();
     }),
-  { tags: ["provider:aws", "provider:aws:apigateway", "live"] },
 );

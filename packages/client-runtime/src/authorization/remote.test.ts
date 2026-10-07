@@ -18,7 +18,7 @@ import {
   resolveRemoteWebSocketConnectionUrl,
 } from "./remote.ts";
 import { fetchRemoteEnvironmentDescriptor } from "../environment/descriptor.ts";
-import * as RpcHttp from "../rpc/http.ts";
+import { remoteHttpClientLayer } from "../rpc/http.ts";
 
 const isEnvironmentAuthInvalidError = Schema.is(EnvironmentAuthInvalidError);
 
@@ -49,8 +49,7 @@ const hangingFetch = () => {
   return { fetchFn, calls };
 };
 
-const provideRemoteHttp = (fetchFn: typeof fetch) =>
-  Effect.provide(RpcHttp.layerRemoteHttpClient(fetchFn));
+const provideRemoteHttp = (fetchFn: typeof fetch) => Effect.provide(remoteHttpClientLayer(fetchFn));
 
 const expectFetchCall = (
   calls: ReadonlyArray<FetchCall>,

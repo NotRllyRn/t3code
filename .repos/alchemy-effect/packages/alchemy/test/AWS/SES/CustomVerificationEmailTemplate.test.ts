@@ -66,7 +66,7 @@ test.provider(
 
       yield* stack.destroy();
     }),
-  { tags: ["provider:aws", "provider:aws:ses", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );
 
 test.provider.skipIf(!VERIFIED_FROM)(
@@ -120,7 +120,7 @@ test.provider.skipIf(!VERIFIED_FROM)(
       yield* stack.destroy();
       yield* assertCvetDeleted(template.templateName);
     }),
-  { tags: ["provider:aws", "provider:aws:ses", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );
 
 test.provider.skipIf(!VERIFIED_FROM)(
@@ -161,5 +161,5 @@ test.provider.skipIf(!VERIFIED_FROM)(
       yield* stack.destroy();
       yield* assertCvetDeleted("alchemy-test-cvet-b");
     }),
-  { tags: ["provider:aws", "provider:aws:ses", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );

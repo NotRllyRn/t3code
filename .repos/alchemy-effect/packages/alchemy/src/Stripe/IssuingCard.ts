@@ -287,7 +287,6 @@ export type IssuingCard = Resource<
  * ```
  *
  * @resource
- * @product Issuing
  */
 export const IssuingCard = Resource<IssuingCard>("Stripe.IssuingCard");
 

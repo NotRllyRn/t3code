@@ -43,10 +43,7 @@ test(
     ).toBe(true);
     expect(sameStringSet(["subnet-a"], ["subnet-b"])).toBe(false);
   }),
-  {
-    tags: ["provider:aws", "provider:aws:elasticache", "live"],
-    timeout: 2_700_000,
-  },
+  { timeout: 2_700_000 },
 );
 
 test(
@@ -76,10 +73,7 @@ test(
       expect(error?._tag).toBe("InvalidReplicationGroupConfiguration");
     }
   }),
-  {
-    tags: ["provider:aws", "provider:aws:elasticache", "live"],
-    timeout: 2_700_000,
-  },
+  { timeout: 2_700_000 },
 );
 
 const withEnv = <A, E = never, R = never>(
@@ -161,10 +155,7 @@ test(
       tls: false,
     });
   }),
-  {
-    tags: ["provider:aws", "provider:aws:elasticache", "live"],
-    timeout: 2_700_000,
-  },
+  { timeout: 2_700_000 },
 );
 
 const assertSubnetGroupGone = (name: string) =>
@@ -223,10 +214,10 @@ test.provider(
           Effect.gen(function* () {
             const group = yield* AWS.ElastiCache.SubnetGroup("Subnets", {
               description,
-              subnetIds: net.subnetIds,
+              subnetIds: net.privateSubnetIds,
               tags: { fixture: "elasticache-provisioned" },
             });
-            return { group, subnetIds: net.subnetIds };
+            return { group, subnetIds: net.privateSubnetIds };
           }),
         );
 
@@ -248,15 +239,7 @@ test.provider(
       yield* stack.destroy();
       yield* assertSubnetGroupGone(group.subnetGroupName);
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:ec2",
-      "provider:aws:elasticache",
-      "live",
-    ],
-    timeout: 180_000,
-  },
+  { timeout: 2_700_000 },
 );
 
 test.provider.skipIf(!process.env.AWS_TEST_SLOW)(
@@ -297,15 +280,7 @@ test.provider.skipIf(!process.env.AWS_TEST_SLOW)(
       yield* stack.destroy();
       yield* assertReplicationGroupGone(cache.replicationGroupId);
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:ec2",
-      "provider:aws:elasticache",
-      "live",
-    ],
-    timeout: 2_700_000,
-  },
+  { timeout: 2_700_000 },
 );
 
 test.provider.skipIf(!process.env.AWS_TEST_SLOW)(
@@ -344,15 +319,7 @@ test.provider.skipIf(!process.env.AWS_TEST_SLOW)(
       yield* stack.destroy();
       yield* assertCacheClusterGone(cache.cacheClusterId);
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:ec2",
-      "provider:aws:elasticache",
-      "live",
-    ],
-    timeout: 2_700_000,
-  },
+  { timeout: 2_700_000 },
 );
 
 test.provider.skipIf(!process.env.AWS_TEST_SLOW)(
@@ -387,15 +354,7 @@ test.provider.skipIf(!process.env.AWS_TEST_SLOW)(
       yield* stack.destroy();
       yield* assertReplicationGroupGone(replaced.replicationGroupId);
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:ec2",
-      "provider:aws:elasticache",
-      "live",
-    ],
-    timeout: 2_700_000,
-  },
+  { timeout: 2_700_000 },
 );
 
 test.provider.skipIf(!process.env.AWS_TEST_SLOW)(
@@ -444,15 +403,7 @@ test.provider.skipIf(!process.env.AWS_TEST_SLOW)(
       yield* stack.destroy();
       yield* assertReplicationGroupGone(reduced.replicationGroupId);
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:ec2",
-      "provider:aws:elasticache",
-      "live",
-    ],
-    timeout: 2_700_000,
-  },
+  { timeout: 2_700_000 },
 );
 
 test.provider.skipIf(!process.env.AWS_TEST_SLOW)(
@@ -483,13 +434,5 @@ test.provider.skipIf(!process.env.AWS_TEST_SLOW)(
       yield* assertFinalSnapshotAvailable();
       yield* deleteFinalSnapshot();
     }).pipe(Effect.ensuring(deleteFinalSnapshot().pipe(Effect.ignore))),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:ec2",
-      "provider:aws:elasticache",
-      "live",
-    ],
-    timeout: 2_700_000,
-  },
+  { timeout: 2_700_000 },
 );

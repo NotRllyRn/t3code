@@ -91,8 +91,5 @@ test.provider.skipIf(!process.env.AWS_TEST_TRANSLATE_PARALLEL_DATA)(
       const after = yield* getParallelData(parallelDataName);
       expect(after).toBeUndefined();
     }).pipe(Effect.ensuring(cleanupBucket)),
-  {
-    tags: ["provider:aws", "provider:aws:s3", "provider:aws:translate", "live"],
-    timeout: 900_000,
-  },
+  { timeout: 900_000 },
 );

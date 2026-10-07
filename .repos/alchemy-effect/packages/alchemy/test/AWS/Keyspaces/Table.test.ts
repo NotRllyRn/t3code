@@ -88,8 +88,5 @@ test.provider(
       const gone = yield* getTable(ksName, "events");
       expect(gone).toBeUndefined();
     }),
-  {
-    tags: ["provider:aws", "provider:aws:keyspaces", "live"],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );

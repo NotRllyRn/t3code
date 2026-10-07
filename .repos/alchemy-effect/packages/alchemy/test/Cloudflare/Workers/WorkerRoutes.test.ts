@@ -228,16 +228,7 @@ test.provider(
         ),
       );
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:dns",
-      "provider:cloudflare:worker",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );
 
 // --- observed state is the baseline: drift removal + destroy cleanup ----
@@ -322,15 +313,7 @@ test.provider(
       // Destroying the worker detaches its routes from the zone.
       expect(yield* findRoute(zoneId, T2_KEPT)).toBeUndefined();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:worker",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );
 
 // --- refusal: a pattern already routed to a different Worker ------------
@@ -390,15 +373,7 @@ test.provider(
         Effect.ensuring(stack.destroy().pipe(Effect.orDie).pipe(Effect.ignore)),
       );
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:worker",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );
 
 /**

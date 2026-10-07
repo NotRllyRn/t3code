@@ -5,9 +5,9 @@ import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import { MinimumLogLevel } from "effect/References";
 import * as Schedule from "effect/Schedule";
-import * as HttpClient from "effect/http/HttpClient";
-import * as HttpClientRequest from "effect/http/HttpClientRequest";
-import type * as HttpClientResponse from "effect/http/HttpClientResponse";
+import * as HttpClient from "effect/unstable/http/HttpClient";
+import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
+import type * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 import Stack from "./fixtures/stack.ts";
 
 /**
@@ -164,15 +164,7 @@ test.skipIf(!ARTIFACTS_ENABLED)(
     const out = yield* stack;
     yield* exercise("effect", out.effectWorkerUrl);
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:artifacts",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: TEST_TIMEOUT,
-  },
+  { timeout: TEST_TIMEOUT },
 );
 
 // Async worker: namespace declared on `env: { REPOS }`, used from plain async fetch.
@@ -182,13 +174,5 @@ test.skipIf(!ARTIFACTS_ENABLED)(
     const out = yield* stack;
     yield* exercise("async", out.asyncWorkerUrl);
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:artifacts",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: TEST_TIMEOUT,
-  },
+  { timeout: TEST_TIMEOUT },
 );

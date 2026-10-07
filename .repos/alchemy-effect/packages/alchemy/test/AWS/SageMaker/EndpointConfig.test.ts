@@ -23,7 +23,6 @@ test.provider(
       );
       expect(error._tag).toBe("EndpointConfigNotFound");
     }),
-  { tags: ["provider:aws", "provider:aws:sagemaker", "live"] },
 );
 
 const findConfig = (name: string) =>
@@ -100,13 +99,5 @@ test.provider(
       yield* stack.destroy();
       expect(yield* findConfig(config.endpointConfigName)).toBeUndefined();
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:iam",
-      "provider:aws:sagemaker",
-      "live",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

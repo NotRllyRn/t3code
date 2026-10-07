@@ -99,10 +99,7 @@ test.provider(
 
       yield* expectGone(accountId, input.liveInputId);
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:stream", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -146,10 +143,7 @@ test.provider(
 
       yield* expectGone(accountId, healed.liveInputId);
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:stream", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // Canonical `list()` test (account collection): deploy a live input, then
@@ -196,8 +190,5 @@ test.provider.skipIf(!process.env.CLOUDFLARE_TEST_STREAM_LIST)(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:stream", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

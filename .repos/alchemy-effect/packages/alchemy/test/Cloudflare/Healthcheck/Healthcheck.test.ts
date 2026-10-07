@@ -146,14 +146,6 @@ test.provider(
 
       yield* expectGone(zoneId, check.healthcheckId);
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:healthcheck",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-  },
 );
 
 test.provider(
@@ -227,14 +219,6 @@ test.provider(
 
       yield* expectGone(zoneId, initial.healthcheckId);
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:healthcheck",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-  },
 );
 
 test.provider(
@@ -294,14 +278,6 @@ test.provider(
 
       yield* expectGone(zoneId, switched.healthcheckId);
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:healthcheck",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-  },
 );
 
 test.provider(
@@ -372,14 +348,6 @@ test.provider(
       const gone = yield* findByName(zoneId, NAME_ADOPT);
       expect(gone).toBeUndefined();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:healthcheck",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-  },
 );
 
 test.provider(
@@ -420,14 +388,6 @@ test.provider(
 
       yield* expectGone(zoneId, deployed.healthcheckId);
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:healthcheck",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-  },
 );
 
 /**

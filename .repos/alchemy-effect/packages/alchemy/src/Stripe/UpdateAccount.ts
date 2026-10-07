@@ -24,7 +24,6 @@ export interface UpdateAccountRequest extends Omit<
  * ```
  *
  * @binding
- * @product Account
  */
 export interface UpdateAccount extends Binding.Service<
   UpdateAccount,

@@ -36,16 +36,16 @@ function normalizeAppState(
   return "unknown";
 }
 
-export const layerObserver = Layer.succeed(
+export const mobileBackgroundActivityObserverLayer = Layer.succeed(
   EnvironmentRpcSubscriptionObserver,
   EnvironmentRpcSubscriptionObserver.of({
     observe: observeMobileBackgroundActivitySubscription,
   }),
 );
 
-export const layerReporter = Layer.effectDiscard(
+export const mobileBackgroundActivityReporterLayer = Layer.effectDiscard(
   Effect.gen(function* () {
-    const registry = yield* EnvironmentRegistry.EnvironmentRegistry;
+    const registry = yield* EnvironmentRegistry;
     const storage = yield* MobileStorage.MobileStorage;
     const clientId = yield* storage.loadOrCreateAgentAwarenessDeviceId.pipe(
       Effect.map((deviceId) => `mobile-${deviceId}`),

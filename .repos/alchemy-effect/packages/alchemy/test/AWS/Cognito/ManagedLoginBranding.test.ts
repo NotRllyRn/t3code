@@ -150,5 +150,5 @@ test.provider(
         }),
       );
     }),
-  { tags: ["provider:aws", "provider:aws:cognito", "live"], timeout: 180_000 },
+  { timeout: 180_000 },
 );

@@ -7,7 +7,7 @@ import { describe, expect } from "alchemy-test";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Schedule from "effect/Schedule";
-import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClient from "effect/unstable/http/HttpClient";
 import { fileURLToPath } from "node:url";
 import { getDefaultVpc } from "../DefaultVpc.ts";
 
@@ -124,18 +124,9 @@ const getJsonWithRetry = (url: string, times: number) =>
 // afterAll teardown waits out the mount-target/ENI release (~2–4 min). That
 // is genuinely slow platform provisioning, not a failure mode; the suite was
 // verified green in wave 1C (commit e77b9fd83). Run with AWS_TEST_SLOW=1.
-describe.skipIf(!process.env.AWS_TEST_SLOW).sequential(
-  "EFS Lambda mount",
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:ec2",
-      "provider:aws:efs",
-      "provider:aws:lambda",
-      "live",
-    ],
-  },
-  () => {
+describe
+  .skipIf(!process.env.AWS_TEST_SLOW)
+  .sequential("EFS Lambda mount", () => {
     beforeAll(
       Effect.gen(function* () {
         yield* sharedStack.destroy();
@@ -204,5 +195,4 @@ describe.skipIf(!process.env.AWS_TEST_SLOW).sequential(
         }),
       { timeout: 180_000 },
     );
-  },
-);
+  });

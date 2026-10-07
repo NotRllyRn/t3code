@@ -310,7 +310,6 @@ export interface Ruleset extends Resource<
  * ```
  *
  * @resource
- * @product Repository
  */
 export const Ruleset = Resource<Ruleset>("GitHub.Ruleset", {
   defaultRemovalPolicy: "retain",

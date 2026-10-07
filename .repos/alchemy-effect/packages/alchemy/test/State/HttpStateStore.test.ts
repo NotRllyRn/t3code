@@ -5,16 +5,14 @@ import {
 } from "@/State/HttpStateStore.ts";
 import { describe, expect, it } from "alchemy-test";
 import * as Effect from "effect/Effect";
-import * as Fiber from "effect/Fiber";
-import * as TestClock from "effect/testing/TestClock";
 import * as Layer from "effect/Layer";
 import * as Logger from "effect/Logger";
 import * as Redacted from "effect/Redacted";
-import * as FetchHttpClient from "effect/http/FetchHttpClient";
-import * as HttpClientError from "effect/http/HttpClientError";
-import * as HttpClientRequest from "effect/http/HttpClientRequest";
-import * as HttpClientResponse from "effect/http/HttpClientResponse";
-import * as HttpApiError from "effect/http-api/HttpApiError";
+import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
+import * as HttpClientError from "effect/unstable/http/HttpClientError";
+import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
+import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
+import * as HttpApiError from "effect/unstable/httpapi/HttpApiError";
 
 /**
  * Hermetic tests driven by the production failure modes observed in
@@ -60,7 +58,7 @@ const makeStore = makeHttpStateStore({
   id: "test-http",
 });
 
-describe("describeStateStoreFailure", { tags: ["unit", "local"] }, () => {
+describe("describeStateStoreFailure", () => {
   it("never returns an empty message", () => {
     class Empty extends Error {
       readonly _tag = "SomeTaggedError";
@@ -104,12 +102,12 @@ describe("describeStateStoreFailure", { tags: ["unit", "local"] }, () => {
   });
 });
 
-describe("makeHttpStateStore", { tags: ["unit", "local"] }, () => {
+describe("makeHttpStateStore", () => {
   // Regression: https://github.com/reve-ai/kommunikasie/commit/f2e7320ff261833092b84d8aa25e3563710661e8
   // State encoding unwraps Redacted values before HTTP. Neither the request
   // object nor transport/decoder messages may escape through diagnostics.
   for (const failure of ["status", "decode", "transport"] as const) {
-    it.effect(
+    it.live(
       `does not expose serialized state after a ${failure} failure`,
       () => {
         const secret = "STATE_PAYLOAD_SENTINEL_91f4";
@@ -128,7 +126,7 @@ describe("makeHttpStateStore", { tags: ["unit", "local"] }, () => {
         };
         return Effect.gen(function* () {
           const store = yield* makeStore;
-          const fiber = yield* store
+          const error = yield* store
             .set({
               stack: "s",
               stage: "dev",
@@ -146,9 +144,7 @@ describe("makeHttpStateStore", { tags: ["unit", "local"] }, () => {
                 output: null,
               },
             })
-            .pipe(Effect.flip, Effect.forkChild);
-          yield* TestClock.adjust("30 seconds");
-          const error = yield* Fiber.join(fiber);
+            .pipe(Effect.flip);
           expect(requestBody).toContain(secret);
           expect(JSON.stringify({ error, logs })).not.toContain(secret);
           expect(error.cause).toBeUndefined();
@@ -243,7 +239,7 @@ describe("makeHttpStateStore", { tags: ["unit", "local"] }, () => {
   );
 });
 
-describe("checkHttpStateStoreAuth", { tags: ["unit", "local"] }, () => {
+describe("checkHttpStateStoreAuth", () => {
   const check = checkHttpStateStoreAuth({
     url: "https://state-store.test",
     authToken: "token",

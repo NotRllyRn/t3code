@@ -5,20 +5,19 @@ import * as Effect from "effect/Effect";
 import * as ErrorReporter from "effect/ErrorReporter";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import * as Scope from "effect/Scope";
-import type { HttpBodyError } from "effect/http/HttpBody";
+import type { Scope } from "effect/Scope";
+import type { HttpBodyError } from "effect/unstable/http/HttpBody";
 import {
   causeResponse,
   type HttpServerError,
-} from "effect/http/HttpServerError";
-import { HttpServerRequest } from "effect/http/HttpServerRequest";
-import * as HttpServerResponse from "effect/http/HttpServerResponse";
-import { ManagedHttpShutdown } from "./Runtime/Bootstrap/ManagedHttpShutdown.ts";
+} from "effect/unstable/http/HttpServerError";
+import { HttpServerRequest } from "effect/unstable/http/HttpServerRequest";
+import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 
 export type HttpEffect<Req = never> = Effect.Effect<
   HttpServerResponse.HttpServerResponse,
   HttpServerError | HttpBodyError,
-  HttpServerRequest | Scope.Scope | Req
+  HttpServerRequest | Scope | Req
 >;
 
 /**
@@ -30,13 +29,13 @@ export type HttpEffect<Req = never> = Effect.Effect<
  */
 const scopeEjected = Symbol.for("effect/http/HttpEffect/scopeEjected");
 
-export const isScopeEjected = (scope: Scope.Scope) => scopeEjected in scope;
+export const isScopeEjected = (scope: Scope) => scopeEjected in scope;
 
 export const serve = <Req = never>(
   handler: Effect.Effect<
     HttpServerResponse.HttpServerResponse,
     HttpServerError | HttpBodyError,
-    HttpServerRequest | Scope.Scope | Req
+    HttpServerRequest | Scope | Req
   >,
 ) =>
   Effect.serviceOption(HttpServer).pipe(
@@ -67,11 +66,7 @@ export class HttpServer extends Context.Service<
       options?: {
         port?: number;
       },
-    ) => Effect.Effect<
-      void,
-      never,
-      Exclude<Req, HttpServerRequest> | Scope.Scope
-    >;
+    ) => Effect.Effect<void, never, Exclude<Req, HttpServerRequest> | Scope>;
   }
 >()("HttpServer") {}
 
@@ -80,7 +75,7 @@ export const safeHttpEffect = <Req = never>(
 ): Effect.Effect<
   HttpServerResponse.HttpServerResponse,
   never,
-  Req | HttpServerRequest | Scope.Scope
+  Req | HttpServerRequest | Scope
 > =>
   Effect.catchCause(
     handler.pipe(
@@ -192,40 +187,14 @@ export const NodeHttpServer = (serverOptions?: NodeHttpServerOptions) =>
         serve: (handler, options) =>
           Effect.gen(function* () {
             const port = yield* resolvePort(options);
-            const shutdown = yield* Effect.serviceOption(ManagedHttpShutdown);
-            const managed = Option.getOrUndefined(shutdown);
-            if (managed?.isStopping()) return yield* Effect.interrupt;
-            const serve = Effect.gen(function* () {
-              const server = yield* NodeHttpServerPlatform.make(
-                () => {
-                  const server = NodeHttp.createServer();
-                  managed?.servers.add(server);
-                  server.once("close", () => managed?.servers.delete(server));
-                  return server;
-                },
-                {
-                  port,
-                  host: serverOptions?.hostname ?? "0.0.0.0",
-                  gracefulShutdownTimeout: managed?.drainTimeoutMs,
-                },
-              );
-              // The Node bridge masks interruption, including streaming writes.
-              yield* managed
-                ? server.serve(safeHttpEffect(handler), (handled) =>
-                    Effect.withFiber((fiber) => {
-                      // Observe outside the adapter's request-scope finalization.
-                      managed.observeRequest(fiber);
-                      return Effect.interruptible(handled);
-                    }),
-                  )
-                : server.serve(safeHttpEffect(handler));
-            });
-            if (managed) {
-              const scope = yield* Scope.fork(managed.scope);
-              yield* serve.pipe(Scope.provide(scope));
-            } else {
-              yield* serve;
-            }
+            const server = yield* NodeHttpServerPlatform.make(
+              NodeHttp.createServer,
+              {
+                port,
+                host: serverOptions?.hostname ?? "0.0.0.0",
+              },
+            );
+            yield* server.serve(safeHttpEffect(handler));
           }).pipe(Effect.orDie),
       };
     }),

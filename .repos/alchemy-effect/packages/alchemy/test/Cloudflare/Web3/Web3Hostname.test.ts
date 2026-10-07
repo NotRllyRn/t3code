@@ -127,14 +127,6 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:web3",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-  },
 );
 
 test.provider.skipIf(!entitledZoneId)(
@@ -212,15 +204,7 @@ test.provider.skipIf(!entitledZoneId)(
       const gone = yield* waitUntilGone(zoneId, name);
       expect(gone).toBeUndefined();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:web3",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider.skipIf(!entitledZoneId)(
@@ -286,13 +270,5 @@ test.provider.skipIf(!entitledZoneId)(
       const gone = yield* waitUntilGone(zoneId, name);
       expect(gone).toBeUndefined();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:web3",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

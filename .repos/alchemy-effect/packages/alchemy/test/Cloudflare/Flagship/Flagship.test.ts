@@ -4,7 +4,7 @@ import { expect } from "alchemy-test";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as Schedule from "effect/Schedule";
-import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClient from "effect/unstable/http/HttpClient";
 import Stack from "./fixtures/stack.ts";
 
 // The fixture stack provisions its own Flagship app via the FlagshipApp
@@ -61,15 +61,7 @@ test(
     const result = yield* getJson(`${asyncWorkerUrl}/bool`);
     expect(result).toMatchObject({ mode: "async", enabled: false });
   }),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:flagship",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );
 
 test(
@@ -84,15 +76,7 @@ test(
     expect(result.details.flagKey).toBe("nonexistent-flag");
     expect(result.details.value).toBe("fallback");
   }),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:flagship",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );
 
 test(
@@ -102,15 +86,7 @@ test(
     const result = yield* getJson(`${effectWorkerUrl}/bool`);
     expect(result).toMatchObject({ mode: "effect", enabled: false });
   }),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:flagship",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );
 
 test(
@@ -125,13 +101,5 @@ test(
     expect(result.details.flagKey).toBe("nonexistent-flag");
     expect(result.details.value).toBe("fallback");
   }),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:flagship",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

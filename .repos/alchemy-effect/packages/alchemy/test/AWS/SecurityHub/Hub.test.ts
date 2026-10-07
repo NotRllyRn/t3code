@@ -89,8 +89,5 @@ test.provider(
       const after = yield* describeHub;
       expect(after).toBeUndefined();
     }),
-  {
-    tags: ["provider:aws", "provider:aws:securityhub", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

@@ -32,7 +32,6 @@ test.provider(
       );
       expect(error._tag).toBe("NoSuchConfigRuleException");
     }),
-  { tags: ["provider:aws", "provider:aws:config", "live"] },
 );
 
 const findRule = (ruleName: string) =>
@@ -240,8 +239,5 @@ test.provider(
         yield* assertRuleDeleting(renamed.configRuleName);
       });
     }),
-  {
-    tags: ["provider:aws", "provider:aws:config", "provider:aws:iam", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

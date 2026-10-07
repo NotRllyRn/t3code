@@ -16,10 +16,7 @@ import {
   PATH_EMAIL,
   PATH_HANDLER_PREFIX,
 } from "./EmailOptions.shared.ts";
-import {
-  BINDING_USER_WORKER_DIRECT,
-  PATH_MODULE_RUNNER_INIT,
-} from "./EntryOptions.shared.ts";
+import { BINDING_USER_WORKER_DIRECT } from "./EntryOptions.shared.ts";
 import {
   PATH_SCHEDULED,
   PATH_SCHEDULED_LEGACY,
@@ -574,11 +571,6 @@ export default <ExportedHandler<Env>>{
         cf,
       },
     );
-    if (url.pathname === PATH_MODULE_RUNNER_INIT) {
-      return await env[BINDING_USER_WORKER_DIRECT].fetch(
-        userRequest as unknown as typeof request,
-      );
-    }
     return await env.USER_WORKER.fetch(
       userRequest as unknown as typeof request,
     );

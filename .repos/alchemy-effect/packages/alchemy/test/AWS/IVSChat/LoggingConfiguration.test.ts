@@ -101,8 +101,5 @@ test.provider(
         created.logging.loggingConfigurationArn,
       );
     }),
-  {
-    tags: ["provider:aws", "provider:aws:ivschat", "provider:aws:logs", "live"],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

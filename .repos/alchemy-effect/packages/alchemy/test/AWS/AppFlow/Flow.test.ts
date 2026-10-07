@@ -143,8 +143,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertFlowGone(created.flowName);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:appflow", "provider:aws:s3", "live"],
-    timeout: 150_000,
-  },
+  { timeout: 150_000 },
 );

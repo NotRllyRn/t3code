@@ -8,7 +8,6 @@ import { UpdateCreditGrant } from "./UpdateCreditGrant.ts";
  * Function or Worker Effect.
  *
  * @layer
- * @product Billing
  * @provides Stripe.UpdateCreditGrant
  */
 export const UpdateCreditGrantHttp = Layer.effect(

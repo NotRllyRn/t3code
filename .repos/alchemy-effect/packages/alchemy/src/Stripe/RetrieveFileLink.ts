@@ -24,7 +24,6 @@ export interface RetrieveFileLinkRequest extends Omit<
  * ```
  *
  * @binding
- * @product Files
  */
 export interface RetrieveFileLink extends Binding.Service<
   RetrieveFileLink,

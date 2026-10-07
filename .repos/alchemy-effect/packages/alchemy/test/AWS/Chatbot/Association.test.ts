@@ -38,7 +38,7 @@ test.provider(
         .pipe(Stream.runCollect, Effect.timeout("45 seconds"));
       expect(Array.from(listings)).toEqual([]);
     }),
-  { tags: ["provider:aws", "provider:aws:chatbot", "live"], timeout: 60_000 },
+  { timeout: 60_000 },
 );
 
 // Validates the distilled chatbot patch: associateToConfiguration against an
@@ -58,7 +58,7 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:chatbot", "live"], timeout: 30_000 },
+  { timeout: 30_000 },
 );
 
 // ---------------------------------------------------------------------------
@@ -180,8 +180,5 @@ test.provider.skipIf(
 
       yield* stack.destroy();
     }),
-  {
-    tags: ["provider:aws", "provider:aws:chatbot", "provider:aws:iam", "live"],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );

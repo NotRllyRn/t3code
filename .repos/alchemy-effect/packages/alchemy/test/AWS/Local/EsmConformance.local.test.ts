@@ -221,15 +221,5 @@ test.provider.skipIf(!dockerAvailable)(
       );
       yield* stack.destroy();
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:iam",
-      "provider:aws:lambda",
-      "provider:aws:s3",
-      "provider:aws:sqs",
-      "local",
-    ],
-    timeout: 540_000,
-  },
+  { timeout: 540_000 },
 );

@@ -24,7 +24,6 @@ export interface RetrieveAlertRequest extends Omit<
  * ```
  *
  * @binding
- * @product Billing
  */
 export interface RetrieveAlert extends Binding.Service<
   RetrieveAlert,

@@ -8,7 +8,6 @@ import { makeHttpStripeIdBinding } from "./StripeHttp.ts";
  * Function or Worker Effect.
  *
  * @layer
- * @product Checkout
  * @provides Stripe.RetrievePaymentLink
  */
 export const RetrievePaymentLinkHttp = Layer.effect(

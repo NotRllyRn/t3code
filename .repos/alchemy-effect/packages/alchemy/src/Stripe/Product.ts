@@ -123,7 +123,6 @@ export type Product = Resource<
  * ```
  *
  * @resource
- * @product Product
  */
 export const Product = Resource<Product>("Stripe.Product");
 

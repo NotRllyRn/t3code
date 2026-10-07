@@ -24,7 +24,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFound");
     }),
-  { tags: ["provider:aws", "provider:aws:sagemaker", "live"] },
 );
 
 const findCluster = (name: string) =>
@@ -122,14 +121,5 @@ test.provider.skipIf(!process.env.AWS_TEST_SAGEMAKER_HYPERPOD)(
       const gone = yield* findCluster(cluster.clusterName);
       expect(gone).toBeUndefined();
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:iam",
-      "provider:aws:s3",
-      "provider:aws:sagemaker",
-      "live",
-    ],
-    timeout: 3_600_000,
-  },
+  { timeout: 3_600_000 },
 );

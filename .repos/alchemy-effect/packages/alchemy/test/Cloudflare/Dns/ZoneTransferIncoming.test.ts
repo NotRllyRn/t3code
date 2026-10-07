@@ -78,10 +78,7 @@ test.provider(
       // destroy bookend so the harness state stays clean.
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:dns", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider.skipIf(!!secondaryZoneId)(
@@ -98,15 +95,7 @@ test.provider.skipIf(!!secondaryZoneId)(
       ).pipe(Effect.flip);
       expect(error._tag).toEqual("IncomingZoneTransferNotFound");
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:dns",
-      "provider:cloudflare:zone",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider.skipIf(!secondaryZoneId)(
@@ -175,8 +164,5 @@ test.provider.skipIf(!secondaryZoneId)(
       // Re-running destroy is idempotent.
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:dns", "live"],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );

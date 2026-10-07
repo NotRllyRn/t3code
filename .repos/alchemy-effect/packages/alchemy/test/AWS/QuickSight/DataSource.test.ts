@@ -65,10 +65,7 @@ test.provider(
 
       expect(["QuickSightSubscriptionRequired", "created"]).toContain(outcome);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:quicksight", "live"],
-    timeout: 60_000,
-  },
+  { timeout: 60_000 },
 );
 
 class DataSourceStillExists extends Data.TaggedError("DataSourceStillExists")<{
@@ -142,8 +139,5 @@ test.provider.skipIf(!SUBSCRIBED)(
         }),
       );
     }),
-  {
-    tags: ["provider:aws", "provider:aws:quicksight", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

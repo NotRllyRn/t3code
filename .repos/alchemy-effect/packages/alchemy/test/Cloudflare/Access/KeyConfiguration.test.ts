@@ -69,10 +69,7 @@ test.provider(
       const restored = yield* zeroTrust.getAccessKey({ accountId });
       expect(restored.keyRotationIntervalDays).toEqual(90);
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:access", "live"],
-    timeout: 90_000,
-  },
+  { timeout: 90_000 },
 );
 
 // Canonical `list()` test (per-account singleton): the key configuration
@@ -93,8 +90,5 @@ test.provider(
       expect(all.length).toBe(1);
       expect(all[0]!.accountId).toEqual(accountId);
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:access", "live"],
-    timeout: 90_000,
-  },
+  { timeout: 90_000 },
 );

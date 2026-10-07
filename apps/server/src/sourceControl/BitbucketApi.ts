@@ -15,7 +15,7 @@ import {
   type SourceControlRepositoryCloneUrls,
   type SourceControlRepositoryVisibility,
 } from "@t3tools/contracts";
-import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
+import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http";
 import { sanitizeBranchFragment } from "@t3tools/shared/git";
 import {
   detectSourceControlProviderFromRemoteUrl,
@@ -72,14 +72,12 @@ export class BitbucketRepositoryLocatorError extends Schema.TaggedError<Bitbucke
     repository: Schema.String,
   },
 ) {
-  static readonly detail = "Bitbucket repositories must be specified as workspace/repository.";
-
   get detail(): string {
-    return BitbucketRepositoryLocatorError.detail;
+    return "Bitbucket repositories must be specified as workspace/repository.";
   }
 
   override get message(): string {
-    return `Bitbucket API failed: ${this.detail}`;
+    return `Bitbucket API failed in createRepository: ${this.detail}`;
   }
 }
 
@@ -729,9 +727,9 @@ export const make = Effect.gen(function* () {
     readonly context?: SourceControlProvider.SourceControlProviderContext;
     readonly repository?: string;
   }) {
-    if (input.repository !== undefined) {
-      return yield* requireRepositoryLocator(input.repository);
-    }
+    const fromRepository =
+      input.repository !== undefined ? parseBitbucketRepositorySlug(input.repository) : null;
+    if (fromRepository) return fromRepository;
 
     const fromContext =
       input.context?.provider.kind === "bitbucket"

@@ -45,7 +45,6 @@ export interface EncryptResult {
  * ```
  *
  * @binding
- * @product Secret Key
  */
 export interface Encrypt extends Binding.Service<
   Encrypt,

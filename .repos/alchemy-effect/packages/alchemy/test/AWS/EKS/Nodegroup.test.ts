@@ -24,7 +24,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:eks", "live"] },
 );
 
 // Ungated `list()` probe: enumerates every cluster, lists each cluster's node
@@ -32,26 +31,23 @@ test.provider(
 // resource — returns `[]` in a clean account/region, otherwise a well-formed
 // array of full Nodegroup Attributes. Proves the enumeration wiring compiles
 // and runs live.
-test.provider(
-  "list returns a well-formed array of node groups",
-  (stack) =>
-    Effect.gen(function* () {
-      yield* stack.destroy();
+test.provider("list returns a well-formed array of node groups", (stack) =>
+  Effect.gen(function* () {
+    yield* stack.destroy();
 
-      const provider = yield* Provider.findProvider(Nodegroup);
-      const all = yield* provider.list();
+    const provider = yield* Provider.findProvider(Nodegroup);
+    const all = yield* provider.list();
 
-      expect(Array.isArray(all)).toBe(true);
-      for (const nodegroup of all) {
-        expect(typeof nodegroup.nodegroupArn).toBe("string");
-        expect(typeof nodegroup.nodegroupName).toBe("string");
-        expect(typeof nodegroup.clusterName).toBe("string");
-        expect(typeof nodegroup.nodeRole).toBe("string");
-        expect(Array.isArray(nodegroup.subnets)).toBe(true);
-        expect(Array.isArray(nodegroup.instanceTypes)).toBe(true);
-      }
-    }),
-  { tags: ["provider:aws", "provider:aws:eks", "live"] },
+    expect(Array.isArray(all)).toBe(true);
+    for (const nodegroup of all) {
+      expect(typeof nodegroup.nodegroupArn).toBe("string");
+      expect(typeof nodegroup.nodegroupName).toBe("string");
+      expect(typeof nodegroup.clusterName).toBe("string");
+      expect(typeof nodegroup.nodeRole).toBe("string");
+      expect(Array.isArray(nodegroup.subnets)).toBe(true);
+      expect(Array.isArray(nodegroup.instanceTypes)).toBe(true);
+    }
+  }),
 );
 
 // Full deploy lifecycle. An EKS cluster + managed node group takes 5+ minutes to
@@ -116,5 +112,5 @@ test.provider.skipIf(!process.env.AWS_TEST_EKS_CLUSTER)(
         );
       expect(gone).toBe(true);
     }),
-  { tags: ["provider:aws", "provider:aws:eks", "live"], timeout: 900_000 },
+  { timeout: 900_000 },
 );

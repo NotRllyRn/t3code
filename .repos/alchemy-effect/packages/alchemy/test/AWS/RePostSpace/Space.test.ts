@@ -22,7 +22,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:repostspace", "live"] },
 );
 
 // Deletion is verified as INITIATED (a DELETE* status, irreversible) or
@@ -100,8 +99,5 @@ test.provider.skipIf(!process.env.AWS_TEST_REPOSTSPACE)(
       yield* assertSpaceDeleting(space.spaceId);
     }),
   // async provisioning (~30 min) + update + delete initiation, one test.
-  {
-    tags: ["provider:aws", "provider:aws:repostspace", "live"],
-    timeout: 3_600_000,
-  },
+  { timeout: 3_600_000 },
 );

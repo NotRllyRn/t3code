@@ -112,10 +112,7 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:stripe", "provider:stripe:filelink", "live"],
-    timeout: 60_000,
-  },
+  { timeout: 60_000 },
 );
 
 test.provider(
@@ -200,10 +197,7 @@ test.provider(
       const expired = yield* waitUntilExpired(created.id);
       expect(expired).toEqual("expired");
     }).pipe(logLevel),
-  {
-    tags: ["provider:stripe", "provider:stripe:filelink", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -235,8 +229,5 @@ test.provider(
       const expired = yield* waitUntilExpired(deployed.id);
       expect(expired).toEqual("expired");
     }).pipe(logLevel),
-  {
-    tags: ["provider:stripe", "provider:stripe:filelink", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

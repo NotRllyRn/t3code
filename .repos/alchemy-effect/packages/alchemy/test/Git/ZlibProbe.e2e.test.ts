@@ -10,7 +10,7 @@ import * as Test from "@/Test/Alchemy";
 import { expect } from "alchemy-test";
 import * as Effect from "effect/Effect";
 import * as Schedule from "effect/Schedule";
-import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClient from "effect/unstable/http/HttpClient";
 import ZlibProbeWorker from "./fixtures/zlib-probe-worker.ts";
 
 const { test, beforeAll, afterAll, deploy, destroy } = Test.make({
@@ -77,8 +77,5 @@ test(
     }
     expect(probe).toBeDefined();
   }),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:worker", "live"],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );

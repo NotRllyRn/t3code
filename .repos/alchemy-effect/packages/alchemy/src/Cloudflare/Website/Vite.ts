@@ -252,19 +252,9 @@ export const Vite: {
     never,
     Req | Providers
   >;
-} = (<const Bindings extends WorkerBindingProps = {}, Req = never>(
-  id?: string,
-  propsEff?:
-    | InputProps<ViteProps<Bindings>>
-    | Effect.Effect<InputProps<ViteProps<Bindings>>, never, Req>,
-) =>
+} = ((id?: any, propsEff?: any) =>
   id === undefined
-    ? <const Bindings extends WorkerBindingProps = {}, Req = never>(
-        id: string,
-        propsEff?:
-          | InputProps<ViteProps<Bindings>>
-          | Effect.Effect<InputProps<ViteProps<Bindings>>, never, Req>,
-      ) => effectClass(Vite(id, propsEff))
+    ? (id: string, propsEff: any) => effectClass(Vite(id, propsEff))
     : Worker(
         id,
         Effect.map(

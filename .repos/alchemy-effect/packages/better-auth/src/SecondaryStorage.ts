@@ -8,7 +8,9 @@ import type { BetterAuthStorageError } from "./Errors.ts";
  * key-value store used for sessions, rate limiting, and OAuth state when
  * configured.
  *
- * All five operations are required. TTLs are in SECONDS.
+ * All five operations are required (Better Auth marks `getAndDelete` and
+ * `increment` optional today but documents them as required in the next
+ * major). TTLs are in SECONDS, matching Better Auth.
  */
 export interface SecondaryStorageService {
   readonly get: (
@@ -22,18 +24,17 @@ export interface SecondaryStorageService {
   readonly delete: (
     key: string,
   ) => Effect.Effect<void, BetterAuthStorageError, RuntimeContext>;
-  /** Atomic read-and-delete. */
+  /** Atomic read-and-delete where the backing store supports it. */
   readonly getAndDelete: (
     key: string,
   ) => Effect.Effect<string | null, BetterAuthStorageError, RuntimeContext>;
   /**
-   * Atomically increment a counter. When the key is absent it is created
-   * at `1` with `ttlSeconds`; later increments never extend the TTL
-   * (fixed window).
+   * Increment a counter, creating it at `1` with `ttlSeconds` on first
+   * write. Later increments never extend the TTL (fixed window).
    */
   readonly increment: (
     key: string,
-    ttlSeconds: number,
+    ttlSeconds?: number,
   ) => Effect.Effect<number, BetterAuthStorageError, RuntimeContext>;
 }
 

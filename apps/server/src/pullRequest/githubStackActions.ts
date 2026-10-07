@@ -8,9 +8,8 @@ import * as Clock from "effect/Clock";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 
-import * as GitHubApi from "../sourceControl/GitHubApi.ts";
+import * as GitHubCli from "../sourceControl/GitHubCli.ts";
 import { decodePullRequestStacksJson } from "./gitHubPullRequestJson.ts";
-import { cascadeRebaseStack } from "./githubStackRebase.ts";
 
 const stackErrorIdentity = {
   repository: Schema.String,
@@ -22,6 +21,10 @@ export class GitHubStackChangedError extends Schema.TaggedError<GitHubStackChang
   "GitHubStackChangedError",
   { ...stackErrorIdentity, completed: Schema.Int },
 ) {
+  get detail(): string {
+    return this.message;
+  }
+
   override get message(): string {
     return this.completed > 0
       ? `The stack changed at PR #${this.number} after ${this.completed} layers. Earlier updates remain on GitHub. Refresh it before trying again.`
@@ -33,6 +36,10 @@ export class GitHubStackUnsupportedError extends Schema.TaggedError<GitHubStackU
   "GitHubStackUnsupportedError",
   stackErrorIdentity,
 ) {
+  get detail(): string {
+    return this.message;
+  }
+
   override get message(): string {
     return "This operation is not supported for this stack.";
   }
@@ -42,6 +49,10 @@ export class GitHubStackResponseInvalidError extends Schema.TaggedError<GitHubSt
   "GitHubStackResponseInvalidError",
   { ...stackErrorIdentity, cause: Schema.optional(Schema.Defect()) },
 ) {
+  get detail(): string {
+    return this.message;
+  }
+
   override get message(): string {
     return "GitHub returned an unreadable stack operation response.";
   }
@@ -51,6 +62,10 @@ export class GitHubStackMergeRejectedError extends Schema.TaggedError<GitHubStac
   "GitHubStackMergeRejectedError",
   { ...stackErrorIdentity, cause: Schema.Defect() },
 ) {
+  get detail(): string {
+    return this.message;
+  }
+
   override get message(): string {
     return "GitHub refused the stack merge. Check the stack's branch rules and merge requirements.";
   }
@@ -60,6 +75,10 @@ export class GitHubStackMergePendingError extends Schema.TaggedError<GitHubStack
   "GitHubStackMergePendingError",
   stackErrorIdentity,
 ) {
+  get detail(): string {
+    return this.message;
+  }
+
   override get message(): string {
     return "The merge is still running on GitHub. Check its status there before submitting another request.";
   }
@@ -69,6 +88,10 @@ export class GitHubStackPermissionError extends Schema.TaggedError<GitHubStackPe
   "GitHubStackPermissionError",
   stackErrorIdentity,
 ) {
+  get detail(): string {
+    return this.message;
+  }
+
   override get message(): string {
     return "You cannot update every branch in this stack. Check write access and fork maintainer permissions before retrying.";
   }
@@ -78,11 +101,12 @@ export class GitHubStackRebaseFailedError extends Schema.TaggedError<GitHubStack
   "GitHubStackRebaseFailedError",
   { ...stackErrorIdentity, completed: Schema.Int, cause: Schema.Defect() },
 ) {
+  get detail(): string {
+    return this.message;
+  }
+
   override get message(): string {
-    // A conflict or a refused push already says which layer and what to do about it.
-    return this.cause instanceof Error && this.cause.message !== ""
-      ? this.cause.message
-      : `Stack rebase stopped at PR #${this.number} after ${this.completed} layers. Earlier updates remain on GitHub; resolve the failing layer before retrying.`;
+    return `Stack rebase stopped at PR #${this.number} after ${this.completed} layers. Earlier updates remain on GitHub; resolve the failing layer before retrying.`;
   }
 }
 
@@ -125,9 +149,41 @@ const decodeBranchAccess = Schema.decodeEffect(
   ),
 );
 
+const decodeRebaseBranch = Schema.decodeEffect(
+  Schema.fromJsonString(
+    Schema.Struct({
+      data: Schema.Struct({
+        processed: Schema.optional(
+          Schema.Array(Schema.NullOr(Schema.Struct({ headRefOid: Schema.String }))),
+        ),
+        repository: Schema.Struct({
+          pullRequest: Schema.Struct({
+            id: Schema.String,
+            headRefOid: Schema.String,
+            baseRef: Schema.Struct({ compare: Schema.Struct({ behindBy: Schema.Int }) }),
+          }),
+        }),
+      }),
+    }),
+  ),
+);
+const decodeRebaseResponse = Schema.decodeEffect(
+  Schema.fromJsonString(
+    Schema.Struct({
+      data: Schema.Struct({
+        updatePullRequestBranch: Schema.Struct({
+          pullRequest: Schema.Struct({ headRefOid: Schema.String }),
+        }),
+      }),
+    }),
+  ),
+);
+
+const encodeNodeIds = Schema.encodeSync(Schema.fromJsonString(Schema.Array(Schema.String)));
+
 const decodeMergeResponse = Schema.decodeEffect(Schema.fromJsonString(MergeResponse));
 
-/** Remote-only updates: a stack rebase works in a scratch clone, never the environment's checkout. */
+/** Remote-only updates: a stack rebase never switches or rewrites the environment's checkout. */
 export const runGitHubStackAction = Effect.fn("runGitHubStackAction")(function* (input: {
   cwd: string;
   repository: string;
@@ -138,7 +194,7 @@ export const runGitHubStackAction = Effect.fn("runGitHubStackAction")(function* 
   action: PullRequestAction;
   mergeMethod?: PullRequestMergeMethod;
 }) {
-  const api = yield* GitHubApi.GitHubApi;
+  const github = yield* GitHubCli.GitHubCli;
   const identity = {
     repository: input.repository,
     number: input.number,
@@ -147,12 +203,11 @@ export const runGitHubStackAction = Effect.fn("runGitHubStackAction")(function* 
   if (input.action !== "merge" && input.action !== "update-branch")
     return yield* new GitHubStackUnsupportedError({ ...identity });
   const endpoint = `repos/${input.repository}`;
-  const read = yield* api.rest({
-    host: input.host,
-    operation: "runGitHubStackAction",
-    path: `${endpoint}/stacks?pull_request=${input.number}`,
+  const read = yield* github.execute({
+    cwd: input.cwd,
+    args: ["api", "--hostname", input.host, `${endpoint}/stacks?pull_request=${input.number}`],
   });
-  const decoded = decodePullRequestStacksJson(read.body);
+  const decoded = decodePullRequestStacksJson(read.stdout);
   if (Result.isFailure(decoded))
     return yield* new GitHubStackResponseInvalidError({ ...identity, cause: decoded.failure });
   const stack = decoded.success;
@@ -188,19 +243,27 @@ export const runGitHubStackAction = Effect.fn("runGitHubStackAction")(function* 
     return yield* new GitHubStackUnsupportedError({ ...identity });
   if (input.action === "update-branch") {
     const [owner, name] = input.repository.split("/");
-    const permissions = yield* api.graphql({
-      host: input.host,
-      operation: "runGitHubStackAction",
-      allowReserve: true,
-      variables: { owner, name },
-      query: `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){${open
-        .map(
-          (layer) =>
-            `pr${layer.number}:pullRequest(number:${layer.number}){headRepository{viewerPermission} maintainerCanModify}`,
-        )
-        .join(" ")}}}`,
+    const permissions = yield* github.execute({
+      cwd: input.cwd,
+      args: [
+        "api",
+        "--hostname",
+        input.host,
+        "graphql",
+        "-f",
+        `owner=${owner}`,
+        "-f",
+        `name=${name}`,
+        "-f",
+        `query=query($owner:String!,$name:String!){repository(owner:$owner,name:$name){${open
+          .map(
+            (layer) =>
+              `pr${layer.number}:pullRequest(number:${layer.number}){headRepository{viewerPermission} maintainerCanModify}`,
+          )
+          .join(" ")}}}`,
+      ],
     });
-    const access = yield* decodeBranchAccess(permissions).pipe(
+    const access = yield* decodeBranchAccess(permissions.stdout).pipe(
       Effect.mapError((cause) => new GitHubStackResponseInvalidError({ ...identity, cause })),
     );
     // viewerCanUpdateBranch is false for an already-current layer, even if rebasing its parent
@@ -216,30 +279,93 @@ export const runGitHubStackAction = Effect.fn("runGitHubStackAction")(function* 
       })
     )
       return yield* new GitHubStackPermissionError({ ...identity });
-    // GitHub's own "Rebase stack" has no API, and its per-PR "update branch" replays the old
-    // copy of every lower layer into the one above it. The cascade moves each layer's own commits.
-    yield* cascadeRebaseStack({
-      host: input.host,
-      repository: input.repository,
-      base: stack.base,
-      layers: open.map((layer) => ({
-        number: layer.number,
-        headBranch: layer.headBranch,
-        headSha: layer.headSha!,
-      })),
-    }).pipe(
-      Effect.mapError((cause) =>
-        cause._tag === "GitHubStackRebaseConflictError" ||
-        cause._tag === "GitHubStackRebaseGitError"
-          ? new GitHubStackRebaseFailedError({
-              ...identity,
-              number: cause.number,
-              completed: cause.completed,
-              cause,
-            })
-          : cause,
-      ),
-    );
+    const processed: Array<{ id: string; number: number; headSha: string }> = [];
+    for (const [index, layer] of open.entries()) {
+      yield* Effect.gen(function* () {
+        const read = yield* github.execute({
+          cwd: input.cwd,
+          args: [
+            "api",
+            "--hostname",
+            input.host,
+            "graphql",
+            "-f",
+            `owner=${owner}`,
+            "-f",
+            `name=${name}`,
+            "-F",
+            `number=${layer.number}`,
+            "-f",
+            `sha=${layer.headSha}`,
+            "-f",
+            `query=query($owner:String!,$name:String!,$number:Int!,$sha:String!){${
+              processed.length === 0
+                ? ""
+                : `processed:nodes(ids:${encodeNodeIds(processed.map((head) => head.id))}){... on PullRequest{headRefOid}}`
+            } repository(owner:$owner,name:$name){pullRequest(number:$number){id headRefOid baseRef{compare(headRef:$sha){behindBy}}}}}`,
+          ],
+        });
+        const {
+          data: {
+            processed: observed,
+            repository: { pullRequest: pr },
+          },
+        } = yield* decodeRebaseBranch(read.stdout);
+        // A push to an earlier layer must not silently become the next layer's new base.
+        const changed = processed.find(
+          (head, index) => observed?.[index]?.headRefOid !== head.headSha,
+        );
+        if (changed !== undefined)
+          return yield* new GitHubStackChangedError({
+            ...identity,
+            number: changed.number,
+            completed: index,
+          });
+        if (pr.headRefOid !== layer.headSha)
+          return yield* new GitHubStackChangedError({
+            ...identity,
+            number: layer.number,
+            completed: index,
+          });
+        if (pr.baseRef.compare.behindBy === 0) {
+          processed.push({ id: pr.id, number: layer.number, headSha: pr.headRefOid });
+          return;
+        }
+        // Pass the reviewed revision to GitHub, including when a push races this read.
+        const updated = yield* github.execute({
+          cwd: input.cwd,
+          args: [
+            "api",
+            "--hostname",
+            input.host,
+            "graphql",
+            "-f",
+            `id=${pr.id}`,
+            "-f",
+            `sha=${layer.headSha}`,
+            "-f",
+            "query=mutation($id:ID!,$sha:GitObjectID!){updatePullRequestBranch(input:{pullRequestId:$id,expectedHeadOid:$sha,updateMethod:REBASE}){pullRequest{headRefOid}}}",
+          ],
+        });
+        const response = yield* decodeRebaseResponse(updated.stdout);
+        processed.push({
+          id: pr.id,
+          number: layer.number,
+          headSha: response.data.updatePullRequestBranch.pullRequest.headRefOid,
+        });
+      }).pipe(
+        Effect.mapError((cause) =>
+          cause._tag === "GitHubStackChangedError"
+            ? cause
+            : new GitHubStackRebaseFailedError({
+                ...identity,
+                number: layer.number,
+                completed: index,
+                cause,
+              }),
+        ),
+      );
+    }
     return;
   }
   if (open.some((layer) => layer.isDraft))
@@ -248,18 +374,24 @@ export const runGitHubStackAction = Effect.fn("runGitHubStackAction")(function* 
     decodeMergeResponse(raw).pipe(
       Effect.mapError((cause) => new GitHubStackResponseInvalidError({ ...identity, cause })),
     );
-  const request = yield* api.rest({
-    host: input.host,
-    operation: "runGitHubStackAction",
-    method: "PUT",
-    path: `${endpoint}/pulls/${input.number}/merge-async`,
-    body: {
-      merge_method: input.mergeMethod ?? "merge",
-      merge_action: "default",
-      sha: target.headSha,
-    },
+  const request = yield* github.execute({
+    cwd: input.cwd,
+    args: [
+      "api",
+      "--hostname",
+      input.host,
+      "--method",
+      "PUT",
+      `${endpoint}/pulls/${input.number}/merge-async`,
+      "-f",
+      `merge_method=${input.mergeMethod ?? "merge"}`,
+      "-f",
+      "merge_action=default",
+      "-f",
+      `sha=${target.headSha}`,
+    ],
   });
-  let result = yield* decode(request.body);
+  let result = yield* decode(request.stdout);
   const deadline = (yield* Clock.currentTimeMillis) + 5 * 60_000;
   for (
     let attempt = 0;
@@ -269,12 +401,16 @@ export const runGitHubStackAction = Effect.fn("runGitHubStackAction")(function* 
     const uuid = result.details.uuid;
     if (!uuid) return yield* new GitHubStackResponseInvalidError({ ...identity });
     yield* Effect.sleep(Math.min(1_000 * 2 ** attempt, 10_000));
-    const poll = yield* api.rest({
-      host: input.host,
-      operation: "runGitHubStackAction",
-      path: `${endpoint}/pulls/${input.number}/merge-async/${encodeURIComponent(uuid)}`,
+    const poll = yield* github.execute({
+      cwd: input.cwd,
+      args: [
+        "api",
+        "--hostname",
+        input.host,
+        `${endpoint}/pulls/${input.number}/merge-async/${encodeURIComponent(uuid)}`,
+      ],
     });
-    result = yield* decode(poll.body);
+    result = yield* decode(poll.stdout);
   }
   if (result.status === "pending") return yield* new GitHubStackMergePendingError({ ...identity });
   if (result.status === "failed")

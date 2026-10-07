@@ -20,7 +20,6 @@ import {
  * key is bound.
  *
  * @layer
- * @product Tax
  * @provides Stripe.UpdateTaxSettings
  */
 export const UpdateTaxSettingsHttp = Layer.effect(

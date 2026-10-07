@@ -4,7 +4,7 @@ import * as ConfigProvider from "effect/ConfigProvider";
 import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
-import * as Base64Url from "effect/encoding/Base64Url";
+import * as Encoding from "effect/Encoding";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -12,8 +12,8 @@ import * as Queue from "effect/Queue";
 import * as Schema from "effect/Schema";
 import * as Terminal from "effect/Terminal";
 import * as TestClock from "effect/testing/TestClock";
-import * as HttpClient from "effect/http/HttpClient";
-import * as HttpClientResponse from "effect/http/HttpClientResponse";
+import * as HttpClient from "effect/unstable/http/HttpClient";
+import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 
 import * as CliTokenManager from "./CliTokenManager.ts";
 
@@ -36,8 +36,10 @@ const TestIdTokenPayloadJson = Schema.fromJsonString(Schema.Struct({ email: Sche
 const encodeTestIdTokenHeader = Schema.encodeSync(TestIdTokenHeaderJson);
 const encodeTestIdTokenPayload = Schema.encodeSync(TestIdTokenPayloadJson);
 const idTokenWithEmail = (() => {
-  const header = Base64Url.encode(encodeTestIdTokenHeader({ alg: "none" }));
-  const payload = Base64Url.encode(encodeTestIdTokenPayload({ email: "theo@example.test" }));
+  const header = Encoding.encodeBase64Url(encodeTestIdTokenHeader({ alg: "none" }));
+  const payload = Encoding.encodeBase64Url(
+    encodeTestIdTokenPayload({ email: "theo@example.test" }),
+  );
   return `${header}.${payload}.`;
 })();
 
@@ -137,7 +139,7 @@ const tokenGranted = {
   }),
 };
 
-const layerDeviceFlow = (server: DeviceFlowServer) =>
+const makeDeviceFlowLayer = (server: DeviceFlowServer) =>
   Layer.succeed(
     HttpClient.HttpClient,
     HttpClient.make((request) =>
@@ -177,7 +179,7 @@ it.layer(NodeServices.layer)("CliTokenManager.deviceAuthorizationLogin", (it) =>
         Effect.sync(() => {
           prompts.push(prompt);
         }),
-      ).pipe(Effect.provide(layerDeviceFlow(server)), provideTestEnv, Effect.forkChild);
+      ).pipe(Effect.provide(makeDeviceFlowLayer(server)), provideTestEnv, Effect.forkChild);
 
       yield* TestClock.adjust(Duration.seconds(10));
       const { token, identity } = yield* Fiber.join(fiber);
@@ -219,7 +221,7 @@ it.layer(NodeServices.layer)("CliTokenManager.deviceAuthorizationLogin", (it) =>
       };
 
       const fiber = yield* CliTokenManager.deviceAuthorizationLogin(() => Effect.void).pipe(
-        Effect.provide(layerDeviceFlow(server)),
+        Effect.provide(makeDeviceFlowLayer(server)),
         provideTestEnv,
         Effect.forkChild,
       );
@@ -245,7 +247,7 @@ it.layer(NodeServices.layer)("CliTokenManager.deviceAuthorizationLogin", (it) =>
       };
 
       const fiber = yield* CliTokenManager.deviceAuthorizationLogin(() => Effect.void).pipe(
-        Effect.provide(layerDeviceFlow(server)),
+        Effect.provide(makeDeviceFlowLayer(server)),
         provideTestEnv,
         Effect.forkChild,
       );
@@ -270,7 +272,7 @@ it.layer(NodeServices.layer)("CliTokenManager.deviceAuthorizationLogin", (it) =>
       };
 
       const fiber = yield* CliTokenManager.deviceAuthorizationLogin(() => Effect.void).pipe(
-        Effect.provide(layerDeviceFlow(server)),
+        Effect.provide(makeDeviceFlowLayer(server)),
         provideTestEnv,
         Effect.flip,
         Effect.forkChild,
@@ -291,7 +293,7 @@ it.layer(NodeServices.layer)("CliTokenManager.deviceAuthorizationLogin", (it) =>
       };
 
       const fiber = yield* CliTokenManager.deviceAuthorizationLogin(() => Effect.void).pipe(
-        Effect.provide(layerDeviceFlow(server)),
+        Effect.provide(makeDeviceFlowLayer(server)),
         provideTestEnv,
         Effect.flip,
         Effect.forkChild,
@@ -311,7 +313,7 @@ it.layer(NodeServices.layer)("CliTokenManager.deviceAuthorizationLogin", (it) =>
       };
 
       const fiber = yield* CliTokenManager.deviceAuthorizationLogin(() => Effect.void).pipe(
-        Effect.provide(layerDeviceFlow(server)),
+        Effect.provide(makeDeviceFlowLayer(server)),
         provideTestEnv,
         Effect.flip,
         Effect.forkChild,

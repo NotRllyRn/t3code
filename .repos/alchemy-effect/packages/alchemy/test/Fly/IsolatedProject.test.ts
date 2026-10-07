@@ -4,7 +4,7 @@ import { expect } from "alchemy-test";
 import * as Effect from "effect/Effect";
 import { MinimumLogLevel } from "effect/References";
 import * as Schedule from "effect/Schedule";
-import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClient from "effect/unstable/http/HttpClient";
 import {
   materializeIsolatedProject,
   removeIsolatedProject,
@@ -68,16 +68,7 @@ test.provider(
         yield* removeIsolatedProject(serviceProject);
       }
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:fly",
-      "provider:fly:app",
-      "provider:fly:ipassignment",
-      "provider:fly:service",
-      "live",
-    ],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test.provider(
@@ -102,13 +93,5 @@ test.provider(
         yield* removeIsolatedProject(spriteProject);
       }
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:fly",
-      "provider:fly:service",
-      "provider:fly:sprite",
-      "live",
-    ],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );

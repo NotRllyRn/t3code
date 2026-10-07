@@ -188,7 +188,6 @@ export type TaxSettings = Resource<
  * ```
  *
  * @resource
- * @product Tax
  */
 export const TaxSettings = Resource<TaxSettings>("Stripe.TaxSettings");
 

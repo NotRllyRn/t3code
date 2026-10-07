@@ -22,7 +22,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:healthlake", "live"] },
 );
 
 // The provider's delete already waits until the data store is gone; this
@@ -107,8 +106,5 @@ test.provider.skipIf(!process.env.AWS_TEST_HEALTHLAKE)(
       yield* assertDatastoreGone(datastore.datastoreId);
     }),
   // create (~15-30 min) + tag sync + delete wait-until-gone, one test.
-  {
-    tags: ["provider:aws", "provider:aws:healthlake", "live"],
-    timeout: 5_400_000,
-  },
+  { timeout: 5_400_000 },
 );

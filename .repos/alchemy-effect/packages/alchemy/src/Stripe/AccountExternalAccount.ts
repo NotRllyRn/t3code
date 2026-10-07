@@ -179,7 +179,6 @@ export type AccountExternalAccount = Resource<
  * ```
  *
  * @resource
- * @product Account
  */
 export const AccountExternalAccount = Resource<AccountExternalAccount>(
   "Stripe.AccountExternalAccount",

@@ -83,7 +83,6 @@ test.provider.skipIf(lbEnabled)(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  { tags: ["provider:cloudflare", "provider:cloudflare:loadbalancer", "live"] },
 );
 
 test.provider.skipIf(!lbEnabled)(
@@ -160,10 +159,7 @@ test.provider.skipIf(!lbEnabled)(
 
       yield* expectGone(accountId, initial.pool.poolId);
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:loadbalancer", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // Account-collection list: enumerate every pool in the account and assert
@@ -193,8 +189,5 @@ test.provider.skipIf(!lbEnabled)(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:loadbalancer", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

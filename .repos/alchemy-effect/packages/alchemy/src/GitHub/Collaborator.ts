@@ -122,7 +122,6 @@ export interface Collaborator extends Resource<
  * ```
  *
  * @resource
- * @product Repository
  */
 export const Collaborator = Resource<Collaborator>("GitHub.Collaborator", {
   defaultRemovalPolicy: "retain",

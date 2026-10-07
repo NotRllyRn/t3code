@@ -51,43 +51,25 @@ type MessagesHandler<Req> = (
  * );
  * ```
  */
-export function consumeQueueMessages<
-  Q extends Queue,
-  Req = never,
-  ResourceReq = never,
->(
-  queue: Q | Effect.Effect<Q, never, ResourceReq>,
+export function consumeQueueMessages<Q extends Queue, Req = never>(
+  queue: Q,
   process: MessagesHandler<Req>,
-): Effect.Effect<void, never, QueueEventSource | ResourceReq>;
-export function consumeQueueMessages<
-  Q extends Queue,
-  Req = never,
-  ResourceReq = never,
->(
-  queue: Q | Effect.Effect<Q, never, ResourceReq>,
+): Effect.Effect<void, never, QueueEventSource>;
+export function consumeQueueMessages<Q extends Queue, Req = never>(
+  queue: Q,
   props: MessagesProps,
   process: MessagesHandler<Req>,
-): Effect.Effect<void, never, QueueEventSource | ResourceReq>;
-export function consumeQueueMessages<
-  Q extends Queue,
-  Req = never,
-  ResourceReq = never,
->(
-  queue: Q | Effect.Effect<Q, never, ResourceReq>,
+): Effect.Effect<void, never, QueueEventSource>;
+export function consumeQueueMessages<Q extends Queue, Req = never>(
+  queue: Q,
   propsOrProcess: MessagesProps | MessagesHandler<Req>,
   maybeProcess?: MessagesHandler<Req>,
-): Effect.Effect<void, never, QueueEventSource | ResourceReq> {
+): Effect.Effect<void, never, QueueEventSource> {
   const [props, process] =
     typeof propsOrProcess === "function"
       ? [{} as MessagesProps, propsOrProcess]
       : [propsOrProcess, maybeProcess!];
-  // Accept the queue or the Effect that declares it, like bindings do.
-  const resolved = Effect.isEffect(queue) ? queue : Effect.succeed(queue);
-  return resolved.pipe(
-    Effect.flatMap((value) =>
-      QueueEventSource.use((source) => source(value, props, process)),
-    ),
-  );
+  return QueueEventSource.use((source) => source(queue, props, process));
 }
 
 /**

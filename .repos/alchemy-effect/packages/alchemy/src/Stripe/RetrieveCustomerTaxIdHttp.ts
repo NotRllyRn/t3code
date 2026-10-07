@@ -17,7 +17,6 @@ import {
  * retrieve takes both `customer` and `id`.
  *
  * @layer
- * @product Customer
  * @provides Stripe.RetrieveCustomerTaxId
  */
 export const RetrieveCustomerTaxIdHttp = Layer.effect(

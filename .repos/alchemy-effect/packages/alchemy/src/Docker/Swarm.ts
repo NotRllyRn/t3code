@@ -123,7 +123,6 @@ export interface Swarm extends Resource<
  * ```
  *
  * @resource
- * @product Swarm
  */
 export const Swarm = Resource<Swarm>("Docker.Swarm");
 

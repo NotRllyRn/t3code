@@ -4,7 +4,7 @@ import {
   Virtualizer,
   type FileContents,
 } from "@pierre/diffs";
-import { Editor, TextDocument } from "@pierre/diffs/edit";
+import { Editor, TextDocument } from "@pierre/diffs/editor";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 const renderingManagerUrl = new URL(
@@ -22,20 +22,9 @@ class MeasuredElement {
   children: MeasuredElement[] = [];
   dataset: Record<string, string> = {};
   nextElementSibling: MeasuredElement | null = null;
-  shadowRoot: MeasuredElement | null = null;
   width = 283;
 
   constructor(readonly height = 0) {}
-
-  attachShadow() {
-    this.shadowRoot ??= new MeasuredElement();
-    return this.shadowRoot;
-  }
-
-  appendChild(child: MeasuredElement) {
-    this.children.push(child);
-    return child;
-  }
 
   getBoundingClientRect() {
     MeasuredElement.geometryReads += 1;
@@ -119,10 +108,8 @@ class LayoutVirtualizer extends Virtualizer {
 
 class MeasuredFile extends VirtualizedFile {
   override top = 0;
-  // Rows are measured by hand here; the virtualizer only needs to reconcile them.
-  override onRender = () => false;
 
-  override __attachEditor(editor: Parameters<VirtualizedFile["__attachEditor"]>[0]) {
+  override attachEditor(editor: Parameters<VirtualizedFile["attachEditor"]>[0]) {
     this.editor = editor;
     return () => {
       this.editor = undefined;
@@ -130,9 +117,7 @@ class MeasuredFile extends VirtualizedFile {
   }
 
   async initialize(file: FileContents) {
-    this.updateCodeViewLayout(file, 0);
-    // Document changes require the session an attached editor installs.
-    (this as unknown as { installEditSession(file: FileContents): void }).installEditSession(file);
+    this.prepareCodeViewItem(file, 0);
     await this.fileRenderer.initializeHighlighter();
     expect(
       this.fileRenderer.renderFile(file, {
@@ -195,7 +180,7 @@ class MeasuredFile extends VirtualizedFile {
 }
 
 const instances: MeasuredFile[] = [];
-const editors: Editor<"file", undefined, undefined>[] = [];
+const editors: Editor<undefined>[] = [];
 
 beforeAll(async () => {
   await getSharedHighlighter({
@@ -240,7 +225,7 @@ async function makeFixture(
     cacheKey: `wrapped:${overflow}`,
     lang: "text",
   };
-  const document = new TextDocument<"file", undefined>(file.name, contents, "text");
+  const document = new TextDocument(file.name, contents, "text");
   const instance = new MeasuredFile(
     {
       overflow,
@@ -289,7 +274,7 @@ describe("wrapped editor document changes", () => {
     const before = instance.getLinePosition(previousLastLine);
     expect(before).toEqual({ top: 120328, height: 60 });
     const viewport = { top: before!.top - 100, bottom: before!.top + 80 };
-    expect(instance.getAdvancedStickySpecs(viewport)).toEqual({ topOffset: 118240, height: 2096 });
+    expect(instance.getAdvancedStickySpecs(viewport)).toEqual({ topOffset: 118240, height: 2156 });
 
     append();
 
@@ -297,7 +282,7 @@ describe("wrapped editor document changes", () => {
     expect(instance.getLinePosition(previousLastLine)).toEqual({ top: before!.top, height: 20 });
     expect(instance.getLinePosition(document.lineCount)).toEqual({ top: 120348, height: 20 });
     expect(instance.getVirtualizedHeight()).toBe(120376);
-    expect(instance.getAdvancedStickySpecs(viewport)).toEqual({ topOffset: 118240, height: 2096 });
+    expect(instance.getAdvancedStickySpecs(viewport)).toEqual({ topOffset: 118240, height: 2136 });
   });
 
   it("invalidates changed and shifted rows after an insertion in the middle", async () => {
@@ -388,7 +373,7 @@ describe("wrapped editor document changes", () => {
     const { instance, file, append } = await makeFixture();
     append();
     instance.setMetrics({ hunkLineCount: 50, lineHeight: 24, diffHeaderHeight: 44, spacing: 8 });
-    instance.updateCodeViewLayout(file, 0);
+    instance.prepareCodeViewItem(file, 0);
     expect(instance.getLinePosition(6001)).toEqual({ top: 144008, height: 24 });
   });
 
@@ -396,7 +381,7 @@ describe("wrapped editor document changes", () => {
     const { instance, file, append } = await makeFixture();
     append();
     instance.setLineAnnotations([{ lineNumber: 10, metadata: undefined }]);
-    instance.updateCodeViewLayout(file, 0);
+    instance.prepareCodeViewItem(file, 0);
     expect(instance.getLinePosition(6001)).toEqual({ top: 120008, height: 20 });
   });
 });
@@ -491,11 +476,11 @@ describe("wrapped measurement widths", () => {
       "document",
       Object.assign(new EditorElement(), { createElement: () => new EditorElement() }),
     );
-    const first = new Editor("file");
+    const first = new Editor<undefined>();
     editors.push(first);
     first.edit(instance);
     first.cleanUp();
-    const second = new Editor("file");
+    const second = new Editor<undefined>();
     editors.push(second);
     second.edit(instance);
     instance.resizeContent(482.25);
@@ -546,14 +531,10 @@ class EditorElement extends MeasuredElement {
   style: Record<string, string> = {};
   parentElement: EditorElement | null = null;
 
-  override appendChild(child: EditorElement) {
+  appendChild(child: EditorElement) {
     child.parentElement = this;
     this.children.push(child);
     return child;
-  }
-
-  append(child: EditorElement) {
-    this.appendChild(child);
   }
 
   prepend(child: EditorElement) {
@@ -649,15 +630,14 @@ async function makeEditorFixture(lineCount: number) {
     langs: ["text"],
     preferredHighlighter: "shiki-wasm",
   });
-  const editor = new Editor("file");
+  const editor = new Editor<undefined>();
   editors.push(editor);
   editor.edit(instance);
-  editor.__syncRenderView({
-    highlighter,
-    fileContainer: measuredElement(host),
-    file,
-    lineAnnotations: undefined,
-    renderRange: { startingLine: 0, totalLines: 1, bufferBefore: 0, bufferAfter: 0 },
+  editor.__syncRenderView(highlighter, measuredElement(host), file, undefined, {
+    startingLine: 0,
+    totalLines: 1,
+    bufferBefore: 0,
+    bufferAfter: 0,
   });
   const append = (count: number) => {
     const lines = editor.getText().split("\n");

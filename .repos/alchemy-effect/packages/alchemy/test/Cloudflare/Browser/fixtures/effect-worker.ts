@@ -1,8 +1,8 @@
 import * as Cloudflare from "@/Cloudflare";
 import * as Effect from "effect/Effect";
 import * as Stream from "effect/Stream";
-import { HttpServerRequest } from "effect/http/HttpServerRequest";
-import * as HttpServerResponse from "effect/http/HttpServerResponse";
+import { HttpServerRequest } from "effect/unstable/http/HttpServerRequest";
+import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 
 const TARGET_URL = "https://example.com";
 
@@ -56,11 +56,10 @@ export default class BrowserEffectWorker extends Cloudflare.Worker<BrowserEffect
           }
           case "/scrape": {
             const scrape = yield* browser
-              // example.com has no heading; its only link reads "Learn more".
-              .scrape({ url: TARGET_URL, elements: [{ selector: "a" }] })
+              .scrape({ url: TARGET_URL, elements: [{ selector: "h1" }] })
               .pipe(Effect.orDie);
             return yield* HttpServerResponse.json({
-              text: scrape.result[0]?.results[0]?.text ?? null,
+              heading: scrape.result[0]?.results[0]?.text ?? null,
             });
           }
           case "/snapshot": {

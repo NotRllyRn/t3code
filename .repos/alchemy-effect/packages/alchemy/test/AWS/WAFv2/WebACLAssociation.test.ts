@@ -77,7 +77,6 @@ test.provider(
         expect(result.failure._tag).toBe("WAFNonexistentItemException");
       }
     }),
-  { tags: ["provider:aws", "provider:aws:wafv2", "live"] },
 );
 
 // Live lifecycle is gated: associating a FRESHLY CREATED web ACL (or
@@ -147,13 +146,5 @@ test.provider.skipIf(!process.env.AWS_TEST_WAF_ASSOCIATION)(
     }),
   // First associate can wait up to ~150s for the fresh user pool to
   // propagate to WAF (retryUnavailableEntityLong).
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:appsync",
-      "provider:aws:wafv2",
-      "live",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

@@ -13,7 +13,7 @@ interface Pool {
   readonly id: number;
 }
 
-describe("makeExecutionMemo", { tags: ["unit", "local"] }, () => {
+describe("makeExecutionMemo", () => {
   it.effect(
     "builds at most once per execution scope and releases at scope close",
     () =>

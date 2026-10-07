@@ -97,5 +97,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertDeleted(set.regexPatternSetName, set.regexPatternSetId);
     }),
-  { tags: ["provider:aws", "provider:aws:wafv2", "live"], timeout: 120_000 },
+  { timeout: 120_000 },
 );

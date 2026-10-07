@@ -1,29 +1,24 @@
-import { Query } from "@distilled.cloud/core/query";
-import {
-  CredentialsFromToken,
-  GraphQLLive,
-  Railway,
-  type GqlTransport,
-} from "@distilled.cloud/railway";
+import * as railway from "@distilled.cloud/railway";
+import { CredentialsFromToken } from "@distilled.cloud/railway";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schedule from "effect/Schedule";
-import * as FetchHttpClient from "effect/http/FetchHttpClient";
+import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 
 /** Dashboard host used by `railway login --browserless` pairing URLs. */
 export const RAILWAY_CLI_LOGIN_HOST = "https://railway.com";
 
 /**
- * Build the Railway CLI pairing URL for a `loginSessionCreate`
+ * Build the Railway CLI pairing URL for a {@link railway.createLoginSession}
  * code.
  *
  * Mirrors `railway login --browserless`: the payload is
  * `wordCode={code}&hostname={hostname}` (URL-safe base64) on
  * `https://railway.com/cli-login?d=…`. The user confirms the pairing code
- * in the browser; `loginSessionAuth` is the dashboard-side
- * mutation that marks the session authorized. `loginSessionVerify`
+ * in the browser; {@link railway.loginSessionAuth} is the dashboard-side
+ * mutation that marks the session authorized. {@link railway.verifyLoginSession}
  * is a liveness check (true while the pairing session exists). The CLI then
- * polls `loginSessionConsume` until a token is returned.
+ * polls {@link railway.loginSessionConsume} until a token is returned.
  *
  * Alchemy's AuthProvider `method: "oauth"` runs this flow: create → print
  * the pairing URL → poll consume → store the token.
@@ -31,7 +26,7 @@ export const RAILWAY_CLI_LOGIN_HOST = "https://railway.com";
  * ### Pairing URL
  * **Example:** From a session code
  * ```typescript
- * const code = yield* createLoginSession();
+ * const code = yield* railway.createLoginSession({});
  * const url = loginSessionUrl(code, { hostname: "dev-box" });
  * ```
  */
@@ -62,36 +57,21 @@ const anonymousRailwayCredentials = (apiBaseUrl?: string) =>
 
 const anonymousRailway = (apiBaseUrl?: string) =>
   Layer.mergeAll(
-    GraphQLLive,
     anonymousRailwayCredentials(apiBaseUrl),
     FetchHttpClient.layer,
   );
 
 export const provideAnonymousRailway = <A, E>(
-  effect: Effect.Effect<A, E, GqlTransport>,
+  effect: Effect.Effect<A, E, railway.GraphQLRequirements>,
   apiBaseUrl?: string,
 ): Effect.Effect<A, E> =>
   effect.pipe(Effect.provide(anonymousRailway(apiBaseUrl)));
 
 const LOGIN_POLL_TIMES = 300;
 
-export const createLoginSession = Query.fn(() => Railway.loginSessionCreate());
-
-export const cancelLoginSession = Query.fn((code: string) =>
-  Railway.loginSessionCancel({ code }),
-);
-
-const verifyLoginSession = Query.fn((code: string) =>
-  Railway.loginSessionVerify({ code }),
-);
-
-const consumeLoginSession = Query.fn((code: string) =>
-  Railway.loginSessionConsume({ code }),
-);
-
 /**
- * Poll `loginSessionVerify` then
- * `loginSessionConsume` until a token is returned, or 5 minutes
+ * Poll {@link railway.verifyLoginSession} then
+ * {@link railway.loginSessionConsume} until a token is returned, or 5 minutes
  * elapse. Mirrors `railway login --browserless`: consume is the token source;
  * verify is a liveness check. Does not cancel the session — the caller should
  * cancel on timeout or interrupt.
@@ -99,13 +79,15 @@ const consumeLoginSession = Query.fn((code: string) =>
  * Exhaustion returns `undefined` (not a failure) so the AuthProvider can
  * surface a timeout rather than a poll error.
  */
+const missingSession = ["RailwayNotFound"] as const;
+
 export const pollLoginSessionToken = (code: string) =>
-  verifyLoginSession(code).pipe(
-    Effect.catchTag("RailwayNotFound", () => Effect.succeed(false)),
+  railway.verifyLoginSession({ code }).pipe(
+    railway.catchTags(missingSession, () => Effect.succeed(false)),
     Effect.flatMap(() =>
-      consumeLoginSession(code).pipe(
-        Effect.catchTag("RailwayNotFound", () => Effect.succeed(null)),
-      ),
+      railway
+        .loginSessionConsume({ code })
+        .pipe(railway.catchTags(missingSession, () => Effect.succeed(null))),
     ),
     Effect.map((token) =>
       token != null && token.length > 0 ? token : undefined,

@@ -134,7 +134,6 @@ export type PaymentMethodDomain = Resource<
  * ```
  *
  * @resource
- * @product Payment Methods
  */
 export const PaymentMethodDomain = Resource<PaymentMethodDomain>(
   "Stripe.PaymentMethodDomain",

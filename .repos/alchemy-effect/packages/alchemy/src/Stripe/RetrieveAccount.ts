@@ -24,7 +24,6 @@ export interface RetrieveAccountRequest extends Omit<
  * ```
  *
  * @binding
- * @product Account
  */
 export interface RetrieveAccount extends Binding.Service<
   RetrieveAccount,

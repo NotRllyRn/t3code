@@ -9,7 +9,7 @@ import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as Schedule from "effect/Schedule";
 import * as Stream from "effect/Stream";
-import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClient from "effect/unstable/http/HttpClient";
 import { fileURLToPath } from "node:url";
 import { TestFunction, TestFunctionLive } from "./handler.ts";
 
@@ -98,10 +98,7 @@ test.provider(
       Effect.tap(() => stack.destroy()),
       Effect.onError(() => stack.destroy().pipe(Effect.ignore)),
     ),
-  {
-    tags: ["provider:aws", "provider:aws:iam", "provider:aws:lambda", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 test.provider(
@@ -157,7 +154,7 @@ test.provider(
       Effect.tap(() => stack.destroy()),
       Effect.onError(() => stack.destroy().pipe(Effect.ignore)),
     ),
-  { tags: ["provider:aws", "provider:aws:lambda", "live"], timeout: 360_000 },
+  { timeout: 360_000 },
 );
 
 test.provider(
@@ -205,7 +202,7 @@ test.provider(
       Effect.tap(() => stack.destroy()),
       Effect.onError(() => stack.destroy().pipe(Effect.ignore)),
     ),
-  { tags: ["provider:aws", "provider:aws:lambda", "live"], timeout: 360_000 },
+  { timeout: 360_000 },
 );
 
 test.provider(
@@ -273,7 +270,7 @@ test.provider(
       Effect.tap(() => stack.destroy()),
       Effect.onError(() => stack.destroy().pipe(Effect.ignore)),
     ),
-  { tags: ["provider:aws", "provider:aws:lambda", "live"], timeout: 360_000 },
+  { timeout: 360_000 },
 );
 
 test.provider(
@@ -312,7 +309,7 @@ test.provider(
       Effect.tap(() => stack.destroy()),
       Effect.onError(() => stack.destroy().pipe(Effect.ignore)),
     ),
-  { tags: ["provider:aws", "provider:aws:lambda", "live"], timeout: 360_000 },
+  { timeout: 360_000 },
 );
 
 test.provider(
@@ -366,7 +363,7 @@ test.provider(
       Effect.tap(() => stack.destroy()),
       Effect.onError(() => stack.destroy().pipe(Effect.ignore)),
     ),
-  { tags: ["provider:aws", "provider:aws:lambda", "live"], timeout: 360_000 },
+  { timeout: 360_000 },
 );
 
 // Canonical `list()` test (AWS account/region-scoped collection): deploy a
@@ -401,7 +398,7 @@ test.provider(
       Effect.tap(() => stack.destroy()),
       Effect.onError(() => stack.destroy().pipe(Effect.ignore)),
     ),
-  { tags: ["provider:aws", "provider:aws:lambda", "live"], timeout: 180_000 },
+  { timeout: 180_000 },
 );
 
 test.provider(
@@ -497,7 +494,7 @@ test.provider(
       Effect.tap(() => stack.destroy()),
       Effect.onError(() => stack.destroy().pipe(Effect.ignore)),
     ),
-  { tags: ["provider:aws", "provider:aws:lambda", "live"], timeout: 360_000 },
+  { timeout: 360_000 },
 );
 
 const assertFunctionReady = Effect.fn(function* (

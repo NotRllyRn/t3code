@@ -113,15 +113,7 @@ test.provider(
       const deactivated = yield* GetTaxRegistration({ id: created.id });
       expect(deactivated.status).toEqual("expired");
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:stripe",
-      "provider:stripe:taxregistration",
-      "provider:stripe:taxsettings",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -153,15 +145,7 @@ test.provider(
       const expired = yield* waitUntilExpired(deployed.id);
       expect(expired).toEqual("expired");
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:stripe",
-      "provider:stripe:taxregistration",
-      "provider:stripe:taxsettings",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 test.provider(
@@ -207,13 +191,5 @@ test.provider(
       const gone = yield* waitUntilExpired(replaced.id);
       expect(gone).toEqual("expired");
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:stripe",
-      "provider:stripe:taxregistration",
-      "provider:stripe:taxsettings",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

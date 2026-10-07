@@ -29,7 +29,7 @@ const makeSchema = () => {
     description: z.string().min(1).max(500),
     price: z.number().min(1).max(10000),
     discount: z.number().min(1).max(100).nullable(),
-    quantity: z.number().min(1).max(10),
+    quantity: z.number().min(0).max(10),
     tags: z.array(z.string().min(1).max(30)),
     images: z.array(image),
     ratings: z.array(rating)
@@ -46,10 +46,7 @@ const parsingCase = (input, success) => () => {
   const options = { jitless: true }
   return {
     run: () => schema.safeParse(input, options),
-    validate: (result) => {
-      assert.equal(result.success, success)
-      if (success) assert.deepEqual(result.data, validData)
-    }
+    validate: (result) => assert.equal(result.success, success)
   }
 }
 
@@ -63,7 +60,6 @@ const standardCase = (input, success) => () => {
     validate: (result) => {
       assert.equal(typeof result?.then, "undefined")
       assert.equal(result.issues === undefined, success)
-      if (success) assert.deepEqual(result.value, validData)
     }
   }
 }

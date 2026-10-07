@@ -86,13 +86,5 @@ test.provider.skipIf(!process.env.AWS_TEST_SLOW)(
       yield* assertReplicationGroupGone(restored.cache.replicationGroupId);
       yield* deleteSnapshot();
     }).pipe(Effect.ensuring(deleteSnapshot().pipe(Effect.ignore))),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:ec2",
-      "provider:aws:elasticache",
-      "live",
-    ],
-    timeout: 2_700_000,
-  },
+  { timeout: 2_700_000 },
 );

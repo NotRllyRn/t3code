@@ -124,5 +124,5 @@ test.provider(
         );
       expect(namespaceGone).toBe(true);
     }),
-  { tags: ["provider:aws", "provider:aws:cloudmap", "live"], timeout: 240_000 },
+  { timeout: 240_000 },
 );

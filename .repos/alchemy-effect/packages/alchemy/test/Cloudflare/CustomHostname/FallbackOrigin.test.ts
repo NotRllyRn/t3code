@@ -109,30 +109,25 @@ const isGone = (
 // Cloudflare for SaaS (`SaasAccessNotGranted` / `Forbidden`). This read-only
 // assertion ALWAYS runs — on an unentitled account every zone is skipped and
 // the result is a well-typed empty `FallbackOriginAttributes[]`.
-test.provider(
-  "list enumerates fallback origins across all zones",
-  (stack) =>
-    Effect.gen(function* () {
-      yield* stack.destroy();
+test.provider("list enumerates fallback origins across all zones", (stack) =>
+  Effect.gen(function* () {
+    yield* stack.destroy();
 
-      const provider = yield* Provider.findProvider(
-        Cloudflare.CustomHostname.FallbackOrigin,
-      );
-      const all = yield* provider.list();
+    const provider = yield* Provider.findProvider(
+      Cloudflare.CustomHostname.FallbackOrigin,
+    );
+    const all = yield* provider.list();
 
-      // Well-typed `FallbackOriginAttributes[]`: each element matches the
-      // shape `read` produces.
-      expect(Array.isArray(all)).toBe(true);
-      for (const item of all) {
-        expect(typeof item.zoneId).toBe("string");
-        expect(typeof item.origin).toBe("string");
-      }
+    // Well-typed `FallbackOriginAttributes[]`: each element matches the
+    // shape `read` produces.
+    expect(Array.isArray(all)).toBe(true);
+    for (const item of all) {
+      expect(typeof item.zoneId).toBe("string");
+      expect(typeof item.origin).toBe("string");
+    }
 
-      yield* stack.destroy();
-    }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:customhostname", "live"],
-  },
+    yield* stack.destroy();
+  }).pipe(logLevel),
 );
 
 // Entitlement-gated: when Cloudflare for SaaS is provisioned, deploy a
@@ -174,10 +169,7 @@ testSaas(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:customhostname", "live"],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );
 
 testSaas(
@@ -279,8 +271,5 @@ testSaas(
       );
       expect(isGone(gone)).toBe(true);
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:customhostname", "live"],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );

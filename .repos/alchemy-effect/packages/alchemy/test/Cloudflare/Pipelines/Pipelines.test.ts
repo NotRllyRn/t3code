@@ -182,10 +182,7 @@ test.provider(
       // Destroy again — delete must be idempotent.
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:pipelines", "live"],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );
 
 interface EtlOpts {
@@ -292,13 +289,5 @@ test.provider(
       // Destroy again — deletes must be idempotent.
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:pipelines",
-      "provider:cloudflare:r2",
-      "live",
-    ],
-    timeout: 600_000,
-  },
+  { timeout: 600_000 },
 );

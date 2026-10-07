@@ -148,9 +148,16 @@ export const SAMLProviderProvider = () =>
         arns,
         (samlProviderArn) =>
           Effect.gen(function* () {
-            const response = yield* iam.getSAMLProvider({
-              SAMLProviderArn: samlProviderArn,
-            });
+            const response = yield* iam
+              .getSAMLProvider({ SAMLProviderArn: samlProviderArn })
+              .pipe(
+                Effect.catchTag("NoSuchEntityException", () =>
+                  Effect.succeed(undefined),
+                ),
+              );
+            if (!response) {
+              return undefined;
+            }
             const tags = yield* iam.listSAMLProviderTags({
               SAMLProviderArn: samlProviderArn,
             });
@@ -162,12 +169,7 @@ export const SAMLProviderProvider = () =>
               assertionEncryptionMode: response.AssertionEncryptionMode,
               tags: toTagRecord(tags.Tags),
             };
-          }).pipe(
-            // A provider can disappear between listing, reading and tag lookup.
-            Effect.catchTag("NoSuchEntityException", () =>
-              Effect.succeed(undefined),
-            ),
-          ),
+          }),
         { concurrency: 10 },
       );
       return rows.filter((row) => row !== undefined);

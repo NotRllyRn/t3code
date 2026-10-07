@@ -10,7 +10,7 @@ const { test } = Test.make({
   state: inMemoryState(),
 });
 
-describe("Alchemy.Random", { tags: ["unit", "local"] }, () => {
+describe("Alchemy.Random", () => {
   test.provider("list returns [] for the non-listable random secret", (stack) =>
     Effect.gen(function* () {
       yield* stack.destroy();

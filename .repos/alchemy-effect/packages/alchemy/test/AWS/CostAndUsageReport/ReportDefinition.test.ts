@@ -52,7 +52,6 @@ test.provider(
       const response = yield* pin(cur.describeReportDefinitions({}));
       expect(Array.isArray(response.ReportDefinitions ?? [])).toBe(true);
     }),
-  { tags: ["provider:aws", "provider:aws:costandusagereport", "live"] },
 );
 
 const REPORT_NAME = "alchemy-test-cur-report";
@@ -201,13 +200,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertReportGone(REPLACED_REPORT_NAME);
     }),
-  {
-    tags: [
-      "provider:aws",
-      "provider:aws:costandusagereport",
-      "provider:aws:s3",
-      "live",
-    ],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

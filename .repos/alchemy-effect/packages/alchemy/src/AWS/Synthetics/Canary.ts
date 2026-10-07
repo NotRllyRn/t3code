@@ -556,14 +556,11 @@ export const CanaryProvider = () =>
             ),
           );
 
-      const waitForBackingResourceGone = <
-        E extends { readonly _tag: string },
-        R,
-      >(
+      const waitForBackingResourceGone = (
         canaryName: string,
         resource: "LambdaFunction" | "LogGroup",
         identifier: string,
-        exists: Effect.Effect<boolean, E, R>,
+        exists: Effect.Effect<boolean, any, any>,
       ) =>
         exists.pipe(
           Effect.flatMap((visible) =>

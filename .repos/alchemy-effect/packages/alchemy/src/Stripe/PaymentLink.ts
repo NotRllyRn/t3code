@@ -256,7 +256,6 @@ export type PaymentLink = Resource<
  * ```
  *
  * @resource
- * @product Checkout
  */
 export const PaymentLink = Resource<PaymentLink>("Stripe.PaymentLink");
 

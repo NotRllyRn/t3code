@@ -171,16 +171,7 @@ test.provider(
       yield* stack.destroy();
       yield* expectLegacyPipelineGone(accountId, pipeline.name);
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:pipelines",
-      "provider:cloudflare:r2",
-      "provider:cloudflare:worker",
-      "live",
-    ],
-    timeout: 420_000,
-  },
+  { timeout: 420_000 },
 );
 
 test.provider(
@@ -263,15 +254,7 @@ test.provider(
       // Destroy again — delete must be idempotent.
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:pipelines",
-      "provider:cloudflare:r2",
-      "live",
-    ],
-    timeout: 420_000,
-  },
+  { timeout: 420_000 },
 );
 
 // The list endpoint returns truncated summary items
@@ -317,13 +300,5 @@ test.provider.skipIf(!process.env.CLOUDFLARE_TEST_LEGACY_PIPELINE_LIST)(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:cloudflare",
-      "provider:cloudflare:pipelines",
-      "provider:cloudflare:r2",
-      "live",
-    ],
-    timeout: 300_000,
-  },
+  { timeout: 300_000 },
 );

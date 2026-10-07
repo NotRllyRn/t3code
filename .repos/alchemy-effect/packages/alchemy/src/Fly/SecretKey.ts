@@ -174,7 +174,6 @@ const SecretKeyResource = Resource<SecretKey>("Fly.SecretKey");
  * ```
  *
  * @resource
- * @product Secret Key
  */
 export const SecretKey: typeof SecretKeyResource = Object.assign(
   (

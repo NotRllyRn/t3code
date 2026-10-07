@@ -22,7 +22,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:networkfirewall", "live"] },
 );
 
 const suricataV1 =
@@ -147,10 +146,7 @@ test.provider(
       yield* assertRuleGroupGone(stateless.ruleGroupArn);
       yield* assertRuleGroupGone(stateful.ruleGroupArn);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:networkfirewall", "live"],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );
 
 test.provider(
@@ -187,8 +183,5 @@ test.provider(
       yield* stack.destroy();
       yield* assertRuleGroupGone(second.group.ruleGroupArn);
     }),
-  {
-    tags: ["provider:aws", "provider:aws:networkfirewall", "live"],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

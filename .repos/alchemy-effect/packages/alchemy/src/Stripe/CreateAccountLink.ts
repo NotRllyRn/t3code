@@ -27,7 +27,6 @@ import type { RuntimeContext } from "../RuntimeContext.ts";
  * ```
  *
  * @binding
- * @product Account
  */
 export interface CreateAccountLink extends Binding.Service<
   CreateAccountLink,

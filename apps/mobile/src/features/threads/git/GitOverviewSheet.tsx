@@ -55,18 +55,6 @@ type GitOverviewSheetProps = StaticScreenProps<{
 };
 
 export function GitOverviewSheet(props: GitOverviewSheetProps) {
-  const navigation = useNavigation();
-  const { environmentId, threadId } = props.route.params;
-  // A hand-typed deep link can carry a blank ID, which the branded IDs reject.
-  const isBlankLink = environmentId.trim().length === 0 || threadId.trim().length === 0;
-  useEffect(() => {
-    if (isBlankLink) navigation.goBack();
-  }, [isBlankLink, navigation]);
-  if (isBlankLink) return null;
-  return <GitOverviewSheetContent {...props} />;
-}
-
-function GitOverviewSheetContent(props: GitOverviewSheetProps) {
   const { layout } = useAdaptiveWorkspaceLayout();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
@@ -294,7 +282,7 @@ function GitOverviewSheetContent(props: GitOverviewSheetProps) {
         <SheetListRow
           icon="text.bubble"
           title="Review changes"
-          subtitle="Inspect changes, uncommitted edits, and turn diffs"
+          subtitle="Inspect turn diffs, worktree changes, and base branch diff"
           disabled={busy || !isRepo}
           onPress={() => {
             const params = { environmentId, threadId };
@@ -351,7 +339,7 @@ function GitOverviewSheetContent(props: GitOverviewSheetProps) {
                   <SheetListRow
                     icon="arrow.triangle.pull"
                     title={`#${link.number} ${link.snapshot?.title ?? "Pull request"}`}
-                    subtitle={`${link.repository} · ${link.snapshot === null ? "Status pending" : link.snapshot.isDraft && link.snapshot.state === "open" ? "Draft" : link.snapshot.state}${link.watch === undefined ? "" : " · Watching"}`}
+                    subtitle={`${link.repository} · ${link.snapshot === null ? "Status pending" : link.snapshot.isDraft && link.snapshot.state === "open" ? "Draft" : link.snapshot.state}`}
                     onPress={() => {
                       void tryOpenExternalUrl(link.url, "pull-request").then((opened) => {
                         if (!opened)

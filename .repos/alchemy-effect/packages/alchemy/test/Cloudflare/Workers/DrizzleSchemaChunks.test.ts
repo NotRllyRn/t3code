@@ -5,7 +5,7 @@ import * as Test from "@/Test/Alchemy";
 import { expect } from "alchemy-test";
 import * as Effect from "effect/Effect";
 import * as Schedule from "effect/Schedule";
-import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClient from "effect/unstable/http/HttpClient";
 import { fileURLToPath } from "node:url";
 
 const fixtureMain = fileURLToPath(
@@ -81,10 +81,7 @@ test(
     );
     expect(body).toContain('"ok":true');
   }),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:worker", "live"],
-    timeout: 180_000,
-  },
+  { timeout: 180_000 },
 );
 
 /**
@@ -127,8 +124,5 @@ test.provider(
 
       yield* stack.destroy();
     }),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:worker", "live"],
-    timeout: 240_000,
-  },
+  { timeout: 240_000 },
 );

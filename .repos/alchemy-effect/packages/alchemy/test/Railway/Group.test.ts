@@ -1,5 +1,4 @@
-import { Query } from "@distilled.cloud/core/query";
-import { Railway as RailwayApi } from "@distilled.cloud/railway";
+import * as railway from "@distilled.cloud/railway";
 import * as Provider from "@/Provider";
 import * as Railway from "@/Railway";
 import { projectGroups } from "@/Railway/GraphQL.ts";
@@ -37,39 +36,28 @@ const asGroupMap = (value: unknown): Record<string, { name?: string }> => {
   return out;
 };
 
-const readEnvironmentConfig = Query.fn((id: string, projectId: string) => ({
-  config: RailwayApi.environment({ id, projectId }).config,
-}));
-
-const readServiceGroup = Query.fn((id: string) => {
-  const service = RailwayApi.service({ id });
-  return { id: service.id, groupId: service.groupId };
-});
-
 const readConfigGroups = (environmentId: string, projectId: string) =>
-  readEnvironmentConfig(environmentId, projectId).pipe(
+  railway.environment({ id: environmentId, projectId }, { config: true }).pipe(
     Effect.map((env) => asGroupMap(env.config)),
-    Effect.catchTag("RailwayNotFound", () =>
+    railway.catchTags(["RailwayNotFound"], () =>
       Effect.succeed({} as Record<string, { name?: string }>),
     ),
   );
 
 const readProjectGroups = (projectId: string) =>
-  projectGroups(projectId, (group) => ({
-    id: group.id,
-    groupId: group.groupId,
-    name: group.name,
-  })).pipe(
+  projectGroups(projectId, { id: true, groupId: true, name: true }).pipe(
     Effect.map((groups) =>
       groups.filter((group) => group.name != null && group.name.length > 0),
     ),
-    Effect.catchTag("RailwayNotFound", () => Effect.succeed([])),
+    railway.catchTags(["RailwayNotFound"], () => Effect.succeed([])),
   );
 
 const readService = (serviceId: string) =>
-  readServiceGroup(serviceId).pipe(
-    Effect.catchTag("RailwayNotFound", () => Effect.succeed(undefined)),
-  );
+  railway
+    .service({ id: serviceId }, { id: true, groupId: true })
+    .pipe(
+      railway.catchTags(["RailwayNotFound"], () => Effect.succeed(undefined)),
+    );
 
 const waitUntilGroupGone = (
   projectId: string,
@@ -207,15 +195,5 @@ test.provider(
       );
       expect(groupGone).toEqual("gone");
     }).pipe(logLevel),
-  {
-    tags: [
-      "provider:railway",
-      "provider:railway:group",
-      "provider:railway:project",
-      "provider:railway:projectenvironment",
-      "provider:railway:service",
-      "live",
-    ],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

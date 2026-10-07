@@ -8,7 +8,6 @@ import { makeHttpStripeAccountBinding } from "./StripeHttp.ts";
  * Function or Worker Effect.
  *
  * @layer
- * @product Customer
  * @provides Stripe.CreateCustomer
  */
 export const CreateCustomerHttp = Layer.effect(

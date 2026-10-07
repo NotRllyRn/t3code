@@ -86,10 +86,7 @@ test.provider.skipIf(entitled)(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:intel", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // Canonical `list()` test (account collection). Enumeration is NOT gated by
@@ -116,10 +113,7 @@ test.provider(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:intel", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // Requires a Cloudforce One feed-provider account to create the feed under
@@ -152,10 +146,7 @@ test.provider.skipIf(!entitled)(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:intel", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // Requires a Cloudforce One feed-provider account — unentitled accounts fail with
@@ -236,10 +227,7 @@ test.provider.skipIf(!entitled)(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:intel", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );
 
 // Requires a Cloudflare feed-provider account (typed IndicatorFeedsNotEntitled otherwise);
@@ -302,8 +290,5 @@ test.provider.skipIf(!entitled)(
 
       yield* stack.destroy();
     }).pipe(logLevel),
-  {
-    tags: ["provider:cloudflare", "provider:cloudflare:intel", "live"],
-    timeout: 120_000,
-  },
+  { timeout: 120_000 },
 );

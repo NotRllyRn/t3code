@@ -31,7 +31,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:finspace", "live"] },
 );
 
 test.provider(
@@ -54,7 +53,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:finspace", "live"] },
 );
 
 test.provider(
@@ -69,7 +67,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:finspace", "live"] },
 );
 
 test.provider(
@@ -84,7 +81,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:finspace", "live"] },
 );
 
 test.provider(
@@ -100,7 +96,6 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:finspace", "live"] },
 );
 
 test.provider(
@@ -115,5 +110,4 @@ test.provider(
       );
       expect(error._tag).toBe("ResourceNotFoundException");
     }),
-  { tags: ["provider:aws", "provider:aws:finspace", "live"] },
 );

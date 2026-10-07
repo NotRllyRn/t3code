@@ -1,20 +1,15 @@
-import * as loadBalancers from "@distilled.cloud/hetzner/load_balancers";
-import * as zoneRrsets from "@distilled.cloud/hetzner/zone_rrsets";
 import * as Hetzner from "@/Hetzner";
 import * as Alchemy from "@/index.ts";
 import * as Test from "@/Test/Alchemy";
-import { CredentialsFromEnv } from "@distilled.cloud/hetzner";
-import * as firewalls from "@distilled.cloud/hetzner/firewalls";
-import * as servers from "@distilled.cloud/hetzner/servers";
-import * as volumes from "@distilled.cloud/hetzner/volumes";
+import { CredentialsFromEnv, Services } from "@distilled.cloud/hetzner";
 import { expect } from "alchemy-test";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { MinimumLogLevel } from "effect/References";
 import * as Schedule from "effect/Schedule";
-import * as FetchHttpClient from "effect/http/FetchHttpClient";
-import * as HttpClient from "effect/http/HttpClient";
+import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
+import * as HttpClient from "effect/unstable/http/HttpClient";
 import Api from "./fixtures/app/api.ts";
 import {
   API_PORT,
@@ -111,19 +106,19 @@ test.skipIf(!hasHetznerCreds)(
     expect(out.apiUrl).toContain(out.serverIpv4);
 
     const liveServer = yield* distilled(
-      servers.getServer({ id: out.serverId }),
+      Services.servers.getServer({ id: out.serverId }),
     );
     expect(liveServer.server?.id).toEqual(out.serverId);
     expect(liveServer.server?.public_net.ipv4?.ip).toEqual(out.serverIpv4);
 
     const liveVolume = yield* distilled(
-      volumes.getVolume({ id: out.volumeId }),
+      Services.volumes.getVolume({ id: out.volumeId }),
     );
     expect(liveVolume.volume.server).toEqual(out.serverId);
     expect(liveVolume.volume.linux_device).toMatch(/^\/dev\//);
 
     const liveFirewall = yield* distilled(
-      firewalls.getFirewall({ id: out.firewallId }),
+      Services.firewalls.getFirewall({ id: out.firewallId }),
     );
     expect(liveFirewall.firewall.applied_to).toEqual(
       expect.arrayContaining([
@@ -149,7 +144,7 @@ test.skipIf(!hasHetznerCreds)(
     );
 
     const liveLb = yield* distilled(
-      loadBalancers.getLoadBalancer({ id: out.lbId }),
+      Services.loadBalancers.getLoadBalancer({ id: out.lbId }),
     );
     expect(liveLb.load_balancer.public_net.ipv4.ip).toEqual(out.lbIpv4);
     expect(liveLb.load_balancer.targets).toEqual(
@@ -162,7 +157,7 @@ test.skipIf(!hasHetznerCreds)(
     );
 
     const liveRecord = yield* distilled(
-      zoneRrsets.getZoneRrset({
+      Services.zoneRrsets.getZoneRrset({
         id_or_name: String(out.zoneId),
         rr_name: out.recordName,
         rr_type: out.recordType,
@@ -193,20 +188,5 @@ test.skipIf(!hasHetznerCreds)(
     expect(body.path).toEqual(VOLUME_PATH);
     expect(body.text).toEqual(MARKER);
   }).pipe(logLevel),
-  {
-    tags: [
-      "provider:hetzner",
-      "provider:hetzner:firewall",
-      "provider:hetzner:loadbalancer",
-      "provider:hetzner:mountvolume",
-      "provider:hetzner:recordset",
-      "provider:hetzner:server",
-      "provider:hetzner:service",
-      "provider:hetzner:volume",
-      "provider:hetzner:zone",
-      "live",
-    ],
-    timeout: 180_000,
-    exclusive: true,
-  },
+  { timeout: 180_000, exclusive: true },
 );

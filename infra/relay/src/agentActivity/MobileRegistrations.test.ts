@@ -9,7 +9,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Logger from "effect/Logger";
 import * as Redacted from "effect/Redacted";
-import { FetchHttpClient } from "effect/http";
+import { FetchHttpClient } from "effect/unstable/http";
 
 import * as Devices from "./Devices.ts";
 import * as AgentActivityRows from "./AgentActivityRows.ts";
@@ -18,11 +18,11 @@ import * as EnvironmentLinks from "../environments/EnvironmentLinks.ts";
 import * as LiveActivities from "./LiveActivities.ts";
 import * as RelayConfiguration from "../Config.ts";
 import * as AgentActivityPublisher from "./AgentActivityPublisher.ts";
-import * as FcmDeliveries from "./FcmDeliveries.ts";
+import { FcmDeliveries } from "./FcmDeliveries.ts";
 
-const layerPublisher = AgentActivityPublisher.layer.pipe(
+const publisherLayer = AgentActivityPublisher.layer.pipe(
   Layer.provide(
-    Layer.succeed(FcmDeliveries.FcmDeliveries, {
+    Layer.succeed(FcmDeliveries, {
       enqueue: () => Effect.succeed(null),
       process: () => Effect.void,
     }),
@@ -116,8 +116,6 @@ function makeEnvironmentLinks(
       ]),
     listForUser: () => Effect.succeed([]),
     getForUser: () => Effect.succeed(null),
-    findActiveManagedForEnvironment: () => Effect.succeed([]),
-    setHoldWebhooksWhileOffline: () => Effect.void,
     revokeForUser: () => Effect.succeed(false),
     ...overrides,
   };
@@ -153,13 +151,13 @@ const config = RelayConfiguration.RelayConfiguration.of({
   managedEndpointNamespace: undefined,
 });
 
-function layerRegistrationReplay(input: {
+function makeRegistrationReplayLayer(input: {
   readonly devices: Devices.Devices["Service"];
   readonly liveActivities: LiveActivities.LiveActivities["Service"];
   readonly queuedJobs: Array<SignedApnsDeliveryJob>;
 }) {
   return MobileRegistrations.layer.pipe(
-    Layer.provide(layerPublisher),
+    Layer.provide(publisherLayer),
     Layer.provide(
       ApnsDeliveries.layer.pipe(
         Layer.provide(ApnsClient.layer.pipe(Layer.provide(ApnsProviderTokens.layer))),
@@ -490,7 +488,7 @@ describe("MobileRegistrations", () => {
         expect(registeredDevices).toHaveLength(1);
         expect(queuedStarts).toEqual([]);
         expect(queuedJobs).toEqual([]);
-      }).pipe(Effect.provide(layerRegistrationReplay({ devices, liveActivities, queuedJobs })));
+      }).pipe(Effect.provide(makeRegistrationReplayLayer({ devices, liveActivities, queuedJobs })));
     },
   );
 });
