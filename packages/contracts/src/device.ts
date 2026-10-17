@@ -466,6 +466,17 @@ export const DeviceToolTargetInput = Schema.Struct({
     }),
   ),
   hostId: Schema.optional(DeviceHostId),
+  includeImage: Schema.optional(
+    Schema.Boolean.annotate({
+      description: "Include a bounded model-facing screenshot. Defaults to false.",
+    }),
+  ),
+  imageDetail: Schema.optional(
+    Schema.Literals(["model", "original"]).annotate({
+      description:
+        "Use original only for OCR or fine detail; it embeds the full PNG in conversation history. Defaults to model (JPEG, at most 1280px and 500 KiB).",
+    }),
+  ),
 });
 export type DeviceToolTargetInput = typeof DeviceToolTargetInput.Type;
 

@@ -145,7 +145,13 @@ export const PreviewSnapshotTool = safeBrowserTool(
       includeImage: Schema.optional(
         Schema.Boolean.annotate({
           description:
-            "Include the PNG image in the tool response. Defaults to false. Set true only when you need to see the page.",
+            "Include a bounded model-facing image in the tool response. Defaults to false. Set true only when you need to see the page.",
+        }),
+      ),
+      imageDetail: Schema.optional(
+        Schema.Literals(["model", "original"]).annotate({
+          description:
+            "Use original only for OCR or fine detail; it embeds the full PNG in conversation history. Defaults to model (JPEG, at most 1280px and 500 KiB).",
         }),
       ),
       save: Schema.optional(

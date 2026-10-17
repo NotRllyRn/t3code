@@ -86,6 +86,11 @@ const layerPullRequestsTest = McpHttpServer.layerPullRequestsToolkit.pipe(
   ),
 );
 
+const png = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADUlEQVQImWP4////fwAJ+wP9CNHoHgAAAABJRU5ErkJggg==",
+  "base64",
+);
+
 const snapshotResult = {
   url: "http://example.test/",
   title: "Example",
@@ -98,7 +103,7 @@ const snapshotResult = {
   actionTimeline: [],
   screenshot: {
     mimeType: "image/png",
-    data: Buffer.from("png").toString("base64"),
+    data: png.toString("base64"),
     width: 10,
     height: 5,
   },
@@ -261,7 +266,7 @@ it.effect.each([
       const broker = yield* PreviewAutomationBroker.PreviewAutomationBroker;
       const connected = yield* Deferred.make<void>();
       const png =
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=";
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADUlEQVQImWP4////fwAJ+wP9CNHoHgAAAABJRU5ErkJggg==";
       const page = {
         url: "http://example.test/",
         loading: false,
@@ -340,8 +345,8 @@ it.effect.each([
             ? [
                 {
                   type: "image",
-                  mimeType: "image/png",
-                  data: new Uint8Array(Buffer.from(png, "base64")),
+                  mimeType: "image/jpeg",
+                  data: expect.any(Uint8Array),
                 },
               ]
             : []),
@@ -429,7 +434,7 @@ it.effect("saves the snapshot PNG on request and reports its path", () =>
       expect(path.basename(screenshotPath!)).toMatch(
         /^browser-screenshot-example-test-[0-9a-z]+-[0-9a-f]{8}\.png$/,
       );
-      expect(Buffer.from(yield* fileSystem.readFile(screenshotPath!)).toString()).toBe("png");
+      expect(Buffer.from(yield* fileSystem.readFile(screenshotPath!))).toEqual(png);
       const [, text] = snapshot.content;
       expect(text?.type === "text" ? text.text : "").toContain(screenshotPath);
 
@@ -439,7 +444,7 @@ it.effect("saves the snapshot PNG on request and reports its path", () =>
       const pathOnly = yield* callSnapshot({ save: true });
       const saved = pathOnly.structuredContent as { readonly screenshotPath: string };
       expect(saved).toEqual({ url: snapshotResult.url, screenshotPath: expect.any(String) });
-      expect(Buffer.from(yield* fileSystem.readFile(saved.screenshotPath)).toString()).toBe("png");
+      expect(Buffer.from(yield* fileSystem.readFile(saved.screenshotPath))).toEqual(png);
       const [only, ...others] = pathOnly.content;
       expect(others).toEqual([]);
       expect(only?.type === "text" ? decodeJsonText(only.text) : null).toEqual(saved);

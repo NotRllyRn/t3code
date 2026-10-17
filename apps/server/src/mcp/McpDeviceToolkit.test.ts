@@ -76,12 +76,12 @@ const state = {
   hubBasePath: "/api/device-hub",
   revision: 1,
 };
-const png = new Uint8Array(24);
-new DataView(png.buffer).setUint32(0, 0x89504e47);
-new DataView(png.buffer).setUint32(4, 0x0d0a1a0a);
-new DataView(png.buffer).setUint32(12, 0x49484452);
-new DataView(png.buffer).setUint32(16, 1206);
-new DataView(png.buffer).setUint32(20, 2622);
+const png = new Uint8Array(
+  Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADUlEQVQImWP4////fwAJ+wP9CNHoHgAAAABJRU5ErkJggg==",
+    "base64",
+  ),
+);
 
 const layerDeviceServiceMock = Layer.mock(DeviceService.DeviceService)({
   state: Effect.succeed(state),
@@ -145,10 +145,19 @@ it.effect("registers the device tools and returns the screenshot as image conten
         .callTool({ name: "device_screenshot", arguments: { deviceId: "UDID-1" } })
         .pipe(callWith(["device"]), Effect.provideService(McpSchema.McpServerClient, client));
       expect(shot.isError).toBe(false);
-      expect(shot.content.map((entry) => entry.type)).toEqual(["text", "image"]);
+      expect(shot.content.map((entry) => entry.type)).toEqual(["text"]);
       expect(shot.structuredContent).toMatchObject({
-        screenshot: { mimeType: "image/png", width: 1206, height: 2622 },
+        screenshot: { mimeType: "image/png", width: 1, height: 1 },
       });
+
+      const visible = yield* server
+        .callTool({
+          name: "device_screenshot",
+          arguments: { deviceId: "UDID-1", includeImage: true },
+        })
+        .pipe(callWith(["device"]), Effect.provideService(McpSchema.McpServerClient, client));
+      expect(visible.content.map((entry) => entry.type)).toEqual(["text", "image"]);
+      expect(visible.content.at(-1)).toMatchObject({ type: "image", mimeType: "image/jpeg" });
 
       const foreign = yield* server
         .callTool({ name: "device_screenshot", arguments: { deviceId: "UDID-2" } })

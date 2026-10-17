@@ -62,7 +62,7 @@ const DeviceOpenTool = Tool.make("device_open", {
 
 export const DeviceScreenshotTool = Tool.make("device_screenshot", {
   description:
-    "Capture the current screen of an open device as a PNG image. Use it to see what the user sees; for taps and text use the agent-device CLI.",
+    "Inspect the current screen of an open device. Set includeImage=true only when you need to see it; for taps and text use the agent-device CLI.",
   parameters: DeviceToolTargetInput,
   success: DeviceToolScreenshotResult,
   failure: DeviceToolFailure,

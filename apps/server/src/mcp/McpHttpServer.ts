@@ -36,6 +36,7 @@ import { ThreadToolkit } from "./toolkits/thread/tools.ts";
 import * as ThreadHandlers from "./toolkits/thread/handlers.ts";
 import * as ThreadMetadataMcpService from "./ThreadMetadataMcpService.ts";
 import * as McpSessionRegistry from "./McpSessionRegistry.ts";
+import { modelImage } from "./modelImage.ts";
 import * as PreviewAutomationBroker from "./PreviewAutomationBroker.ts";
 import * as OrchestratorHandlers from "./toolkits/orchestrator/handlers.ts";
 import { OrchestratorToolkit } from "./toolkits/orchestrator/tools.ts";
@@ -481,6 +482,11 @@ const registerPreviewSnapshot = Effect.fn("McpHttpServer.registerPreviewSnapshot
               // Images stay out of tool history unless asked for: providers replay them on every
               // later request, and some reject inline images outright.
               const includeImage = payload?.includeImage === true;
+              const visibleImage = includeImage
+                ? yield* Effect.promise(() =>
+                    modelImage(png, payload?.imageDetail === "original" ? "original" : "model"),
+                  )
+                : undefined;
               if (screenshotPath !== undefined && !includeImage) {
                 const saved = {
                   url: cutText(snapshot.url, MAX_SNAPSHOT_IDENTIFIER_CHARS),
@@ -524,8 +530,14 @@ const registerPreviewSnapshot = Effect.fn("McpHttpServer.registerPreviewSnapshot
                           text: `Snapshot text was bounded. Omitted: ${bounded.omitted.join("; ")}.`,
                         },
                       ]),
-                  ...(includeImage
-                    ? [{ type: "image" as const, data: png, mimeType: screenshot.mimeType }]
+                  ...(visibleImage
+                    ? [
+                        {
+                          type: "image" as const,
+                          data: visibleImage.data,
+                          mimeType: visibleImage.mimeType,
+                        },
+                      ]
                     : []),
                 ],
               });
@@ -646,38 +658,48 @@ const registerImageTool = <T extends Tool.Any, E, R>(
             Effect.provideService(McpInvocationContext.McpInvocationContext, invocation),
             Effect.matchCauseEffect({
               onFailure: imageToolFailure(tool.name, operation, failureText),
-              onSuccess: ({ encodedResult }) => {
-                const { screenshot, ...rest } = encodedResult as ImageToolResult;
-                const includeImage =
-                  (payload as { readonly includeImage?: boolean } | undefined)?.includeImage !==
-                  false;
-                const metadata = {
-                  ...rest,
-                  screenshot: {
-                    mimeType: screenshot.mimeType,
-                    width: screenshot.width,
-                    height: screenshot.height,
-                  },
-                };
-                return Effect.succeed(
-                  new McpSchema.CallToolResult({
+              onSuccess: ({ encodedResult }) =>
+                Effect.gen(function* () {
+                  const { screenshot, ...rest } = encodedResult as ImageToolResult;
+                  const includeImage =
+                    (payload as { readonly includeImage?: boolean } | undefined)?.includeImage ===
+                    true;
+                  const visibleImage = includeImage
+                    ? yield* Effect.promise(() =>
+                        modelImage(
+                          new Uint8Array(Buffer.from(screenshot.data, "base64")),
+                          (payload as { readonly imageDetail?: string } | undefined)
+                            ?.imageDetail === "original"
+                            ? "original"
+                            : "model",
+                        ),
+                      )
+                    : undefined;
+                  const metadata = {
+                    ...rest,
+                    screenshot: {
+                      mimeType: screenshot.mimeType,
+                      width: screenshot.width,
+                      height: screenshot.height,
+                    },
+                  };
+                  return new McpSchema.CallToolResult({
                     isError: false,
                     structuredContent: metadata,
                     content: [
-                      { type: "text", text: JSON.stringify(metadata) },
-                      ...(includeImage
+                      { type: "text", text: encodeJsonText(metadata) },
+                      ...(visibleImage
                         ? [
                             {
                               type: "image" as const,
-                              data: new Uint8Array(Buffer.from(screenshot.data, "base64")),
-                              mimeType: screenshot.mimeType,
+                              data: visibleImage.data,
+                              mimeType: visibleImage.mimeType,
                             },
                           ]
                         : []),
                     ],
-                  }),
-                );
-              },
+                  });
+                }),
             }),
           );
         }),
