@@ -96,6 +96,42 @@ const noSpawn = ChildProcessSpawner.make(() =>
 const encodeCredentials = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
 
 it.layer(layerTest)("CodexDriver", (it) => {
+  it.effect("rejects partial broker configuration", () =>
+    Effect.gen(function* () {
+      const result = yield* CodexDriver.create({
+        instanceId: ProviderInstanceId.make("codex-broker-invalid"),
+        displayName: "Codex test",
+        enabled: false,
+        environment: [{ name: "CODEX_BROKER_URL", value: "https://broker.test", sensitive: false }],
+        config: CodexDriver.defaultConfig(),
+      }).pipe(Effect.result);
+
+      expect(result._tag).toBe("Failure");
+      if (result._tag === "Failure") {
+        expect(result.failure.detail).toContain(
+          "CODEX_BROKER_URL and CODEX_BROKER_CLIENT_KEY must be configured together",
+        );
+      }
+    }).pipe(Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, noSpawn), Effect.scoped),
+  );
+
+  it.effect("does not expose reset-credit redemption in broker mode", () =>
+    Effect.gen(function* () {
+      const instance = yield* CodexDriver.create({
+        instanceId: ProviderInstanceId.make("codex-broker"),
+        displayName: "Codex test",
+        enabled: false,
+        environment: [
+          { name: "CODEX_BROKER_URL", value: "https://broker.test", sensitive: false },
+          { name: "CODEX_BROKER_CLIENT_KEY", value: "secret", sensitive: true },
+        ],
+        config: CodexDriver.defaultConfig(),
+      });
+
+      expect(instance.consumeResetCredit).toBeUndefined();
+    }).pipe(Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, noSpawn), Effect.scoped),
+  );
+
   it.effect("disconnect refreshes a restored managed account while its auth flow is idle", () =>
     Effect.gen(function* () {
       const instanceId = ProviderInstanceId.make("restored-managed-account");

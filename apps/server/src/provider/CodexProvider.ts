@@ -598,7 +598,11 @@ const makePendingCodexProvider = (
     });
   });
 
-function accountProbeStatus({ account, rateLimits, brokerManaged }: CodexAppServerProviderSnapshot): {
+function accountProbeStatus({
+  account,
+  rateLimits,
+  brokerManaged,
+}: CodexAppServerProviderSnapshot): {
   readonly status: Exclude<ServerProviderState, "disabled">;
   readonly auth: ServerProvider["auth"];
   readonly message?: string;

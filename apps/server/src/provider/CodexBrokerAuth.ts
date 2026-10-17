@@ -1,3 +1,4 @@
+// @effect-diagnostics nodeBuiltinImport:off
 import * as NodeCrypto from "node:crypto";
 
 import * as Duration from "effect/Duration";
@@ -20,7 +21,7 @@ import {
 
 const REFRESH_TIMEOUT = Duration.seconds(8);
 
-export class CodexBrokerPoolExhaustedError extends Schema.TaggedErrorClass<CodexBrokerPoolExhaustedError>()(
+export class CodexBrokerPoolExhaustedError extends Schema.TaggedError<CodexBrokerPoolExhaustedError>()(
   "CodexBrokerPoolExhaustedError",
   {
     message: Schema.String,

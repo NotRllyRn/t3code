@@ -66,6 +66,8 @@ import type * as ProviderContinuationRequests from "@t3tools/provider-core/serve
 import * as CodexAdapterV2 from "./CodexAdapterV2.ts";
 import { makeReplayServerConfig, withCodexReplayChildMetadata } from "./CodexAdapterV2.testkit.ts";
 import * as CodexAdapterV2Testkit from "./CodexAdapterV2.testkit.ts";
+import type { CodexBrokerIntegration } from "../../provider/CodexBrokerAuth.ts";
+import type { CodexBrokerLease } from "../../provider/CodexBrokerClient.ts";
 
 const encodeUnknownJson = Schema.encodeUnknownSync(Schema.fromJsonString(Schema.Unknown));
 const replayTranscriptJson = Schema.fromJsonString(CodexReplay.CodexAppServerReplayTranscript);
@@ -1756,6 +1758,7 @@ describe("CodexAdapterV2 session initialize", () => {
   const openReplaySession = (
     transcript: CodexReplay.CodexAppServerReplayTranscript,
     beforeEmitInbound?: CodexReplay.CodexAppServerReplayDriver["beforeEmitInbound"],
+    brokerIntegration?: CodexBrokerIntegration,
   ) =>
     Effect.gen(function* () {
       const driver = yield* CodexReplay.makeReplayDriver(
@@ -1797,6 +1800,7 @@ describe("CodexAdapterV2 session initialize", () => {
         fileSystem: yield* FileSystem.FileSystem,
         idAllocator: yield* IdAllocator.IdAllocatorV2,
         serverConfig: yield* makeReplayServerConfig(transcript.scenario).pipe(Effect.orDie),
+        ...(brokerIntegration ? { brokerIntegration } : {}),
       });
       const runtime = yield* adapter.openSession({
         threadId: ThreadId.make(`thread-${transcript.scenario}`),
@@ -1817,6 +1821,59 @@ describe("CodexAdapterV2 session initialize", () => {
 
   const replayPreamble = (nativeThreadId: string) =>
     codexReplayPreamble({ nativeThreadId, nativeTurnId: "unused", prompt: "unused" });
+
+  it.effect("authenticates broker sessions after initialization", () =>
+    Effect.gen(function* () {
+      const calls: string[] = [];
+      const lease: CodexBrokerLease = {
+        status: "ok",
+        accountId: "account",
+        accountLabel: "Account",
+        accessToken: "token",
+        chatgptAccountId: "chatgpt-account",
+        expiresAt: "2099-01-01T00:00:00Z",
+        shortRemainingPercent: 90,
+        weeklyRemainingPercent: 80,
+        shortResetsAt: null,
+        weeklyResetsAt: null,
+      };
+      const brokerIntegration: CodexBrokerIntegration = {
+        instanceId: "broker",
+        client: { health: Effect.void, route: () => Effect.succeed(lease) },
+        acquireEphemeralAuth: () => Effect.die("unused"),
+        newEphemeralSession: () => Effect.die("unused"),
+        newInteractiveSession: (threadId) =>
+          Effect.sync(() => {
+            calls.push(`route:${threadId}`);
+            return {
+              brokerSessionId: "broker-session",
+              lease: Effect.succeed(lease),
+              applyLogin: () => Effect.sync(() => calls.push("login")),
+              registerRefreshHandler: () => Effect.sync(() => calls.push("refresh")),
+              beginLogicalTurn: () => Effect.succeed({ lease, accountChanged: false }),
+              reportTerminalFailure: () => Effect.succeed({ lease, accountChanged: false }),
+              completeLogicalTurn: () => Effect.void,
+            };
+          }),
+      };
+      const session = yield* openReplaySession(
+        makeCodexReplayTranscript({
+          scenario: "broker-auth",
+          entries: replayPreamble("broker-auth"),
+        }),
+        undefined,
+        brokerIntegration,
+      );
+
+      yield* session.ensureThread("thread-broker-auth");
+      assert.deepEqual(calls, ["route:thread-broker-auth", "refresh", "login"]);
+    }).pipe(
+      Effect.scoped,
+      Effect.provide(
+        Layer.mergeAll(IdAllocator.layer, McpProviderSessions.layer, NodeServices.layer),
+      ),
+    ),
+  );
 
   it.effect("sends one initialize when two threads start on a fresh session at once", () =>
     Effect.gen(function* () {
